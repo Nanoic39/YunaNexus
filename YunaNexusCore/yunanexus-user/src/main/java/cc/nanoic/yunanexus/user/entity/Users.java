@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
 
 @Data
 @TableName("Users")
@@ -44,10 +44,10 @@ public class Users {
     /**
      * 账号创建时间戳
      */
-    private Timestamp create_time;
+    private LocalDateTime createTime;
 
     /**
      * 账号更新时间戳
      */
-    private Timestamp update_time;
+    private LocalDateTime updateTime;
 }
