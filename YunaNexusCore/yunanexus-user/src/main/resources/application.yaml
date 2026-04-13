@@ -1,6 +1,6 @@
 spring:
   application:
-    name: YunaNexusUserService # 服务名称
+    name: YunaNexus-UserService # 服务名称
   # 环境激活（Maven自动注入）
   profiles:
     active: @spring.profiles.active@
@@ -11,10 +11,13 @@ mybatis-plus:
   type-aliases-package: cc.nanoic.yunanexus.user.entity
   configuration:
     map-underscore-to-camel-case: true # 下划线转驼峰：开启
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 日志实现类
   global-config:
     db-config:
       id-type: auto
 
 server:
   port: 8100 # 端口
+custom:
+  time:
+    time-zone: Asia/Shanghai
