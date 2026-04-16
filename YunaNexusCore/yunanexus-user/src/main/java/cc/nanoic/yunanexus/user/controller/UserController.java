@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.user.controller;
 
 import cc.nanoic.yunanexus.user.common.Result;
+import cc.nanoic.yunanexus.user.entity.DTO.RegisterDTO;
 import cc.nanoic.yunanexus.user.entity.ServiceVersion;
 import cc.nanoic.yunanexus.user.entity.VO.PingVO;
 import cc.nanoic.yunanexus.user.service.PingService;
@@ -8,9 +9,7 @@ import cc.nanoic.yunanexus.user.service.UsersService;
 import cc.nanoic.yunanexus.user.utils.FormatTime;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.lang.management.ManagementFactory;
 import java.time.LocalDateTime;
@@ -33,8 +32,10 @@ public class UserController {
 
     /**
      * PING!
+     * TODO: 接口待删除
      * @return PingVO
      */
+    @Deprecated(since = "1.0.0", forRemoval = true)
     @GetMapping("/ping")
     public Result<PingVO> ping() {
 
@@ -59,5 +60,12 @@ public class UserController {
         pingVO.setRunTimeDesc(formatTime.formatMillis2String(runTimeMillis));
 
         return Result.success(pingVO);
+    }
+
+    @PostMapping("/register")
+    public Result<?> register(@RequestBody RegisterDTO registerDTO) {
+        // 校验参数
+
+        return Result.success("注册成功!");
     }
 }

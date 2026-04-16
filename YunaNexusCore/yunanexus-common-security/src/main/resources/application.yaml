@@ -1,0 +1,8 @@
+yunanexus:
+  security:
+    rsa:
+      secret-dir: ./rsa/
+      public-key-file: rsa.pub
+      private-key-file: rsa
+      key-size: 2048
+      auto-generate: true
