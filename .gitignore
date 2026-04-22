@@ -50,3 +50,5 @@ build/
 ### 针对本项目补充 ###
 /说明文件/
 /YunaNexusCore/yunanexus-user/src/main/resources/application-*
+# 密钥文件(由YunaNexusCommonSecurity自动生成)
+.rsa/

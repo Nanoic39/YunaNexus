@@ -51,6 +51,12 @@
             <artifactId>fastjson2-extension-spring6</artifactId>
         </dependency>
 
+        <!-- common -->
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>yunanexus-common-security</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>
