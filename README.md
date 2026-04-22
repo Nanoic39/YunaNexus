@@ -24,7 +24,7 @@ YunaNexus/
 ## MaiTTx - MaiMai Technology Toolbox
 > 舞萌工具箱，提供更流畅更便捷更优雅的游戏体验
 
-<div style="cursor: grabbing;pointer-events: none; text-align: center;">
+<div align="center">
     <img alt="MaiTTxLogo" style="border-radius: 8px" src="Assets/Image/MaiTTx_ICON.jpg"/>
 </div>
 

@@ -1,6 +1,8 @@
 package cc.nanoic.yunanexus.user.controller;
 
+import cc.nanoic.yunanexus.common.security.annotation.RSADecryptRequest;
 import cc.nanoic.yunanexus.user.common.Result;
+import cc.nanoic.yunanexus.user.entity.DTO.EmailVerifySend;
 import cc.nanoic.yunanexus.user.entity.DTO.RegisterDTO;
 import cc.nanoic.yunanexus.user.entity.ServiceVersion;
 import cc.nanoic.yunanexus.user.entity.VO.PingVO;
@@ -62,10 +64,20 @@ public class UserController {
         return Result.success(pingVO);
     }
 
+    @RSADecryptRequest
     @PostMapping("/register")
     public Result<?> register(@RequestBody RegisterDTO registerDTO) {
-        // 校验参数
+        // 校验邮箱是否已验证
+        
 
         return Result.success("注册成功!");
     }
+
+    // @GetMapping("/email-verify-send")
+    // public Result<?> emailVerifySend(@RequestBody EmailVerifySend emailVerifySend) {
+    //     // 发送验证码
+    //     // TODO: 封装验证码发送SDK
+
+
+    // }
 }

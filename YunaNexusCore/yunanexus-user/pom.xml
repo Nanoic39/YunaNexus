@@ -51,10 +51,20 @@
             <artifactId>fastjson2-extension-spring6</artifactId>
         </dependency>
 
+        <!-- valid -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
         <!-- common -->
         <dependency>
             <groupId>cc.nanoic.yunanexus</groupId>
             <artifactId>yunanexus-common-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>yunanexus-common-mail</artifactId>
         </dependency>
 
     </dependencies>

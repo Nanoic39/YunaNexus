@@ -16,6 +16,7 @@
     <modules>
         <module>yunanexus-user</module>
         <module>yunanexus-common-security</module>
+        <module>yunanexus-common-mail</module>
     </modules>
 
     <!-- 版本管理 -->
@@ -27,11 +28,14 @@
         <spring.cloud.version>2025.1.0</spring.cloud.version>
         <spring.cloud.alibaba.version>2025.1.0.0</spring.cloud.alibaba.version>
         <spring.boot.starter.aop.version>3.4.7</spring.boot.starter.aop.version>
+        <spring.boot.starter.validation.version>4.0.5</spring.boot.starter.validation.version>
+        <spring.boot.starter.mail>4.0.0</spring.boot.starter.mail>
         <mybatis.plus.version>3.5.15</mybatis.plus.version>
         <fastjson2.version>2.0.43</fastjson2.version>
         <fastjson2.extension.spring6.version>2.0.61</fastjson2.extension.spring6.version>
         <lombok.version>1.18.44</lombok.version>
         <yunanexus.common.security.version>1.0.0</yunanexus.common.security.version>
+        <yunanexus.common.mail.version>1.0.0</yunanexus.common.mail.version>
     </properties>
 
     <dependencyManagement>
@@ -94,10 +98,30 @@
                 <version>${spring.boot.starter.aop.version}</version>
             </dependency>
 
+            <!-- Valid -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-validation</artifactId>
+                <version>${spring.boot.starter.validation.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-mail</artifactId>
+                <version>${spring.boot.starter.mail}</version>
+            </dependency>
+
+            <!-- common -->
+
             <dependency>
                 <groupId>cc.nanoic.yunanexus</groupId>
                 <artifactId>yunanexus-common-security</artifactId>
                 <version>${yunanexus.common.security.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cc.nanoic.yunanexus</groupId>
+                <artifactId>yunanexus-common-mail</artifactId>
+                <version>${yunanexus.common.mail.version}</version>
             </dependency>
 
         </dependencies>

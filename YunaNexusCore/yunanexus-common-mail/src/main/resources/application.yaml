@@ -1,0 +1,5 @@
+yunanexus:
+  mail:
+    enabled: true
+    from-name: YunaNexus
+    subject-prefix: ""
