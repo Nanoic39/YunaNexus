@@ -47,6 +47,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public Result<?> handleGlobalException(Exception e) {
         log.error("【系统未知异常】", e); // 完整堆栈打印
-        return Result.fail(R.SERVER_ERROR, R.SERVER_ERROR.getTip(), e.getMessage());
+        return Result.fail(R.SERVER_ERROR, e.getMessage(), R.SERVER_ERROR.getTip());
     }
 }

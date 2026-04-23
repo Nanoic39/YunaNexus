@@ -1,5 +1,7 @@
 package cc.nanoic.yunanexus.user.controller;
 
+import cc.nanoic.yunanexus.common.mail.enums.MailTemplateType;
+import cc.nanoic.yunanexus.common.mail.service.YunaMailService;
 import cc.nanoic.yunanexus.common.security.annotation.RSADecryptRequest;
 import cc.nanoic.yunanexus.user.common.Result;
 import cc.nanoic.yunanexus.user.entity.DTO.EmailVerifySend;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.lang.management.ManagementFactory;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/")
@@ -28,6 +32,9 @@ public class UserController {
 
     @Resource
     FormatTime formatTime;
+
+    @Resource
+    YunaMailService yunaMailService;
 
     @Value("${spring.application.name}")
     private String serviceName;
@@ -73,11 +80,16 @@ public class UserController {
         return Result.success("注册成功!");
     }
 
-    // @GetMapping("/email-verify-send")
-    // public Result<?> emailVerifySend(@RequestBody EmailVerifySend emailVerifySend) {
-    //     // 发送验证码
-    //     // TODO: 封装验证码发送SDK
-
-
-    // }
+    @PostMapping("/email-verify-send")
+    public Result<?> emailVerifySend(@RequestBody EmailVerifySend emailVerifySend) {
+        // 生成验证码
+        String code = usersService.generateEmailVerifyCode();
+        Map<String, Object> params = new HashMap<>();
+        params.put("code", code);
+        params.put("minutes", 10);
+        // Redis缓存
+        // TODO: 封装Redis工具SDK
+        yunaMailService.sendMail(emailVerifySend.getEmail(), MailTemplateType.VERIFICATION, params);
+        return Result.success("验证码已发送到您的邮箱!");
+    }
 }

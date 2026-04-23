@@ -11,15 +11,12 @@ import java.util.Map;
 public class MailTemplateProperties {
     private boolean enabled = true;
     private String fromAddress;
-    private String fromName = "【YunaNexus】";
+    private String fromName = "【YunaNexus Dev.GROUP】";
     private String subjectPrefix = "";
-
-    private Map<String, TemplateConfig> templates = new HashMap<>();
-    private Map<String, TemplateConfig> customTemplates = new HashMap<>();
-
-    @Data
-    public static class TemplateConfig {
-        private String subject;
-        private String body;
-    }
+    private String host = "smtp.qq.com";
+    private Integer port = 465;
+    private String username;
+    private String password;
+    private String protocol = "smtp";
+    private Map<String, Object> properties = new HashMap<>();
 }

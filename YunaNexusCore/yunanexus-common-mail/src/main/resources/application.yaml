@@ -1,5 +1,15 @@
 yunanexus:
   mail:
     enabled: true
-    from-name: YunaNexus
-    subject-prefix: ""
+    from-address:
+    from-name: 
+    subject-prefix: "" # 邮件主题前缀
+    host:
+    port: 587
+    username:
+    password:
+    protocol: smtp
+    properties:
+      "[mail.smtp.auth]": "true"
+      "[mail.smtp.starttls.enable]": "true"
+      "[mail.smtp.starttls.required]": "true"
