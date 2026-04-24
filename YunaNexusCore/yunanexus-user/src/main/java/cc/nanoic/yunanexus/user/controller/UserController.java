@@ -80,9 +80,22 @@ public class UserController {
     @RSADecryptRequest
     @PostMapping("/register")
     public Result<?> register(@RequestBody RegisterDTO registerDTO) {
-        // 校验邮箱是否已验证
-        
+        String email = registerDTO.getEmail();
 
+        // 是否被查询限流
+        if (usersService.isCheckLimited(email)) {
+            return Result.fail(R.PARAM_ERROR, "每分钟最多5次校验请求!");
+        }
+
+        // 校验邮箱是否已验证
+        if(!usersService.verifyEmailCode(registerDTO.getEmail(), registerDTO.getVerifyCode())) {
+            return Result.fail(R.PARAM_ERROR, "邮箱验证码有误!");
+        }
+
+        // 进入注册流程
+        usersService.register(registerDTO);
+
+        // 如果没有报错
         return Result.success("注册成功!");
     }
 
@@ -90,18 +103,16 @@ public class UserController {
     public Result<?> emailVerifySend(@RequestBody EmailVerifySend emailVerifySend) {
         String email = emailVerifySend.getEmail();
 
-        // 增加限流键
-        String limitKey = "email:verify:limit:" + email;
-        if (!yunaRedisService.allowRequest(limitKey, 1, Duration.ofSeconds(60))) {
+        // 校验是否被限流
+        if(usersService.isSendLimited(email)) {
             return Result.fail(R.PARAM_ERROR, "请求过于频繁，请 60 秒后再试");
         }
 
         // 生成验证码
         String code = usersService.generateEmailVerifyCode();
 
-        // 生成验证码缓存键
-        String codeKey = "email:verify:code:" + email;
-        yunaRedisService.set(codeKey, code, Duration.ofMinutes(10));
+        // 储存验证码并增加限流
+        usersService.cacheVerifyCode(email, code);
 
         // 发送验证码
         Map<String, Object> params = new HashMap<>();

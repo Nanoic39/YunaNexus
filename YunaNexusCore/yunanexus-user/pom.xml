@@ -51,6 +51,12 @@
             <artifactId>fastjson2-extension-spring6</artifactId>
         </dependency>
 
+        <!-- Hutool -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+        </dependency>
+
         <!-- valid -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
