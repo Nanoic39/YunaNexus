@@ -17,6 +17,7 @@
         <module>yunanexus-user</module>
         <module>yunanexus-common-security</module>
         <module>yunanexus-common-mail</module>
+        <module>yunanexus-common-redis</module>
     </modules>
 
     <!-- 版本管理 -->
@@ -34,8 +35,10 @@
         <fastjson2.version>2.0.43</fastjson2.version>
         <fastjson2.extension.spring6.version>2.0.61</fastjson2.extension.spring6.version>
         <lombok.version>1.18.44</lombok.version>
+        <redisson.version>4.3.1</redisson.version>
         <yunanexus.common.security.version>1.0.0</yunanexus.common.security.version>
         <yunanexus.common.mail.version>1.0.0</yunanexus.common.mail.version>
+        <yunanexus.common.redis.version>1.0.0</yunanexus.common.redis.version>
     </properties>
 
     <dependencyManagement>
@@ -67,6 +70,8 @@
                 <scope>import</scope>
             </dependency>
 
+
+            <!-- MyBatisPlus -->
             <dependency>
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
@@ -90,6 +95,13 @@
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
+            </dependency>
+
+            <!-- Redisson -->
+            <dependency>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson-spring-boot-starter</artifactId>
+                <version>${redisson.version}</version>
             </dependency>
 
             <dependency>
@@ -122,6 +134,12 @@
                 <groupId>cc.nanoic.yunanexus</groupId>
                 <artifactId>yunanexus-common-mail</artifactId>
                 <version>${yunanexus.common.mail.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>cc.nanoic.yunanexus</groupId>
+                <artifactId>yunanexus-common-redis</artifactId>
+                <version>1.0.0</version>
             </dependency>
 
         </dependencies>

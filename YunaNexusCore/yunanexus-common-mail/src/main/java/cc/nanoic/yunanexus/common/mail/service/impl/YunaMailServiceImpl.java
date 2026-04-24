@@ -7,16 +7,12 @@ import cc.nanoic.yunanexus.common.mail.model.MailTemplate;
 import cc.nanoic.yunanexus.common.mail.service.YunaMailService;
 import jakarta.mail.internet.MimeMessage;
 
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.Map;
 
 public class YunaMailServiceImpl implements YunaMailService {

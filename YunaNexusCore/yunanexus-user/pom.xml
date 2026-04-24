@@ -66,6 +66,10 @@
             <groupId>cc.nanoic.yunanexus</groupId>
             <artifactId>yunanexus-common-mail</artifactId>
         </dependency>
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>yunanexus-common-redis</artifactId>
+        </dependency>
 
     </dependencies>
 

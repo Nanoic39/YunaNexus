@@ -52,3 +52,6 @@ build/
 /YunaNexusCore/yunanexus-user/src/main/resources/application-*
 # 密钥文件(由YunaNexusCommonSecurity自动生成)
 .rsa/
+# Postman文件
+postman/
+.postman/

@@ -2,7 +2,9 @@ package cc.nanoic.yunanexus.user.controller;
 
 import cc.nanoic.yunanexus.common.mail.enums.MailTemplateType;
 import cc.nanoic.yunanexus.common.mail.service.YunaMailService;
+import cc.nanoic.yunanexus.common.redis.service.YunaRedisService;
 import cc.nanoic.yunanexus.common.security.annotation.RSADecryptRequest;
+import cc.nanoic.yunanexus.user.common.R;
 import cc.nanoic.yunanexus.user.common.Result;
 import cc.nanoic.yunanexus.user.entity.DTO.EmailVerifySend;
 import cc.nanoic.yunanexus.user.entity.DTO.RegisterDTO;
@@ -16,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.lang.management.ManagementFactory;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -35,6 +38,9 @@ public class UserController {
 
     @Resource
     YunaMailService yunaMailService;
+
+    @Resource
+    YunaRedisService yunaRedisService;
 
     @Value("${spring.application.name}")
     private String serviceName;
@@ -82,14 +88,27 @@ public class UserController {
 
     @PostMapping("/email-verify-send")
     public Result<?> emailVerifySend(@RequestBody EmailVerifySend emailVerifySend) {
+        String email = emailVerifySend.getEmail();
+
+        // 增加限流键
+        String limitKey = "email:verify:limit:" + email;
+        if (!yunaRedisService.allowRequest(limitKey, 1, Duration.ofSeconds(60))) {
+            return Result.fail(R.PARAM_ERROR, "请求过于频繁，请 60 秒后再试");
+        }
+
         // 生成验证码
         String code = usersService.generateEmailVerifyCode();
+
+        // 生成验证码缓存键
+        String codeKey = "email:verify:code:" + email;
+        yunaRedisService.set(codeKey, code, Duration.ofMinutes(10));
+
+        // 发送验证码
         Map<String, Object> params = new HashMap<>();
         params.put("code", code);
         params.put("minutes", 10);
-        // Redis缓存
-        // TODO: 封装Redis工具SDK
-        yunaMailService.sendMail(emailVerifySend.getEmail(), MailTemplateType.VERIFICATION, params);
+        yunaMailService.sendMail(email, MailTemplateType.VERIFICATION, params);
+
         return Result.success("验证码已发送到您的邮箱!");
     }
 }
