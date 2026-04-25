@@ -7,12 +7,13 @@ import cc.nanoic.yunanexus.user.entity.Users;
 import cc.nanoic.yunanexus.user.mapper.UserInfoMapper;
 import cc.nanoic.yunanexus.user.mapper.UsersMapper;
 import cc.nanoic.yunanexus.user.service.UsersService;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.crypto.digest.BCrypt;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Random;
 import java.util.UUID;
 
 import jakarta.annotation.Resource;
@@ -34,9 +35,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
     @Override
     public String generateEmailVerifyCode() {
         // 随机六位数字
-        Random random = new Random();
-        int randomCode = random.nextInt(900000) + 100000;
-        return String.valueOf(randomCode);
+        return RandomUtil.randomNumbers(6);
     }
 
     @Override
@@ -50,12 +49,12 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
     }
 
     @Override
-    public void cacheVerifyCode(String email, String verifyCode) {
+    public void cacheVerifyCode(String email, String verifyCode, Duration expireTime) {
         // 生成验证码缓存键
-        yunaRedisService.set(verifyCodeKeyPrefix + email, verifyCode, Duration.ofMinutes(10));
+        yunaRedisService.set(verifyCodeKeyPrefix + email, verifyCode, expireTime);
 
         // 增加限流键
-        yunaRedisService.set(sendLimitKeyPrefix + email, verifyCode, Duration.ofMinutes(10));
+        yunaRedisService.set(sendLimitKeyPrefix + email, verifyCode, expireTime);
     }
 
     @Override
@@ -86,7 +85,18 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         UserInfo userInfo = new UserInfo();
         userInfo.setUserId(user.getId());
         userInfo.setNickname(register.getNickname());
+        userInfo.setGender(register.getGender());
         userInfo.setUpdateTime(now);
         userInfoMapper.insert(userInfo);
+    }
+
+    @Override
+    public boolean isExistsUser(String username) {
+        return this.getOne(new LambdaQueryWrapper<Users>().eq(Users::getUsername, username)) != null;
+    }
+
+    @Override
+    public boolean isExistsEmail(String email) {
+        return this.getOne(new LambdaQueryWrapper<Users>().eq(Users::getEmail, email)) != null;
     }
 }

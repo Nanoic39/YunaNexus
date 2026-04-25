@@ -4,6 +4,7 @@ import cc.nanoic.yunanexus.common.mail.enums.MailTemplateType;
 import cc.nanoic.yunanexus.common.mail.service.YunaMailService;
 import cc.nanoic.yunanexus.common.redis.service.YunaRedisService;
 import cc.nanoic.yunanexus.common.security.annotation.RSADecryptRequest;
+import cc.nanoic.yunanexus.user.common.BusinessException;
 import cc.nanoic.yunanexus.user.common.R;
 import cc.nanoic.yunanexus.user.common.Result;
 import cc.nanoic.yunanexus.user.entity.DTO.EmailVerifySend;
@@ -45,6 +46,9 @@ public class UserController {
     @Value("${spring.application.name}")
     private String serviceName;
 
+    @Value("${yunanexus.mail.verify.code.expire-seconds}")
+    private long expireSeconds;
+
     /**
      * PING!
      * TODO: 接口待删除
@@ -77,14 +81,29 @@ public class UserController {
         return Result.success(pingVO);
     }
 
+    // TODO: 考虑该怎么实现优雅的Sentinel限流
+    // 我认为 校验是否存在该用户 和 校验是否存在邮箱 不适合再去使用Redis做限流
+    // 敏感精细操作使用Redis精确限流，网关/接口层直接粗限流即可
+    // (那样的话光一套注册流程要的Redis键就煲炸了)
+    // 但是这里如果不设限的话就可以一直调用这个接口.
     @RSADecryptRequest
     @PostMapping("/register")
     public Result<?> register(@RequestBody RegisterDTO registerDTO) {
         String email = registerDTO.getEmail();
+        String username = registerDTO.getUsername();
+
+        // 注册时需要先校验是否存在该用户
+        if (usersService.isExistsUser(username)) {
+            throw new BusinessException(R.ACCOUNT_EXISTS);
+        }
+        // 校验是否存在邮箱
+        if (usersService.isExistsEmail(email)) {
+            throw new BusinessException(R.EMAIL_EXISTS);
+        }
 
         // 是否被查询限流
         if (usersService.isCheckLimited(email)) {
-            return Result.fail(R.PARAM_ERROR, "每分钟最多5次校验请求!");
+            return Result.fail(R.REQ_API_LIMIT);
         }
 
         // 校验邮箱是否已验证
@@ -102,22 +121,22 @@ public class UserController {
     @PostMapping("/email-verify-send")
     public Result<?> emailVerifySend(@RequestBody EmailVerifySend emailVerifySend) {
         String email = emailVerifySend.getEmail();
+        // 验证码过期时间
+        Duration expireTime = Duration.ofSeconds(expireSeconds);
 
         // 校验是否被限流
         if(usersService.isSendLimited(email)) {
-            return Result.fail(R.PARAM_ERROR, "请求过于频繁，请 60 秒后再试");
+            return Result.fail(R.REQ_API_LIMIT, "请求过于频繁，请 60 秒后再试");
         }
 
         // 生成验证码
         String code = usersService.generateEmailVerifyCode();
 
         // 储存验证码并增加限流
-        usersService.cacheVerifyCode(email, code);
+        usersService.cacheVerifyCode(email, code, expireTime);
 
         // 发送验证码
-        Map<String, Object> params = new HashMap<>();
-        params.put("code", code);
-        params.put("minutes", 10);
+        Map<String, Object> params = Map.of("code", code, "minutes", expireTime.toMinutes());
         yunaMailService.sendMail(email, MailTemplateType.VERIFICATION, params);
 
         return Result.success("验证码已发送到您的邮箱!");

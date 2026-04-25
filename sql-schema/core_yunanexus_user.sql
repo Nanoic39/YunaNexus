@@ -30,7 +30,7 @@ CREATE TABLE `user_info` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '用户信息表主键id(不对外公开,仅用于系统内部操作)',
     `user_id` BIGINT NOT NULL COMMENT '用户表外键id(关联users表的id字段)',
     `nickname` VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户昵称(外显)',
-    `avatar_uuid` VARCHAR(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '用户头像(外显,储存头像文件的文件uuid)',
+    `avatar_uuid` VARCHAR(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci  COMMENT '用户头像(外显,储存头像文件的文件uuid)',
     `gender` VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '未知' COMMENT '用户性别(未知 / 男 / 女 / {用户输入})',
     `birthday` DATE NULL DEFAULT NULL COMMENT '用户出生日期(默认不外显)',
     `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '用户信息更新时间戳',

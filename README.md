@@ -45,6 +45,9 @@ yunanexus:
       "[mail.smtp.auth]": "true"
       "[mail.smtp.starttls.enable]": "true"
       "[mail.smtp.starttls.required]": "true"
+    verify:
+      code:
+        expire-time: 600 # 邮箱验证码有效期，默认值为10分钟，单位：秒
   redis:
     enabled: { boolean:true }
     host: { ip }

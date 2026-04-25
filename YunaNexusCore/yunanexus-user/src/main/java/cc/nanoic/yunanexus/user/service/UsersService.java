@@ -4,6 +4,8 @@ import cc.nanoic.yunanexus.user.entity.DTO.RegisterDTO;
 import cc.nanoic.yunanexus.user.entity.Users;
 import com.baomidou.mybatisplus.extension.service.IService;
 
+import java.time.Duration;
+
 
 public interface UsersService extends IService<Users> {
 
@@ -32,7 +34,7 @@ public interface UsersService extends IService<Users> {
      * @param email 邮箱
      * @param verifyCode 验证码
      */
-    void cacheVerifyCode(String email, String verifyCode);
+    void cacheVerifyCode(String email, String verifyCode, Duration expireTime);
 
     /**
      * 校验验证码
@@ -45,7 +47,20 @@ public interface UsersService extends IService<Users> {
     /**
      * 用户注册
      * @param register 注册DTO
-     * @return 注册结果
      */
     void register(RegisterDTO register);
+
+    /**
+     * 校验是否存在用户
+     * @param username 用户名
+     * @return 校验结果
+     */
+    boolean isExistsUser(String username);
+
+    /**
+     * 校验是否存在邮箱
+     * @param email 邮箱
+     * @return 校验结果
+     */
+    boolean isExistsEmail(String email);
 }

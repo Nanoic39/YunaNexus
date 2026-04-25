@@ -20,6 +20,11 @@ public class RegisterDTO {
     private String nickname;
 
     /**
+     * 性别(允许用户自行输入的性别果然很奇怪吧)
+     */
+    private String gender;
+
+    /**
      * 密码(经过RSA公钥加密)
      */
     @RSADecryptField
