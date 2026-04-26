@@ -86,6 +86,11 @@ public class UserController {
     // 敏感精细操作使用Redis精确限流，网关/接口层直接粗限流即可
     // (那样的话光一套注册流程要的Redis键就煲炸了)
     // 但是这里如果不设限的话就可以一直调用这个接口.
+    /**
+     * 账户注册功能
+     * @param registerDTO 注册传递参数
+     * @return 注册结果
+     */
     @RSADecryptRequest
     @PostMapping("/register")
     public Result<?> register(@RequestBody RegisterDTO registerDTO) {
@@ -118,6 +123,11 @@ public class UserController {
         return Result.success("注册成功!");
     }
 
+    /**
+     * 发送邮箱验证码
+     * @param emailVerifySend 要发送验证邮件的邮箱
+     * @return 返回结果
+     */
     @PostMapping("/email-verify-send")
     public Result<?> emailVerifySend(@RequestBody EmailVerifySend emailVerifySend) {
         String email = emailVerifySend.getEmail();
@@ -141,4 +151,6 @@ public class UserController {
 
         return Result.success("验证码已发送到您的邮箱!");
     }
+
+
 }
