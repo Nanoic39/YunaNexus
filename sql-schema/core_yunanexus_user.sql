@@ -30,7 +30,7 @@ CREATE TABLE `user_info` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '用户信息表主键id(不对外公开,仅用于系统内部操作)',
     `user_id` BIGINT NOT NULL COMMENT '用户表外键id(关联users表的id字段)',
     `nickname` VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户昵称(外显)',
-    `avatar_uuid` VARCHAR(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci  COMMENT '用户头像(外显,储存头像文件的文件uuid)',
+    `avatar_uuid` VARCHAR(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '用户头像(外显,储存头像文件的文件uuid)',
     `gender` VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '未知' COMMENT '用户性别(未知 / 男 / 女 / {用户输入})',
     `birthday` DATE NULL DEFAULT NULL COMMENT '用户出生日期(默认不外显)',
     `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '用户信息更新时间戳',
@@ -180,17 +180,16 @@ DROP TABLE IF EXISTS `oauth_clients`;
 CREATE TABLE `oauth_clients` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'OAuth2.0客户端配置表主键id',
     `uuid` VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客户端配置UUID(唯一)',
-    `user_id` BIGINT NOT NULL COMMENT '创建该OAuth客户端配置的用户id(关联users表的id字段)', -- 不能唯一，因为用户可以有多个客户端配置
     `client_type` tinyint NOT NULL DEFAULT 1 COMMENT '客户端类型(1：官方客户端，2：第三方应用)',
     `audit_status` tinyint NOT NULL DEFAULT 0 COMMENT '审核状态(0：待审核，1：已通过，2：已拒绝)', -- 仅第三方应用需要审核，官方默认为已通过
     `audit_opinion` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '审核意见', -- 仅第三方应用需要填写，官方默认为"官方应用【{该OAuth客户端配置创建人UUID}】"
-    `redirect_whitelist` TEXT NULL COMMENT '可访问的重定向URI列表(多个重定向URI用英文逗号分隔)', -- 第三方申请时填写，
-    `client_secret` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客户端密钥(唯一，存储时使用Argon2/BCrypt加密存储)',
+    `redirect_whitelist` TEXT NULL COMMENT '可访问的重定向URI列表(多个重定向URI用英文逗号分隔)', -- 第三方申请时填写
+    `client_secret` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客户端密钥(存储时使用Argon2/BCrypt加密存储)',
     `client_name` VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客户端名称(唯一)',
     `resource_ids` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'core' COMMENT '可访问的资源ID列表(多个资源ID用英文逗号分隔)',
     `scope_limit` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'core:read,service:file:download' COMMENT '权限范围限制(多个权限范围用英文逗号分隔：{系统名称} | service:{模块名称}:read)',
 
-    -- 授权模式（password=密码登录, refresh_token=刷新Token, client_credentials=客户端模式, authorization_code=SSO单点登录模式）、
+    -- 授权模式（password=密码登录, refresh_token=刷新Token, client_credentials=客户端模式, authorization_code=SSO单点登录模式）
     -- core默认为：password,refresh_token
     -- 官方客户端默认为：authorization_code,password,refresh_token
     -- 第三方应用只能为：refresh_token,client_credentials
@@ -215,8 +214,9 @@ CREATE TABLE `oauth_clients` (
     create_time timestamp DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`) USING BTREE,
-    UNIQUE INDEX `ui_name_secret` (`client_name` ASC, `client_secret` ASC) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色继承约束表' ROW_FORMAT = Dynamic;
+    UNIQUE INDEX `ui_uuid` (`uuid` ASC) USING BTREE,
+    UNIQUE INDEX `ui_client_name` (`client_name` ASC) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'OAuth2.0客户端配置表' ROW_FORMAT = Dynamic;
 
 -- TODO: 临时测试用，待删除 - 后续会有其它服务提供整体的版本管理支持
 -- 版本配置表
