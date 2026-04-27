@@ -1,5 +1,7 @@
 package cc.nanoic.yunanexus.user.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -9,6 +11,7 @@ public class ServiceVersion {
     /**
      * 服务版本配置表主键
      */
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     /**

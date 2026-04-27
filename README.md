@@ -7,9 +7,12 @@
 ```text
 YunaNexus/
 ├── YunaNexusCore/                 # YunaNexus系列中核心项目，作为全局的后台管理面板为其它服务提供基本支持
-│   ├── yunanexus-common-redis/    # 提供Redis相关的SDK ( 🚧 开发中... )
-│   ├── yunanexus-common-mail/     # 提供邮件发送SDK
-│   ├── yunanexus-common-security/ # 提供安全类SDK
+│   ├── yunanexus-common-redis/    # 提供 Redis SDK
+│   ├── yunanexus-common-mail/     # 提供 Mail SDK
+│   ├── yunanexus-common-security/ # 提供 Security SDK
+│   ├── yunanexus-common-rocketmq/ # 提供 RocketMQ SDK
+│   ├── yunanexus-common-web/      # 提供 LocalDateTime/Result/Exception SDK ( 🚧 开发中... )
+│   ├── yunanexus-auth/            # 提供安全认证相关的后端支持 ( 🚧 开发中... )
 │   └── yunanexus-user/            # 提供用户账户/权限相关的后端支持
 ├── sql-schema/                    # YunaNexusCore用到的SQL数据结构
 └── Assets/                        # 用于本项目仓库的素材文件(不影响具体项目内容)
@@ -56,7 +59,15 @@ yunanexus:
     username: { username }
     password: { password }
     ssl: { boolean:false }
-    timeout: { timeout:3s }
+    timeout: 3s # 超时时间
+  rocketmq:
+    enabled: { boolean:true } # 启用RocketMQ?
+    send-timeout-ms: 3000 # 发送超时时间(ms)
+    send-retry-times: 3 # 发送重试次数
+rocketmq:
+  name-server: 127.0.0.1:9876 # RocketMQ默认地址，生产/消费均需要配置
+  producer: # 生产者需要配置，消费者只需要在注解中声明即可
+    group: { group-name }-Producer # -Producer可以不要，这里是为了规范
 ```
 
 ***
@@ -108,6 +119,7 @@ yunanexus:
 ## 🚩 备注：
 
 1. RSA相关配置在 `YunaNexusCore/yunanexus-common-security/src/main/resources/application.yaml` 中
-2. <br />
+2. 各个服务都有自己的 RocketMQ服务配置，运行前需要自行根据自己的RocketMQ环境配置 `name-server`
+3. <br />
 
 

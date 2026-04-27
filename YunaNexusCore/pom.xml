@@ -18,6 +18,8 @@
         <module>yunanexus-common-security</module>
         <module>yunanexus-common-mail</module>
         <module>yunanexus-common-redis</module>
+        <module>yunanexus-common-rocketmq</module>
+        <module>yunanexus-auth</module>
     </modules>
 
     <!-- 版本管理 -->
@@ -31,6 +33,7 @@
         <spring.boot.starter.aop.version>3.4.7</spring.boot.starter.aop.version>
         <spring.boot.starter.validation.version>4.0.5</spring.boot.starter.validation.version>
         <spring.boot.starter.mail>4.0.0</spring.boot.starter.mail>
+        <spring.boot.starter.rocketmq>2.3.0</spring.boot.starter.rocketmq>
         <mybatis.plus.version>3.5.15</mybatis.plus.version>
         <fastjson2.version>2.0.43</fastjson2.version>
         <fastjson2.extension.spring6.version>2.0.61</fastjson2.extension.spring6.version>
@@ -131,6 +134,12 @@
                 <version>${spring.boot.starter.mail}</version>
             </dependency>
 
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-spring-boot-starter</artifactId>
+                <version>${spring.boot.starter.rocketmq}</version>
+            </dependency>
+
             <!-- common -->
 
             <dependency>
@@ -147,6 +156,12 @@
             <dependency>
                 <groupId>cc.nanoic.yunanexus</groupId>
                 <artifactId>yunanexus-common-redis</artifactId>
+                <version>1.0.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>cc.nanoic.yunanexus</groupId>
+                <artifactId>yunanexus-common-rocketmq</artifactId>
                 <version>1.0.0</version>
             </dependency>
 
