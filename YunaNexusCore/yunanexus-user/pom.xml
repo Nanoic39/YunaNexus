@@ -76,6 +76,11 @@
             <groupId>cc.nanoic.yunanexus</groupId>
             <artifactId>yunanexus-common-redis</artifactId>
         </dependency>
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>yunanexus-common-web</artifactId>
+        </dependency>
+        
 
     </dependencies>
 

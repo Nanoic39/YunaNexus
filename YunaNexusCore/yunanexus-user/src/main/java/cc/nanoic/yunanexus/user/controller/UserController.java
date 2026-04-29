@@ -4,19 +4,25 @@ import cc.nanoic.yunanexus.common.mail.enums.MailTemplateType;
 import cc.nanoic.yunanexus.common.mail.service.YunaMailService;
 import cc.nanoic.yunanexus.common.redis.service.YunaRedisService;
 import cc.nanoic.yunanexus.common.security.annotation.RSADecryptRequest;
-import cc.nanoic.yunanexus.user.common.BusinessException;
-import cc.nanoic.yunanexus.user.common.R;
-import cc.nanoic.yunanexus.user.common.Result;
+import cc.nanoic.yunanexus.common.web.common.BusinessException;
+import cc.nanoic.yunanexus.common.web.common.R;
+import cc.nanoic.yunanexus.common.web.common.Result;
 import cc.nanoic.yunanexus.user.entity.DTO.EmailVerifySend;
+import cc.nanoic.yunanexus.user.entity.DTO.OAuthVerifyUserAccountDTO;
 import cc.nanoic.yunanexus.user.entity.DTO.RegisterDTO;
 import cc.nanoic.yunanexus.user.entity.ServiceVersion;
+import cc.nanoic.yunanexus.user.entity.Users;
 import cc.nanoic.yunanexus.user.entity.VO.PingVO;
 import cc.nanoic.yunanexus.user.service.PingService;
 import cc.nanoic.yunanexus.user.service.UsersService;
 import cc.nanoic.yunanexus.user.utils.FormatTime;
+import cn.hutool.crypto.digest.BCrypt;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
 import java.lang.management.ManagementFactory;
 import java.time.Duration;
@@ -150,6 +156,41 @@ public class UserController {
         yunaMailService.sendMail(email, MailTemplateType.VERIFICATION, params);
 
         return Result.success("验证码已发送到您的邮箱!");
+    }
+
+    @PostMapping("/oauth/verify")
+    public Result<?> oAuthVerifyUserAccount(@RequestBody OAuthVerifyUserAccountDTO oAuthVerifyUserAccountDTO) {
+        String username = oAuthVerifyUserAccountDTO.getUsername();
+        String password = oAuthVerifyUserAccountDTO.getPassword();
+        
+        if(!StringUtils.hasText(username) || !StringUtils.hasText(password)) {
+            return Result.fail(R.PARAM_ERROR, "用户名或密码不能为空!");
+        }
+
+        // 查询账户信息
+        Users user = usersService.getOne(
+            new LambdaQueryWrapper<Users>()
+                    .eq(Users::getUsername, username)
+                    .last("LIMIT 1")
+        );
+
+        // 校验密码
+        if(user == null || !BCrypt.checkpw(password, user.getPassword())) {
+            return Result.fail(R.ACCOUNT_ERROR, "账号或密码错误");
+        }
+
+        Integer userStatus = user.getStatus();
+        if (userStatus == null || userStatus != 1) {
+            // 增加一层判断是注销还是封禁
+            return Integer.valueOf(2).equals(userStatus) ? Result.fail(R.ACCOUNT_DISABLED) : Result.fail(R.ACCOUNT_DELETE);
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", user.getId());
+        data.put("userUuid", user.getUuid());
+        data.put("username", user.getUsername());
+
+        return Result.success(data);
     }
 
 
