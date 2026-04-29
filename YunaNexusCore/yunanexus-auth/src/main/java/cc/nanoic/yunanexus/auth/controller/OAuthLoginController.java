@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.auth.controller;
 
+import cc.nanoic.yunanexus.auth.client.UserInternalClient;
 import cc.nanoic.yunanexus.auth.entity.DTO.OAuthLoginRequest;
 import cc.nanoic.yunanexus.auth.entity.OAuthClients;
 import cc.nanoic.yunanexus.auth.entity.VO.OAuthLoginTokenVO;
@@ -7,7 +8,6 @@ import cc.nanoic.yunanexus.auth.service.OAuthClientsService;
 import cc.nanoic.yunanexus.common.redis.service.YunaRedisService;
 import cc.nanoic.yunanexus.common.web.common.R;
 import cc.nanoic.yunanexus.common.web.common.Result;
-import cn.hutool.core.lang.UUID;
 import cn.hutool.crypto.digest.BCrypt;
 import jakarta.annotation.Resource;
 import org.springframework.util.StringUtils;
@@ -15,9 +15,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/oauth")
@@ -28,6 +31,9 @@ public class OAuthLoginController {
 
     @Resource
     private YunaRedisService yunaRedisService;
+
+    @Resource
+    private UserInternalClient userInternalClient;
 
     @PostMapping("/login")
     public Result<OAuthLoginTokenVO> login(@RequestBody OAuthLoginRequest req) {
@@ -52,32 +58,51 @@ public class OAuthLoginController {
         }
 
         // 如果 Password 模式
+        String subject;
         if ("password".equals(req.getGrantType())) {
             // 校验用户名密码
             if (!StringUtils.hasText(req.getUsername()) || !StringUtils.hasText(req.getPassword())) {
                 return Result.fail(R.PARAM_ERROR, "用户名或密码不能为空!");
             }
-        }
 
-        // 如果为 refresh_token模式
-        if ("refresh_token".equals(req.getGrantType()) && !StringUtils.hasText(req.getRefreshToken())) {
-            return Result.fail(R.PARAM_ERROR, "refresh_token不能为空!");
+            subject = verifyByUserService(req.getUsername(), req.getPassword());
+            if (!StringUtils.hasText(subject)) {
+                return Result.fail(R.ACCOUNT_ERROR, "账号或密码错误");
+            }
+
+
+        } else if ("client_credentials".equals(req.getGrantType())) {
+            subject = "client:" + client.getUuid();
+        } else if ("refresh_token".equals(req.getGrantType())) {
+            if (!StringUtils.hasText(req.getRefreshToken())) {
+                return Result.fail(R.PARAM_ERROR, "refreshToken不能为空!");
+            }
+            subject = yunaRedisService.get("auth:refresh:" + req.getRefreshToken());
+            if (!StringUtils.hasText(subject)) {
+                return Result.fail(R.TOKEN_ALL_EXPIRED, "refreshToken已失效");
+            }
+        } else {
+            return Result.fail(R.PARAM_ERROR, "不支持的grantType");
         }
 
         // 过期时间
         long accessTtl = client.getAccessTokenValidity() == null ? 7200L : client.getAccessTokenValidity();
         long refreshTokenTtl = client.getRefreshTokenValidity() == null ? 604800L : client.getRefreshTokenValidity();
 
-        // TODO: 这里需要对接真实登录-OpenFeign+Nacos服务名
-        OAuthLoginTokenVO token = OAuthLoginTokenVO.builder()
-        .tokenType("Bearer")
-        .accessToken(UUID.randomUUID().toString())
-        .refreshToken(UUID.randomUUID().toString())
-        .expiresIn(accessTtl)
-        // .scope()
-        .build();
+        String accessToken = UUID.randomUUID().toString().replace("-", "");
+        String refreshToken = UUID.randomUUID().toString().replace("-", "");
 
-        return Result.success(token);
+        yunaRedisService.set("auth:access:" + accessToken, subject, Duration.ofSeconds(accessTtl));
+        yunaRedisService.set("auth:refresh:" + refreshToken, subject, Duration.ofSeconds(refreshTokenTtl));
+
+        OAuthLoginTokenVO token = OAuthLoginTokenVO.builder()
+                .tokenType("Bearer")
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .expiresIn(accessTtl)
+                .scope(client.getScope())
+                .build();
+        return Result.success(token, "登录成功");
     }
 
     /**
@@ -111,5 +136,28 @@ public class OAuthLoginController {
             return BCrypt.checkpw(raw, encodedOrRaw);
         }
         return raw.equals(encodedOrRaw);
+    }
+
+    /**
+     * 通过 UserService 服务校验登录信息
+     * @param username 账号
+     * @param password 密码
+     * @return Uuid结果
+     */
+    private String verifyByUserService(String username, String password) {
+        try {
+            Map<String, String> req = new HashMap<>();
+            req.put("username", username);
+            req.put("password", password);
+            Result<Map<String, Object>> resp = userInternalClient.verifyUser(req);
+            if (resp == null || resp.getCode() != R.SUCCESS.getCode() || resp.getData() == null) {
+                return null;
+            }
+            // 这里字段需要和 UserController 中返回的字段保持一致
+            Object userUuid = resp.getData().get("userUuid");
+            return userUuid == null ? null : String.valueOf(userUuid);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

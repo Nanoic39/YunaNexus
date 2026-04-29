@@ -185,6 +185,7 @@ public class UserController {
             return Integer.valueOf(2).equals(userStatus) ? Result.fail(R.ACCOUNT_DISABLED) : Result.fail(R.ACCOUNT_DELETE);
         }
 
+        // 修改这里时需要同步修改 OAuthLoginController 中的获取内容
         Map<String, Object> data = new HashMap<>();
         data.put("userId", user.getId());
         data.put("userUuid", user.getUuid());
