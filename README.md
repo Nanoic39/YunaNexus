@@ -121,6 +121,4 @@ rocketmq:
 
 1. RSA相关配置在 `YunaNexusCore/yunanexus-common-security/src/main/resources/application.yaml` 中
 2. 各个服务都有自己的 RocketMQ服务配置，运行前需要自行根据自己的RocketMQ环境配置 `name-server`
-3. <br />
-
-
+3. 今天去打舞萌了，所以休息一天。
