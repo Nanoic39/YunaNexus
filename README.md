@@ -11,7 +11,7 @@ YunaNexus/
 │   ├── yunanexus-common-mail/     # 提供 Mail SDK
 │   ├── yunanexus-common-security/ # 提供 Security SDK
 │   ├── yunanexus-common-rocketmq/ # 提供 RocketMQ SDK
-│   ├── yunanexus-common-web/      # 提供 LocalDateTime/Result/Exception SDK ( 🚧 开发中... )
+│   ├── yunanexus-common-web/      # 提供 LocalDateTime/Result/Exception SDK
 │   ├── yunanexus-auth/            # 提供安全认证相关的后端支持 ( 🚧 开发中... )
 │   └── yunanexus-user/            # 提供用户账户/权限相关的后端支持
 ├── sql-schema/                    # YunaNexusCore用到的SQL数据结构
@@ -87,7 +87,7 @@ rocketmq:
 > 舞萌工具箱，提供更流畅更便捷更优雅的游戏体验
 
 <div align="center">
-    <img alt="MaiTTxLogo" style="border-radius: 8px" src="Assets/Image/MaiTTx_ICON.jpg"/>
+    <img alt="MaiTTxLogo" width="200" style="border-radius: 8px" src="Assets/Image/MaiTTx_ICON.jpg"/>
 </div>
 
 前端采用Flutter+Dart进行开发，工具相关接口由后端自行实现，账户和权限认证系统对接 YunaNexusCore
@@ -114,6 +114,9 @@ rocketmq:
 
 ## 💕 关于Yuna：
 
+<div align="center">
+    <img alt="MaiTTxLogo" border="" width="200" style="border-radius: 8px" src="Assets/Image/YunaQ_AVATAR.png"/>
+</div>
 \[🚧头像、立绘、设定说明占位]<br/>
 \[🚧OC小作文占位.]
 
@@ -121,4 +124,4 @@ rocketmq:
 
 1. RSA相关配置在 `YunaNexusCore/yunanexus-common-security/src/main/resources/application.yaml` 中
 2. 各个服务都有自己的 RocketMQ服务配置，运行前需要自行根据自己的RocketMQ环境配置 `name-server`
-3. 今天去打舞萌了，所以休息一天。
+3. <br />
