@@ -9,7 +9,7 @@ public class OAuthLoginRequest {
      */
     private String grantType;
 
-    private String clientName;
+    private String clientUuid;
     private String clientSecret;
 
     // password 模式
