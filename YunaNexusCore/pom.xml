@@ -32,8 +32,7 @@
         <spring.cloud.version>2025.1.0</spring.cloud.version>
         <spring.cloud.alibaba.version>2025.1.0.0</spring.cloud.alibaba.version>
         <spring.cloud.alibaba.nacos.version>2025.1.0.0</spring.cloud.alibaba.nacos.version>
-        <spring.cloud.openfeign.version>4.1.2</spring.cloud.openfeign.version>
-        <spring.cloud.loadbalancer.version>5.0.1</spring.cloud.loadbalancer.version>
+
         <spring.boot.starter.aop.version>3.4.7</spring.boot.starter.aop.version>
         <spring.boot.starter.validation.version>4.0.5</spring.boot.starter.validation.version>
         <spring.boot.starter.mail>4.0.0</spring.boot.starter.mail>
@@ -151,18 +150,6 @@
                 <groupId>org.apache.rocketmq</groupId>
                 <artifactId>rocketmq-spring-boot-starter</artifactId>
                 <version>${spring.boot.starter.rocketmq}</version>
-            </dependency>
-
-            <!-- OpenFeign -->
-            <dependency>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-starter-openfeign</artifactId>
-                <version>${spring.cloud.openfeign.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-starter-loadbalancer</artifactId>
-                <version>${spring.cloud.loadbalancer.version}</version>
             </dependency>
 
             <!-- common -->

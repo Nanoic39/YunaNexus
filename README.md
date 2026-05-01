@@ -120,7 +120,7 @@ rocketmq:
 \[🚧头像、立绘、设定说明占位]<br/>
 \[🚧OC小作文占位.]
 
-## 🚩 备注：
+## 🚩 备注(带*的为必须处理的内容)：
 
 ### RSA
 RSA相关配置在 `YunaNexusCore/yunanexus-common-security/src/main/resources/application.yaml` 中，不建议进行改动
@@ -128,7 +128,7 @@ RSA相关配置在 `YunaNexusCore/yunanexus-common-security/src/main/resources/a
 ### *RocketMQ
 各个服务都有自己的 RocketMQ服务配置，运行前需要自行根据自己的RocketMQ环境配置 `name-server`
 
-### OAuth
+### *OAuth
 YunaNexusCore的OAuth数据需要使用 `/sql-schema/scripts/` 中的 `oauth-info-init.py` 脚本进行初始化
 
 所有脚本所需的依赖位于requirements.txt文件中，可以使用 `pip install -r requirements.txt` 进行安装
