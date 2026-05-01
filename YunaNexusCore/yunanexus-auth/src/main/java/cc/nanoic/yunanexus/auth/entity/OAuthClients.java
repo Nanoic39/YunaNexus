@@ -25,12 +25,14 @@ public class OAuthClients {
     private Integer clientType;
 
     /**
-     * 审核状态(0：待审核，1：已通过，2：已拒绝)
+     * 审核状态(0：待审核，1：已通过，2：已拒绝)<br/>
+     * 仅第三方应用需要审核，官方默认为已通过
      */
     private Integer auditStatus;
 
     /**
-     * 审核意见
+     * 审核意见<br/>
+     * 仅第三方应用需要填写，官方默认为"官方应用【{该OAuth客户端配置创建人UUID}】"
      */
     private String auditOpinion;
 

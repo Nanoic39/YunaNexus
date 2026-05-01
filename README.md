@@ -122,6 +122,36 @@ rocketmq:
 
 ## 🚩 备注：
 
-1. RSA相关配置在 `YunaNexusCore/yunanexus-common-security/src/main/resources/application.yaml` 中
-2. 各个服务都有自己的 RocketMQ服务配置，运行前需要自行根据自己的RocketMQ环境配置 `name-server`
-3. <br />
+### RSA
+RSA相关配置在 `YunaNexusCore/yunanexus-common-security/src/main/resources/application.yaml` 中，不建议进行改动
+
+### *RocketMQ
+各个服务都有自己的 RocketMQ服务配置，运行前需要自行根据自己的RocketMQ环境配置 `name-server`
+
+### OAuth
+YunaNexusCore的OAuth数据需要使用 `/sql-schema/scripts/` 中的 `oauth-info-init.py` 脚本进行初始化
+
+所有脚本所需的依赖位于requirements.txt文件中，可以使用 `pip install -r requirements.txt` 进行安装
+
+建议在脚本文件夹中构建Python虚拟环境，然后在虚拟环境内运行脚本
+
+上述完整操作命令如下：
+
+```bash
+# {YOUR_PATH}\YunaNexus 表示你的项目根目录，下方的指令格式为：
+# > {你当前步骤应该在的项目路径} ~: #{该步骤用处解释}
+# {需要执行的指令}
+> {YOUR_PATH}\YunaNexus ~: # 进入脚本文件夹
+cd .\sql-sechma\script
+
+> {YOUR_PATH}\YunaNexus\sql-sechma\script ~: # 创建虚拟环境
+python -m venv .venv
+
+> {YOUR_PATH}\YunaNexus\sql-sechma\script ~: # 激活虚拟环境(有些终端检测到虚拟环境后也会自动激活)
+.venv\Scripts\Activate.ps1
+
+> {YOUR_PATH}\YunaNexus\sql-sechma\script ~: # 安装依赖
+pip install -r requirements.txt
+```
+
+随后自行执行需要使用的脚本即可，如：`./oauth-info-init.py`

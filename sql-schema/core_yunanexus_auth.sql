@@ -24,7 +24,7 @@ CREATE TABLE `oauth_clients` (
     -- 授权模式（password=密码登录, refresh_token=刷新Token, client_credentials=客户端模式, authorization_code=SSO单点登录模式）
     -- core默认为：password,refresh_token
     -- 官方客户端默认为：authorization_code,password,refresh_token
-    -- 第三方应用只能为：refresh_token,client_credentials
+    -- 第三方应用只能为：authorization_code,refresh_token
     `authorized_grant_types` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '授权模式列表(多个授权模式用英文逗号分隔：password | refresh_token | client_credentials | authorization_code)',
 
     `scope` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'all' COMMENT '权限范围(多个权限范围用英文逗号分隔：all | read | write | {模块名称})',
@@ -33,9 +33,10 @@ CREATE TABLE `oauth_clients` (
     `access_token_validity` INT DEFAULT 7200 COMMENT 'Access Token有效期（秒）', -- 默认2小时
     `refresh_token_validity` INT DEFAULT 604800 COMMENT 'Refresh Token有效期（秒）', -- 默认7天
 
-    -- 是否允许自动授权/无需手动点击授权按钮（true=允许，false=不允许）
+    -- 是否允许自动授权/无需手动点击授权按钮（1=允许，0=不允许）
     -- 自动授权：用户跳转到授权页 → 不用点「确认授权」，系统直接通过，自动跳回业务端
     -- 手动授权：用户必须手动点击「确认授权」，才会发放授权码，否则拒绝授权
+    -- 仅在 authorization_code 授权模式下生效
     `auto_approve` TINYINT NOT NULL DEFAULT 0 COMMENT '是否无需手动点击授权按钮（仅官方客户端支持修改，0：否，1：是）', -- 默认不允许自动授权，仅官方客户端支持修改
 
     -- 绑定系统角色：客户端登录后自动拥有的角色（实现端级别权限隔离）

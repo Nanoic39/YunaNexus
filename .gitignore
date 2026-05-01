@@ -55,3 +55,4 @@ build/
 # Postman文件
 postman/
 .postman/
+**/.venv
