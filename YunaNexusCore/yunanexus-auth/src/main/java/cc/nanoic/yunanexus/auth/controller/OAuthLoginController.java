@@ -11,10 +11,7 @@ import cc.nanoic.yunanexus.common.web.common.Result;
 import cn.hutool.crypto.digest.BCrypt;
 import jakarta.annotation.Resource;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -134,6 +131,41 @@ public class OAuthLoginController {
         yunaRedisService.delete("auth:refresh:" + oldRefreshToken);
 
         return Result.success(token, "刷新成功");
+    }
+
+    @PostMapping("/logout")
+    public Result<?> logout(@RequestHeader(value = "Authorization", required = false) String authorization) {
+        // 校验accessToken的格式
+        if (!StringUtils.hasText(authorization) || !authorization.startsWith("Bearer ")) {
+            return Result.fail(R.PARAM_ERROR, "accessToken格式错误");
+        }
+
+        String accessToken = authorization.substring(7).trim();
+        if (!StringUtils.hasText(accessToken)) {
+            return Result.fail(R.PARAM_ERROR, "accessToken不能为空");
+        }
+
+        // TODO: 后续Prefix数据需要统一从配置中心获取
+        // 如果accessToken无效则可以认为已登出，前端直接清空保存的refresh即可
+        String accessKey = "auth:access:" + accessToken;
+        String subject = yunaRedisService.get(accessKey);
+        if (!StringUtils.hasText(subject)) {
+            return Result.success("登录状态已失效");
+        }
+
+        // 找到accessToken绑定的refreshToken
+        String refreshToken = yunaRedisService.get("auth:pair:access:" + accessToken);
+        // 删除accessToken
+        yunaRedisService.delete(accessKey);
+        // 删除绑定表
+        yunaRedisService.delete("auth:pair:access:" + accessToken);
+        // 如果存在refreshToken则删除refreshToken和refreshToken绑定access的表
+        if (StringUtils.hasText(refreshToken)) {
+            yunaRedisService.delete("auth:refresh:" + refreshToken);
+            yunaRedisService.delete("auth:pair:refresh:" + refreshToken);
+        }
+
+        return Result.success("登出成功");
     }
 
 
