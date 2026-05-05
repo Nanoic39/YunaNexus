@@ -22,7 +22,7 @@ YunaNexus/
 
 ## 🔧 application-local.yaml配置文件(开发完毕后该板块会被替换为项目运行指南，届时代码仓库中会提供模板文件)
 
-位于`YunaNexusCore/yunanexus-user/src/main/resources/`下
+位于`YunaNexusCore/yunanexus-{xxx}/src/main/resources/`下
 
 与`application.yaml`同一层级
 
@@ -64,6 +64,9 @@ yunanexus:
     enabled: { boolean:true } # 启用RocketMQ?
     send-timeout-ms: 3000 # 发送超时时间(ms)
     send-retry-times: 3 # 发送重试次数
+  auth:
+    jwt:
+      secret: { jwtSecurity } # JWT密钥
 rocketmq:
   name-server: 127.0.0.1:9876 # RocketMQ默认地址，生产/消费均需要配置
   producer: # 生产者需要配置，消费者只需要在注解中声明即可

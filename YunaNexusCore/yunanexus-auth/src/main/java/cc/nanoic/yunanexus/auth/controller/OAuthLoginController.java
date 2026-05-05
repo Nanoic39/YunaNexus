@@ -2,22 +2,21 @@ package cc.nanoic.yunanexus.auth.controller;
 
 import cc.nanoic.yunanexus.auth.client.UserInternalClient;
 import cc.nanoic.yunanexus.auth.entity.DTO.OAuthLoginRequest;
+import cc.nanoic.yunanexus.auth.entity.DTO.OAuthRefreshRequest;
 import cc.nanoic.yunanexus.auth.entity.OAuthClients;
 import cc.nanoic.yunanexus.auth.entity.VO.OAuthLoginTokenVO;
 import cc.nanoic.yunanexus.auth.service.OAuthClientsService;
-import cc.nanoic.yunanexus.common.redis.service.YunaRedisService;
+import cc.nanoic.yunanexus.auth.service.TokenService;
 import cc.nanoic.yunanexus.common.web.common.R;
 import cc.nanoic.yunanexus.common.web.common.Result;
 import cn.hutool.crypto.digest.BCrypt;
 import jakarta.annotation.Resource;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.Duration;
+import com.alibaba.fastjson2.JSON;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/oauth")
@@ -27,10 +26,10 @@ public class OAuthLoginController {
     private OAuthClientsService oAuthClientsService;
 
     @Resource
-    private YunaRedisService yunaRedisService;
+    private UserInternalClient userInternalClient;
 
     @Resource
-    private UserInternalClient userInternalClient;
+    private TokenService tokenService;
 
     //TODO: 要不要拆分不同接口的RequestBody?
 
@@ -70,20 +69,25 @@ public class OAuthLoginController {
                     return Result.fail(R.PARAM_ERROR, "用户名或密码不能为空!");
                 }
 
-                subject = verifyByUserService(req.getUsername(), req.getPassword());
-                if (!StringUtils.hasText(subject)) {
+                // 校验账号密码
+                Map<String, Object> userInfo = verifyByUserService(req.getUsername(), req.getPassword());
+                if(userInfo == null || userInfo.get("userId") == null) {
                     return Result.fail(R.ACCOUNT_ERROR, "账号或密码错误");
                 }
+                Map<String, Object> subjectMap = new HashMap<>();
+                subjectMap.put("userId", userInfo.get("userId"));
+                subjectMap.put("userUuid", userInfo.get("userUuid"));
+                subjectMap.put("clientUuid", client.getUuid());
+                subject = JSON.toJSONString(subjectMap);
             }
             case "client_credentials" -> subject = "client:" + client.getUuid();
             case "refresh_token" -> {
-                if (!StringUtils.hasText(req.getRefreshToken())) {
-                    return Result.fail(R.PARAM_ERROR, "refreshToken不能为空!");
-                }
-                subject = yunaRedisService.get("auth:refresh:" + req.getRefreshToken());
-                if (!StringUtils.hasText(subject)) {
-                    return Result.fail(R.TOKEN_ALL_EXPIRED, "refreshToken已失效");
-                }
+                // 不可以在login接口中刷新Token，如有需要请直接请求refresh接口
+                return Result.fail(R.PARAM_ERROR, "刷新token请调用 refresh 接口!");
+            }
+            case "authorization_code" -> {
+                // 不可以在login接口中处理authorization认证流程
+                return Result.fail(R.PARAM_ERROR, "禁止使用登录接口处理认证!");
             }
             case null, default -> {
                 return Result.fail(R.PARAM_ERROR, "不支持的grantType");
@@ -101,7 +105,7 @@ public class OAuthLoginController {
      * @return 刷新结果
      */
     @PostMapping("/refresh")
-    public Result<OAuthLoginTokenVO> refresh(@RequestBody OAuthLoginRequest req) {
+    public Result<OAuthLoginTokenVO> refresh(@RequestBody OAuthRefreshRequest req) {
         if (!StringUtils.hasText(req.getClientUuid())
                 || !StringUtils.hasText(req.getClientSecret())
                 || !StringUtils.hasText(req.getRefreshToken())) {
@@ -119,20 +123,20 @@ public class OAuthLoginController {
             return Result.fail(R.ACCOUNT_ERROR, "客户端密钥错误.");
         }
 
-        String oldRefreshToken = req.getRefreshToken();
-        String subject = yunaRedisService.get("auth:refresh:" + oldRefreshToken);
-        if (!StringUtils.hasText(subject)) {
+        OAuthLoginTokenVO token = tokenService.refreshToken(client, req.getRefreshToken());
+        if(token == null) {
             return Result.fail(R.TOKEN_ALL_EXPIRED, "refreshToken已失效");
         }
 
-        // 先生成新的token
-        OAuthLoginTokenVO token = generateOAuthToken(client, subject);
-        // 再删除旧的refreshToken
-        yunaRedisService.delete("auth:refresh:" + oldRefreshToken);
-
-        return Result.success(token, "刷新成功");
+        // 静默刷新，不应该有提示
+        return Result.success(token);
     }
 
+    /**
+     * 登出
+     * @param authorization accessToken
+     * @return 登出结果
+     */
     @PostMapping("/logout")
     public Result<?> logout(@RequestHeader(value = "Authorization", required = false) String authorization) {
         // 校验accessToken的格式
@@ -145,24 +149,9 @@ public class OAuthLoginController {
             return Result.fail(R.PARAM_ERROR, "accessToken不能为空");
         }
 
-        // TODO: 后续Prefix数据需要统一从配置中心获取
-        // 如果accessToken无效则可以认为已登出，前端直接清空保存的refresh即可
-        String accessKey = "auth:access:" + accessToken;
-        String subject = yunaRedisService.get(accessKey);
-        if (!StringUtils.hasText(subject)) {
+        boolean revoked = tokenService.logoutByAccessToken(accessToken);
+        if (!revoked) {
             return Result.success("登录状态已失效");
-        }
-
-        // 找到accessToken绑定的refreshToken
-        String refreshToken = yunaRedisService.get("auth:pair:access:" + accessToken);
-        // 删除accessToken
-        yunaRedisService.delete(accessKey);
-        // 删除绑定表
-        yunaRedisService.delete("auth:pair:access:" + accessToken);
-        // 如果存在refreshToken则删除refreshToken和refreshToken绑定access的表
-        if (StringUtils.hasText(refreshToken)) {
-            yunaRedisService.delete("auth:refresh:" + refreshToken);
-            yunaRedisService.delete("auth:pair:refresh:" + refreshToken);
         }
 
         return Result.success("登出成功");
@@ -209,7 +198,7 @@ public class OAuthLoginController {
      * @param password 密码
      * @return Uuid结果
      */
-    private String verifyByUserService(String username, String password) {
+    private Map<String, Object> verifyByUserService(String username, String password) {
         try {
             Map<String, String> req = new HashMap<>();
             req.put("username", username);
@@ -219,8 +208,7 @@ public class OAuthLoginController {
                 return null;
             }
             // 这里字段需要和 UserController 中返回的字段保持一致
-            Object userUuid = resp.getData().get("userUuid");
-            return userUuid == null ? null : String.valueOf(userUuid);
+            return resp.getData();
         } catch (Exception e) {
             return null;
         }
@@ -234,21 +222,6 @@ public class OAuthLoginController {
      */
     private OAuthLoginTokenVO generateOAuthToken(OAuthClients client, String subject) {
         // 过期时间
-        long accessTtl = client.getAccessTokenValidity() == null ? 7200L : client.getAccessTokenValidity();
-        long refreshTokenTtl = client.getRefreshTokenValidity() == null ? 604800L : client.getRefreshTokenValidity();
-
-        String accessToken = UUID.randomUUID().toString().replace("-", "");
-        String refreshToken = UUID.randomUUID().toString().replace("-", "");
-
-        yunaRedisService.set("auth:access:" + accessToken, subject, Duration.ofSeconds(accessTtl));
-        yunaRedisService.set("auth:refresh:" + refreshToken, subject, Duration.ofSeconds(refreshTokenTtl));
-
-        return OAuthLoginTokenVO.builder()
-                .tokenType("Bearer")
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .expiresIn(accessTtl)
-                .scope(client.getScope())
-                .build();
+        return tokenService.generateToken(client, subject);
     }
 }
