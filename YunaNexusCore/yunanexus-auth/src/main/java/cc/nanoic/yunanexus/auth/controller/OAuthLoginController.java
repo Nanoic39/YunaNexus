@@ -157,6 +157,24 @@ public class OAuthLoginController {
         return Result.success("登出成功");
     }
 
+    @PostMapping("/parse")
+    public Result<?> parse(@RequestHeader(value = "Authorization", required = false) String authorization) {
+        if (!StringUtils.hasText(authorization) || !authorization.startsWith("Bearer ")) {
+            return Result.fail(R.PARAM_ERROR, "accessToken格式错误");
+        }
+
+        String accessToken = authorization.substring(7).trim();
+        if (!StringUtils.hasText(accessToken)) {
+            return Result.fail(R.PARAM_ERROR, "accessToken不能为空");
+        }
+
+        Map<String, Object> parsed = tokenService.parseAccessToken(accessToken);
+        if (parsed == null || parsed.get("userId") == null) {
+            return Result.fail(R.NOT_LOGIN, "token无效或已过期");
+        }
+        return Result.success(parsed);
+    }
+
 
 
     /**

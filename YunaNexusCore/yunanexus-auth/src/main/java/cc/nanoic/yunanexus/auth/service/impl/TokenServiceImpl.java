@@ -6,6 +6,8 @@ import cc.nanoic.yunanexus.auth.service.TokenService;
 import cc.nanoic.yunanexus.common.redis.service.YunaRedisService;
 import cn.hutool.jwt.JWT;
 import cn.hutool.jwt.JWTUtil;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.TypeReference;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,8 @@ import org.springframework.util.StringUtils;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -145,5 +149,61 @@ public class TokenServiceImpl implements TokenService {
 
         // 登出成功
         return true;
+    }
+
+    /**
+     * 解析AccessToken，返回用户上下文信息（供其它服务内部调用）
+     * @param accessToken accessToken
+     * @return 解析结果
+     */
+    public Map<String, Object> parseAccessToken(String accessToken) {
+        if(!StringUtils.hasText(accessToken)) {
+            return null;
+        }
+        byte[] key = jwtSecret.getBytes(StandardCharsets.UTF_8);
+        if(!JWTUtil.verify(accessToken, key)) {
+            return null;
+        }
+
+        JWT jwt = JWTUtil.parseToken(accessToken);
+        Object jtiObj = jwt.getPayload("jti");
+        Object expObj = jwt.getPayload("exp");
+        Object subObj = jwt.getPayload("sub");
+        if (jtiObj == null || expObj == null || subObj == null) {
+            return null;
+        }
+
+        String jti = String.valueOf(jtiObj);
+        if (StringUtils.hasText(yunaRedisService.get("auth:blacklist:access:" + jti))) {
+            return null;
+        }
+
+        long expSeconds;
+        if (expObj instanceof Number num) {
+            expSeconds = num.longValue();
+        } else {
+            expSeconds = Long.parseLong(String.valueOf(expObj));
+        }
+        long nowSeconds = System.currentTimeMillis() / 1000;
+        if (expSeconds <= nowSeconds) {
+            return null;
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("jti", jti);
+        result.put("exp", expSeconds);
+        result.put("clientUuid", jwt.getPayload("cid"));
+        result.put("scope", jwt.getPayload("scope"));
+
+        String sub = String.valueOf(subObj);
+        try {
+            Map<String, Object> subMap = JSON.parseObject(sub, new TypeReference<Map<String, Object>>() {});
+            if(subMap != null) {
+                result.putAll(subMap);
+            }
+        } catch (Exception ignore) {
+            result.put("sub", sub);
+        }
+        return result;
     }
 }
