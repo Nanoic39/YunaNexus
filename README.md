@@ -12,7 +12,7 @@ YunaNexus/
 │   ├── yunanexus-common-security/ # 提供 Security SDK
 │   ├── yunanexus-common-rocketmq/ # 提供 RocketMQ SDK
 │   ├── yunanexus-common-web/      # 提供 LocalDateTime/Result/Exception SDK
-│   ├── yunanexus-auth/            # 提供安全认证相关的后端支持 ( 🚧 开发中... )
+│   ├── yunanexus-auth/            # 提供安全认证相关的后端支持
 │   └── yunanexus-user/            # 提供用户账户/权限相关的后端支持
 ├── sql-schema/                    # YunaNexusCore用到的SQL数据结构
 └── Assets/                        # 用于本项目仓库的素材文件(不影响具体项目内容)

@@ -7,7 +7,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum R {
     // 基础
-    SUCCESS(200, "操作成功", ""),
+    SUCCESS(200, "操作成功", null),
     SERVER_ERROR(500, "服务器内部异常", "服务异常，请稍后重试"),
 
     // 客户端错误
