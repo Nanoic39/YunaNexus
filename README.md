@@ -67,6 +67,8 @@ yunanexus:
   auth:
     jwt:
       secret: { jwtSecurity } # JWT密钥
+      access-exp: 7200 # 默认access过期时间
+      refresh-exp: 604800 # 默认refresh过期时间
 rocketmq:
   name-server: 127.0.0.1:9876 # RocketMQ默认地址，生产/消费均需要配置
   producer: # 生产者需要配置，消费者只需要在注解中声明即可

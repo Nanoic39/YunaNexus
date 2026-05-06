@@ -7,12 +7,15 @@ import cc.nanoic.yunanexus.common.security.annotation.RSADecryptRequest;
 import cc.nanoic.yunanexus.common.web.common.BusinessException;
 import cc.nanoic.yunanexus.common.web.common.R;
 import cc.nanoic.yunanexus.common.web.common.Result;
+import cc.nanoic.yunanexus.user.client.AuthInternalClient;
 import cc.nanoic.yunanexus.user.entity.DTO.EmailVerifySend;
 import cc.nanoic.yunanexus.user.entity.DTO.OAuthVerifyUserAccountDTO;
 import cc.nanoic.yunanexus.user.entity.DTO.RegisterDTO;
 import cc.nanoic.yunanexus.user.entity.ServiceVersion;
+import cc.nanoic.yunanexus.user.entity.UserInfo;
 import cc.nanoic.yunanexus.user.entity.Users;
 import cc.nanoic.yunanexus.user.entity.VO.PingVO;
+import cc.nanoic.yunanexus.user.mapper.UserInfoMapper;
 import cc.nanoic.yunanexus.user.service.PingService;
 import cc.nanoic.yunanexus.user.service.UsersService;
 import cc.nanoic.yunanexus.user.utils.FormatTime;
@@ -54,6 +57,12 @@ public class UserController {
 
     @Value("${yunanexus.mail.verify.code.expire-seconds}")
     private long expireSeconds;
+
+    @Resource
+    private AuthInternalClient authInternalClient;
+
+    @Resource
+    private UserInfoMapper userInfoMapper;
 
     /**
      * PING!
@@ -192,6 +201,74 @@ public class UserController {
         data.put("username", user.getUsername());
 
         return Result.success(data);
+    }
+
+    /**
+     * 当前用户信息
+     * @param authorization accessToken
+     * @return 结果
+     */
+    @GetMapping("/me")
+    public Result<?> currentUser(@RequestHeader(value = "Authorization", required = false) String authorization) {
+        if (!StringUtils.hasText(authorization) || !authorization.startsWith("Bearer ")) {
+            return Result.fail(R.PARAM_ERROR, "Authorization格式错误");
+        }
+
+        Result<Map<String, Object>> parsedResp;
+        try {
+            parsedResp = authInternalClient.parseToken(authorization);
+        } catch (Exception e) {
+            return Result.fail(R.SERVER_ERROR, "认证服务暂时不可用");
+        }
+
+        if (parsedResp == null || parsedResp.getCode() != R.SUCCESS.getCode() || parsedResp.getData() == null) {
+            return Result.fail(R.NOT_LOGIN, "token无效或已过期");
+        }
+
+        Long userId = parseLong(parsedResp.getData().get("userId"));
+        if (userId == null) {
+            return Result.fail(R.NOT_LOGIN, "token用户信息无效");
+        }
+
+        Users user = usersService.getById(userId);
+        if (user == null) {
+            return Result.fail(R.ACCOUNT_ERROR, "用户不存在");
+        }
+
+        UserInfo userInfo = userInfoMapper.selectOne(
+                new LambdaQueryWrapper<UserInfo>()
+                        .eq(UserInfo::getUserId, userId)
+                        .last("LIMIT 1")
+        );
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", user.getId());
+        data.put("userUuid", user.getUuid());
+        data.put("username", user.getUsername());
+        data.put("email", user.getEmail());
+        data.put("status", user.getStatus());
+        if (userInfo != null) {
+            data.put("nickname", userInfo.getNickname());
+            data.put("avatarUuid", userInfo.getAvatarUuid());
+            data.put("gender", userInfo.getGender());
+            data.put("birthday", userInfo.getBirthday());
+        }
+
+        return Result.success(data);
+    }
+
+    private Long parseLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
 
