@@ -3,6 +3,7 @@ package cc.nanoic.yunanexus.auth.service.impl;
 import cc.nanoic.yunanexus.auth.entity.OAuthClients;
 import cc.nanoic.yunanexus.auth.entity.VO.OAuthLoginTokenVO;
 import cc.nanoic.yunanexus.auth.service.TokenService;
+import cc.nanoic.yunanexus.auth.support.AuthRedisKeyPrefixProvider;
 import cc.nanoic.yunanexus.common.redis.service.YunaRedisService;
 import cn.hutool.jwt.JWT;
 import cn.hutool.jwt.JWTUtil;
@@ -12,7 +13,6 @@ import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Date;
@@ -34,6 +34,9 @@ public class TokenServiceImpl implements TokenService {
 
     @Value("${yunanexus.auth.jwt.refresh-exp}")
     private long jwtRefreshExp;
+
+    @Resource
+    private AuthRedisKeyPrefixProvider authRedisKeyPrefixProvider;
 
     /**
      * 生成密钥

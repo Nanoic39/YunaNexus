@@ -31,8 +31,6 @@ public class OAuthLoginController {
     @Resource
     private TokenService tokenService;
 
-    //TODO: 要不要拆分不同接口的RequestBody?
-
     /**
      * 登录接口
      * @param req OAuthLoginRequest
