@@ -13,6 +13,8 @@ import java.util.concurrent.atomic.AtomicReference;
 @Component
 public class AuthRedisKeyPrefixProvider {
 
+    // TODO: 本地实现，临时过渡使用，待重新由MySQL数据库查表实现
+
     @Resource
     private YunaRedisService yunaRedisService;
 
