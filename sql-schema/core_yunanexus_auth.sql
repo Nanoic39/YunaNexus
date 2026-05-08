@@ -54,18 +54,18 @@ CREATE TABLE `oauth_clients` (
 
 DROP TABLE IF EXISTS `redis_prefix`;
 CREATE TABLE `redis_prefix` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '服务Redis键前缀配置表主键id',
-    `service_name` VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '服务名称(唯一,对应spring.application.name)',
-    `redis_key_prefix` VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Redis Key前缀(如: auth:refresh | user:refresh | file:refresh)',
-    `version` BIGINT NOT NULL DEFAULT 1 COMMENT '配置版本号(每次变更+1,用于增量刷新)',
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '配置状态(0：禁用，1：启用)',
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Redis Key模板表主键id',
+    `service_name` VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '服务名称(对应spring.application.name)',
+    `key_code` VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模板编码(唯一,如: AUTH_REFRESH)',
+    `key_template` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '完整Key模板(例: auth:refresh:{refreshToken})',
+    `version` BIGINT NOT NULL DEFAULT 1 COMMENT '模板版本号(每次变更+1,用于增量刷新)',
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态(0：禁用，1：启用)',
     `remark` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '备注',
     `create_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`) USING BTREE,
-    UNIQUE INDEX `ui_service_name` (`service_name` ASC) USING BTREE,
-    UNIQUE INDEX `ui_redis_key_prefix` (`redis_key_prefix` ASC) USING BTREE,
-    INDEX `idx_status_version` (`status` ASC, `version` ASC) USING BTREE
+    UNIQUE INDEX `ui_service_key_code` (`service_name` ASC, `key_code` ASC) USING BTREE,
+    INDEX `idx_service_status_version` (`service_name` ASC, `status` ASC, `version` ASC) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '服务Redis键前缀配置表' ROW_FORMAT = Dynamic;
 
 --
