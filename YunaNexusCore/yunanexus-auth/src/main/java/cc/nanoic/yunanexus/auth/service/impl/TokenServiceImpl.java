@@ -87,7 +87,6 @@ public class TokenServiceImpl implements TokenService {
      * @param client OAuth客户端信息
      * @param refreshToken refreshToken
      * @return 刷新后的Token信息
-     * TODO: 从中心获取前缀
      */
     @Override
     public OAuthLoginTokenVO refreshToken(OAuthClients client, String refreshToken) {

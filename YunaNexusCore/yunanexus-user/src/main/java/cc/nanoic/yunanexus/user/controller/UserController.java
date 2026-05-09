@@ -15,11 +15,13 @@ import cc.nanoic.yunanexus.user.entity.ServiceVersion;
 import cc.nanoic.yunanexus.user.entity.UserInfo;
 import cc.nanoic.yunanexus.user.entity.Users;
 import cc.nanoic.yunanexus.user.entity.VO.PingVO;
+import cc.nanoic.yunanexus.user.entity.VO.UserInfoVO;
 import cc.nanoic.yunanexus.user.mapper.UserInfoMapper;
 import cc.nanoic.yunanexus.user.service.PingService;
 import cc.nanoic.yunanexus.user.service.UsersService;
 import cc.nanoic.yunanexus.user.utils.FormatTime;
 import cn.hutool.crypto.digest.BCrypt;
+import jakarta.annotation.Nullable;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.StringUtils;
@@ -167,6 +169,12 @@ public class UserController {
         return Result.success("验证码已发送到您的邮箱!");
     }
 
+    /**
+     * OAuth验证账户
+     * @param oAuthVerifyUserAccountDTO 账号密码
+     * @return 账户信息
+     * TODO: 全部使用实体，便于固定格式处理数据
+     */
     @PostMapping("/oauth/verify")
     public Result<?> oAuthVerifyUserAccount(@RequestBody OAuthVerifyUserAccountDTO oAuthVerifyUserAccountDTO) {
         String username = oAuthVerifyUserAccountDTO.getUsername();
@@ -225,7 +233,9 @@ public class UserController {
             return Result.fail(R.NOT_LOGIN, "token无效或已过期");
         }
 
+        // 解析UserId
         Long userId = parseLong(parsedResp.getData().get("userId"));
+
         if (userId == null) {
             return Result.fail(R.NOT_LOGIN, "token用户信息无效");
         }
@@ -241,22 +251,76 @@ public class UserController {
                         .last("LIMIT 1")
         );
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("userId", user.getId());
-        data.put("userUuid", user.getUuid());
-        data.put("username", user.getUsername());
-        data.put("email", user.getEmail());
-        data.put("status", user.getStatus());
-        if (userInfo != null) {
-            data.put("nickname", userInfo.getNickname());
-            data.put("avatarUuid", userInfo.getAvatarUuid());
-            data.put("gender", userInfo.getGender());
-            data.put("birthday", userInfo.getBirthday());
-        }
-
-        return Result.success(data);
+        UserInfoVO userInfoVO = buildUserInfoVO(user, userInfo);
+        return Result.success(userInfoVO);
     }
 
+    /**
+     * 外部使用的查询其它(或自己)信息的接口
+     * @param userUuid 待查询的用户uuid
+     * @param authorization 个人Token，用于无Uuid回退时查询自己的信息
+     * @return 查询结果
+     */
+    @GetMapping("/user-info")
+    public Result<?> userInfo(@RequestParam(value = "userUuid", required = false) String userUuid, @RequestHeader(value = "Authorization", required = false) String authorization) {
+        if(!StringUtils.hasText(userUuid)) {
+            // 不传参数说明查询的是自己，此时必须存在Token，否则返回异常
+            // 但是只要存在Uuid就优先查询Uuid
+            // 直接复用自查逻辑
+            currentUser(authorization);
+        }
+
+        // 查询用户信息
+        Users user = usersService.getOne(
+                new LambdaQueryWrapper<Users>()
+                        .eq(Users::getUuid, userUuid)
+                        .last("LIMIT 1")
+        );
+
+        if (user == null) {
+            return Result.fail(R.NOT_FOUND, "用户不存在");
+        }
+
+        // 查询UserInfo
+        UserInfo userInfo = userInfoMapper.selectOne(
+                new LambdaQueryWrapper<UserInfo>()
+                        .eq(UserInfo::getUserId, user.getId())
+                        .last("LIMIT 1")
+        );
+
+        // 构造UserInfoVO
+        // 隐藏生日(生日不应该被其他用户查询)
+        userInfo.setBirthday(null);
+        UserInfoVO userInfoVO = buildUserInfoVO(user, userInfo);
+
+        return Result.success(userInfoVO);
+    }
+
+    /**
+     * 构造返回信息
+     * @param user 需要构造的用户账户
+     * @param userInfo 需要构造的用户信息
+     * @return 构造结果
+     */
+    private UserInfoVO buildUserInfoVO(Users user, UserInfo userInfo) {
+        UserInfoVO userInfoVO = new UserInfoVO();
+        // 无论什么情况下都不应该返回UserId
+        userInfoVO.setUuid(user.getUuid()); // Uuid
+        userInfoVO.setNickname(userInfo.getNickname()); // 昵称
+        userInfoVO.setAvatarUuid(userInfo.getAvatarUuid()); // 头像Uuid
+        userInfoVO.setGender(userInfo.getGender()); // 性别
+        userInfoVO.setBirthday(null); // 生日属于敏感信息，不允许被其它用户查询
+        userInfoVO.setCreateTime(user.getCreateTime()); // 账户创建时间
+        userInfoVO.setUpdateTime(userInfo.getUpdateTime()); // 用户信息更新时间
+
+        return userInfoVO;
+    }
+
+    /**
+     * 将Object解析为Long(uid)
+     * @param value Object值
+     * @return uid
+     */
     private Long parseLong(Object value) {
         if (value == null) {
             return null;
@@ -270,6 +334,7 @@ public class UserController {
             return null;
         }
     }
+
 
 
 }
