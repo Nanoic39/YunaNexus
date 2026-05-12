@@ -68,5 +68,162 @@ CREATE TABLE `redis_prefix` (
     INDEX `idx_service_status_version` (`service_name` ASC, `status` ASC, `version` ASC) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '服务Redis键前缀配置表' ROW_FORMAT = Dynamic;
 
+
+-- 权限中心表（认证中心统一鉴权/权限快照）
+
+-- 角色表
+DROP TABLE IF EXISTS `roles`;
+CREATE TABLE `roles` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '角色表主键id',
+    `name` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '角色名称(唯一)',
+    `level` INT NOT NULL DEFAULT 1 COMMENT '角色等级（1-5：普通用户，6-8：管理员，9：超级管理员）',
+    `parent_role_id` BIGINT NULL DEFAULT NULL COMMENT '父角色ID(用于继承角色权限)',
+    `description` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '角色描述',
+    `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '角色创建时间戳',
+    `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '角色更新时间戳',
+    `status` tinyint NOT NULL DEFAULT 1 COMMENT '角色状态(0：禁用，1：启用)',
+    PRIMARY KEY (`id`) USING BTREE,
+    UNIQUE INDEX `ui_name` (`name` ASC) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色表' ROW_FORMAT = Dynamic;
+
+-- 资源表（标识所有接口/菜单/数据实体）
+DROP TABLE IF EXISTS `resources`;
+CREATE TABLE `resources` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '资源表主键id',
+    `name` VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '资源名称(唯一)',
+    `code` VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '资源标识(唯一,支持通配符*，如：user:info:* | user:*:read | *)',
+    `type` VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '类型( MENU | API | DATA | COMPONENT )',
+    `parent_id` BIGINT NULL DEFAULT NULL COMMENT '父资源ID(用于递归表示资源层级)',
+    `path` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '接口路径/路由(如果类型为 MENU | API | DATA )',
+    `status` tinyint NOT NULL DEFAULT 1 COMMENT '资源状态(0：禁用，1：启用)',
+    PRIMARY KEY (`id`) USING BTREE,
+    UNIQUE INDEX `ui_name_code` (`name` ASC, `code` ASC) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '资源表' ROW_FORMAT = Dynamic;
+
+-- 资源字段表（实现字段级权限/元素级显隐时可复用）
+DROP TABLE IF EXISTS `resource_fields`;
+CREATE TABLE `resource_fields` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '资源字段表主键id',
+    `resource_id` BIGINT NOT NULL COMMENT '资源表外键id(关联resources表的id字段)',
+    `field_name` VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '字段名称(唯一，如：nickname | avatar_uuid | gender | birthday)',
+    `description` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '字段描述',
+    `status` tinyint NOT NULL DEFAULT 1 COMMENT '资源字段状态(0：禁用，1：启用)',
+    PRIMARY KEY (`id`) USING BTREE,
+    INDEX `idx_resource_id` (`resource_id` ASC) USING BTREE,
+    FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '资源字段表' ROW_FORMAT = Dynamic;
+
+-- 用户角色关联表（不对User库users做外键，避免跨库依赖）
+DROP TABLE IF EXISTS `related_users_roles`;
+CREATE TABLE `related_users_roles` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '用户角色关联表主键id',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID(来自User服务users.id)',
+    `role_id` BIGINT NOT NULL COMMENT '角色表外键id(关联roles表的id字段)',
+    `status` tinyint NOT NULL DEFAULT 1 COMMENT '关联状态(0：禁用，1：启用)',
+    PRIMARY KEY (`id`) USING BTREE,
+    UNIQUE INDEX `ui_user_role` (`user_id` ASC, `role_id` ASC) USING BTREE,
+    INDEX `idx_user_id` (`user_id` ASC) USING BTREE,
+    INDEX `idx_role_id` (`role_id` ASC) USING BTREE,
+    FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户角色关联表' ROW_FORMAT = Dynamic;
+
+-- 数据权限规则表（行级权限）
+DROP TABLE IF EXISTS `data_rules`;
+CREATE TABLE `data_rules` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '数据权限规则表主键id',
+    `name` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '规则名称(唯一)',
+    `code` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '规则编码( ALL | SELF | ROLE | CUSTOM )',
+    `sql` VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '自定义规则SQL表达式',
+    `description` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '规则描述',
+    `status` tinyint NOT NULL DEFAULT 1 COMMENT '启用状态(0：禁用，1：启用)',
+    `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '规则创建时间戳',
+    `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '规则更新时间戳',
+    PRIMARY KEY (`id`) USING BTREE,
+    UNIQUE INDEX `ui_name` (`name` ASC) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '数据权限规则表' ROW_FORMAT = Dynamic;
+
+-- 角色权限关联表（角色+资源+字段+行级规则）
+DROP TABLE IF EXISTS `related_roles_resources_fields_rules`;
+CREATE TABLE `related_roles_resources_fields_rules` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '角色权限关联表主键id',
+    `role_id` BIGINT NOT NULL COMMENT '角色表外键id(关联roles表的id字段)',
+    `resource_id` BIGINT NOT NULL COMMENT '资源表外键id(关联resources表的id字段)',
+    `field_ids` VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '*' COMMENT '字段ID列表(多个字段ID用英文逗号分隔，*表示所有字段)',
+    `rule_id` BIGINT NOT NULL COMMENT '规则表外键id(关联data_rules表的id字段)',
+    `description` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '角色权限关联描述',
+    `status` tinyint NOT NULL DEFAULT 1 COMMENT '关联状态(0：禁用，1：启用)',
+    PRIMARY KEY (`id`) USING BTREE,
+    INDEX `idx_role_resource` (`role_id` ASC, `resource_id` ASC) USING BTREE,
+    FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (`rule_id`) REFERENCES `data_rules` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色权限关联表' ROW_FORMAT = Dynamic;
+
+-- 角色继承约束表
+DROP TABLE IF EXISTS `related_roles_constraint`;
+CREATE TABLE `related_roles_constraint` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '角色继承约束表主键id',
+    `role_id` BIGINT NOT NULL COMMENT '角色表外键id(关联roles表的id字段)',
+    `exclude_role_id` BIGINT NOT NULL COMMENT '互斥角色表外键id(关联roles表的id字段)',
+    `type` VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'EXCLUDE' COMMENT '约束类型( EXCLUDE | INHERIT )',
+    `status` tinyint NOT NULL DEFAULT 1 COMMENT '启用状态(0：禁用，1：启用)',
+    PRIMARY KEY (`id`) USING BTREE,
+    FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (`exclude_role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色继承约束表' ROW_FORMAT = Dynamic;
+
+-- 默认数据：角色/规则/资源/字段/默认权限
+INSERT INTO `roles` (`name`, `level`, `parent_role_id`, `description`, `status`) VALUES
+    ('SUPER_ADMIN', 9, NULL, '超级管理员', 1),
+    ('ADMIN', 6, NULL, '管理员', 1),
+    ('USER', 1, NULL, '普通用户', 1);
+
+INSERT INTO `data_rules` (`name`, `code`, `sql`, `description`, `status`) VALUES
+    ('ALL', 'ALL', '1=1', '默认全量规则', 1);
+
+INSERT INTO `resources` (`name`, `code`, `type`, `parent_id`, `path`, `status`) VALUES
+    ('全通配符权限', '*', 'API', NULL, '*', 1),
+    ('用户公开信息查询', 'user:public:read', 'API', NULL, '/user-info', 1),
+    ('当前用户信息查询', 'user:self:read', 'API', NULL, '/me', 1),
+    ('当前用户信息更新', 'user:self:update', 'API', NULL, '/user-info', 1),
+    ('用户信息数据资源', 'data:user_info', 'DATA', NULL, 'user_info', 1);
+
+INSERT INTO `resource_fields` (`resource_id`, `field_name`, `description`, `status`)
+SELECT rs.id, 'nickname', '昵称', 1 FROM `resources` rs WHERE rs.`code`='data:user_info' LIMIT 1;
+INSERT INTO `resource_fields` (`resource_id`, `field_name`, `description`, `status`)
+SELECT rs.id, 'avatar_uuid', '头像文件UUID', 1 FROM `resources` rs WHERE rs.`code`='data:user_info' LIMIT 1;
+INSERT INTO `resource_fields` (`resource_id`, `field_name`, `description`, `status`)
+SELECT rs.id, 'gender', '性别', 1 FROM `resources` rs WHERE rs.`code`='data:user_info' LIMIT 1;
+INSERT INTO `resource_fields` (`resource_id`, `field_name`, `description`, `status`)
+SELECT rs.id, 'birthday', '生日(敏感字段)', 1 FROM `resources` rs WHERE rs.`code`='data:user_info' LIMIT 1;
+
+-- SUPER_ADMIN 默认权限：授予全通配符(*)
+INSERT INTO `related_roles_resources_fields_rules` (`role_id`, `resource_id`, `field_ids`, `rule_id`, `description`, `status`)
+SELECT r.id, rs.id, '*', dr.id, 'SUPER_ADMIN全通配符权限', 1
+FROM `roles` r, `resources` rs, `data_rules` dr
+WHERE r.`name`='SUPER_ADMIN' AND rs.`code`='*' AND dr.`code`='ALL'
+LIMIT 1;
+
+-- USER 默认权限：公共信息read + 自己信息read/update
+INSERT INTO `related_roles_resources_fields_rules` (`role_id`, `resource_id`, `field_ids`, `rule_id`, `description`, `status`)
+SELECT r.id, rs.id, '*', dr.id, 'USER默认API权限', 1
+FROM `roles` r, `resources` rs, `data_rules` dr
+WHERE r.`name`='USER' AND rs.`code` IN ('user:public:read','user:self:read','user:self:update') AND dr.`code`='ALL';
+
+-- USER 字段级默认权限：隐藏birthday
+INSERT INTO `related_roles_resources_fields_rules` (`role_id`, `resource_id`, `field_ids`, `rule_id`, `description`, `status`)
+SELECT r.id, rs.id,
+       (SELECT GROUP_CONCAT(rf.id) FROM `resource_fields` rf WHERE rf.`resource_id`=rs.id AND rf.`field_name` IN ('nickname','avatar_uuid','gender')),
+       dr.id, 'USER默认字段级权限(隐藏birthday)', 1
+FROM `roles` r, `resources` rs, `data_rules` dr
+WHERE r.`name`='USER' AND rs.`code`='data:user_info' AND dr.`code`='ALL'
+LIMIT 1;
+
+-- ADMIN 默认权限：与USER一致（后续扩展）
+INSERT INTO `related_roles_resources_fields_rules` (`role_id`, `resource_id`, `field_ids`, `rule_id`, `description`, `status`)
+SELECT r.id, rs.id, '*', dr.id, 'ADMIN默认权限', 1
+FROM `roles` r, `resources` rs, `data_rules` dr
+WHERE r.`name`='ADMIN' AND rs.`code` IN ('user:public:read','user:self:read','user:self:update') AND dr.`code`='ALL';
+
 --
 SET FOREIGN_KEY_CHECKS = 1;

@@ -40,32 +40,6 @@ CREATE TABLE `user_info` (
     FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户信息表' ROW_FORMAT = Dynamic;
 
--- 资源表（标识所有接口/菜单/数据实体）
-DROP TABLE IF EXISTS `resources`;
-CREATE TABLE `resources` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '资源表主键id',
-    `name` VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '资源名称(唯一)',
-    `code` VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '资源标识(唯一，如：sys:menu | sys:menu:list)',
-    `type` VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '类型( MENU | API | DATA | COMPONENT )',
-    `parent_id` BIGINT NULL DEFAULT NULL COMMENT '父资源ID(用于递归表示资源层级)',
-    `path` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '接口路径/路由(如果类型为 MENU | API | DATA )',
-    `status` tinyint NOT NULL DEFAULT 1 COMMENT '资源状态(0：禁用，1：启用)',
-    PRIMARY KEY (`id`) USING BTREE,
-    UNIQUE INDEX `ui_name_code` (`name` ASC, `code` ASC) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '资源表' ROW_FORMAT = Dynamic;
-
--- 资源字段表（实现数据库字段级权限）
-DROP TABLE IF EXISTS `resource_fields`;
-CREATE TABLE `resource_fields` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '资源字段表主键id',
-    `resource_id` BIGINT NOT NULL COMMENT '资源表外键id(关联resources表的id字段)', -- 不能唯一，因为资源可以有多个字段
-    `field_name` VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '字段名称(唯一，如：email | username | password | nickname)',
-    `description` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '字段描述',
-    `status` tinyint NOT NULL DEFAULT 1 COMMENT '资源字段状态(0：禁用，1：启用)',
-    PRIMARY KEY (`id`) USING BTREE,
-    INDEX `idx_resource_id` (`resource_id` ASC) USING BTREE,
-    FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '资源字段表' ROW_FORMAT = Dynamic;
 
 -- 封禁表
 DROP TABLE IF EXISTS `ban_record`;
@@ -85,7 +59,6 @@ CREATE TABLE `ban_record`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_user_id`(`user_id` ASC) USING BTREE,
   INDEX `idx_end_time`(`end_time` ASC) USING BTREE,
-  FOREIGN KEY (`ban_target`) REFERENCES `resources` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '封禁记录表' ROW_FORMAT = DYNAMIC;
 
 -- 申诉记录表
@@ -104,76 +77,6 @@ CREATE TABLE `appeal_record`  (
   INDEX `idx_status`(`status` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '申诉记录表' ROW_FORMAT = DYNAMIC;
 
--- 角色表
-DROP TABLE IF EXISTS `roles`;
-CREATE TABLE `roles` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '角色表主键id(不对外公开,仅用于系统内部操作)',
-    `name` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '角色名称(唯一)',
-    `level` INT NOT NULL DEFAULT 1 COMMENT '角色等级（1-5：普通用户，6-8：管理员，9：超级管理员）',
-    `parent_role_id` BIGINT NULL DEFAULT NULL COMMENT '父角色ID(用于继承角色权限)',
-    `description` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '角色描述',
-    `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '角色创建时间戳',
-    `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '角色更新时间戳',
-    `status` tinyint NOT NULL DEFAULT 1 COMMENT '角色状态(0：禁用，1：启用)',
-    PRIMARY KEY (`id`) USING BTREE,
-    UNIQUE INDEX `ui_name` (`name` ASC) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色表' ROW_FORMAT = Dynamic;
-
--- 用户角色关联表
-DROP TABLE IF EXISTS `related_users_roles`;
-CREATE TABLE `related_users_roles` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '用户角色关联表主键id(不对外公开，仅用于系统内部操作)',
-    `user_id` BIGINT NOT NULL COMMENT '用户表外键id(关联users表的id字段)', -- 不能唯一，因为用户可以有多个角色
-    `role_id` BIGINT NOT NULL COMMENT '角色表外键id(关联roles表的id字段)', -- 不能唯一，因为角色可以被多个用户拥有
-    `status` tinyint NOT NULL DEFAULT 1 COMMENT '关联状态(0：禁用，1：启用)',
-    PRIMARY KEY (`id`) USING BTREE,
-    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户角色关联表' ROW_FORMAT = Dynamic;
-
--- 数据权限规则表（实现数据库行级权限）
-DROP TABLE IF EXISTS `data_rules`;
-CREATE TABLE `data_rules` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '数据权限规则表主键id',
-    `name` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '规则名称(唯一)',
-    `code` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '规则编码( ALL | SELF | ROLE | CUSTOM )',
-    `sql` VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '自定义规则SQL表达式',
-    `description` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '规则描述',
-    `status` tinyint NOT NULL DEFAULT 1 COMMENT '启用状态(0：禁用，1：启用)',
-    `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '规则创建时间戳',
-    `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '规则更新时间戳',
-    PRIMARY KEY (`id`) USING BTREE,
-    UNIQUE INDEX `ui_name` (`name` ASC) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '数据权限规则表' ROW_FORMAT = Dynamic;
-
--- 角色权限关联表（角色+资源+字段+行级规则）
-DROP TABLE IF EXISTS `related_roles_resources_fields_rules`;
-CREATE TABLE `related_roles_resources_fields_rules` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '角色权限关联表主键id(不对外公开，仅用于系统内部操作)',
-    `role_id` BIGINT NOT NULL COMMENT '角色表外键id(关联roles表的id字段)', -- 不能唯一，因为角色可以被多个资源拥有
-    `resource_id` BIGINT NOT NULL COMMENT '资源表外键id(关联resources表的id字段)', -- 不能唯一，因为资源可以被多个角色拥有
-    `field_ids` VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '*' COMMENT '字段ID列表(多个字段ID用英文逗号分隔，*表示所有字段)',
-    `rule_id` BIGINT NOT NULL COMMENT '规则表外键id(关联data_rules表的id字段)', -- 不能唯一，因为资源可以有多个规则
-    `description` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '角色权限关联描述',
-    `status` tinyint NOT NULL DEFAULT 1 COMMENT '关联状态(0：禁用，1：启用)',
-    PRIMARY KEY (`id`) USING BTREE,
-    FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (`resource_id`) REFERENCES `resources` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (`rule_id`) REFERENCES `data_rules` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色权限关联表' ROW_FORMAT = Dynamic;
-
--- 角色继承约束表
-DROP TABLE IF EXISTS `related_roles_constraint`;
-CREATE TABLE `related_roles_constraint` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '角色继承约束表主键id',
-    `role_id` BIGINT NOT NULL COMMENT '角色表外键id(关联roles表的id字段)', -- 不能唯一，因为角色可以被多个资源拥有
-    `exclude_role_id` BIGINT NOT NULL COMMENT '互斥角色表外键id(关联roles表的id字段)', -- 不能唯一，因为角色可以有多个互斥角色
-    `type` VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'EXCLUDE' COMMENT '约束类型( EXCLUDE | INHERIT )', -- EXCLUDE：互斥角色，INHERIT：继承角色权限
-    `status` tinyint NOT NULL DEFAULT 1 COMMENT '启用状态(0：禁用，1：启用)',
-    PRIMARY KEY (`id`) USING BTREE,
-    FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY (`exclude_role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色继承约束表' ROW_FORMAT = Dynamic;
 
 -- 用户与OAuth客户端关联表（仅维护用户与客户端配置UUID的单向关联，不存客户端详情）
 DROP TABLE IF EXISTS `related_user_oauth_oauth_client`;

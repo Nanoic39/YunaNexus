@@ -4,6 +4,7 @@ import cc.nanoic.yunanexus.common.redis.service.YunaRedisService;
 import cc.nanoic.yunanexus.user.entity.DTO.RegisterDTO;
 import cc.nanoic.yunanexus.user.entity.UserInfo;
 import cc.nanoic.yunanexus.user.entity.Users;
+import cc.nanoic.yunanexus.user.client.AuthInternalClient;
 import cc.nanoic.yunanexus.user.mapper.UserInfoMapper;
 import cc.nanoic.yunanexus.user.mapper.UsersMapper;
 import cc.nanoic.yunanexus.user.service.UsersService;
@@ -19,6 +20,11 @@ import java.util.UUID;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements UsersService {
@@ -27,6 +33,9 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
 
     @Resource
     UserInfoMapper userInfoMapper;
+
+    @Resource
+    private AuthInternalClient authInternalClient;
 
     String sendLimitKeyPrefix = "email:verify:send:limit:";
     String checkLimitKeyPrefix = "email:verify:check:limit:";
@@ -80,6 +89,19 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         user.setUpdateTime(now);
 
         this.save(user);
+
+        Long userId = user.getId();
+        if (userId != null && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    Map<String, Object> req = new HashMap<>();
+                    req.put("userId", userId);
+                    req.put("roleName", "USER");
+                    authInternalClient.bindRole(req);
+                }
+            });
+        }
 
         // 插入数据到userinfo中
         UserInfo userInfo = new UserInfo();
