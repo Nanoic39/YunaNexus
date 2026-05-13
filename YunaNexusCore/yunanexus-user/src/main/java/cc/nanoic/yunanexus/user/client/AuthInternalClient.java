@@ -24,4 +24,7 @@ public interface AuthInternalClient {
 
     @PostMapping("/permission/roles/bind")
     Result<?> bindRole(@RequestBody Map<String, Object> req);
+
+    @PostMapping("/permission/resources/sync")
+    Result<Map<String, Object>> syncResources(@RequestBody java.util.List<Map<String, Object>> resources);
 }

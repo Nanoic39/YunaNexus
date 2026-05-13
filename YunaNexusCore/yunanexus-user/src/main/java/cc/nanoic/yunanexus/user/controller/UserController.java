@@ -267,7 +267,7 @@ public class UserController {
             // 不传参数说明查询的是自己，此时必须存在Token，否则返回异常
             // 但是只要存在Uuid就优先查询Uuid
             // 直接复用自查逻辑
-            currentUser(authorization);
+            return currentUser(authorization);
         }
 
         // 查询用户信息
@@ -309,7 +309,7 @@ public class UserController {
         userInfoVO.setNickname(userInfo.getNickname()); // 昵称
         userInfoVO.setAvatarUuid(userInfo.getAvatarUuid()); // 头像Uuid
         userInfoVO.setGender(userInfo.getGender()); // 性别
-        userInfoVO.setBirthday(null); // 生日属于敏感信息，不允许被其它用户查询
+        userInfoVO.setBirthday(userInfo.getBirthday()); // 生日属于敏感信息（传入前需要处理）
         userInfoVO.setCreateTime(user.getCreateTime()); // 账户创建时间
         userInfoVO.setUpdateTime(userInfo.getUpdateTime()); // 用户信息更新时间
 

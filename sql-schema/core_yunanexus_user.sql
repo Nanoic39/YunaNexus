@@ -58,7 +58,7 @@ CREATE TABLE `ban_record`  (
   `ban_target` BIGINT NULL DEFAULT NULL COMMENT 'RESOURCES范围时填写，标识封禁的资源ID',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_user_id`(`user_id` ASC) USING BTREE,
-  INDEX `idx_end_time`(`end_time` ASC) USING BTREE,
+  INDEX `idx_end_time`(`end_time` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '封禁记录表' ROW_FORMAT = DYNAMIC;
 
 -- 申诉记录表

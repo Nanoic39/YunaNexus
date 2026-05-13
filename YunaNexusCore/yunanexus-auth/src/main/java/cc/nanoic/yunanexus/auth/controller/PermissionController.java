@@ -77,6 +77,15 @@ public class PermissionController {
         return Result.success(data);
     }
 
+    @PostMapping("/resources/sync")
+    public Result<?> syncResources(@RequestBody java.util.List<Map<String, Object>> resources) {
+        int synced = permissionService.syncResources(resources);
+        Map<String, Object> data = new HashMap<>();
+        data.put("synced", synced);
+        data.put("resourceCount", resources == null ? 0 : resources.size());
+        return Result.success(data);
+    }
+
     private String extractBearer(String authorization) {
         if (!StringUtils.hasText(authorization) || !authorization.startsWith("Bearer ")) {
             return null;
