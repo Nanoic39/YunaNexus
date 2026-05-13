@@ -11,6 +11,7 @@ import cc.nanoic.yunanexus.user.client.AuthInternalClient;
 import cc.nanoic.yunanexus.user.entity.DTO.EmailVerifySend;
 import cc.nanoic.yunanexus.user.entity.DTO.OAuthVerifyUserAccountDTO;
 import cc.nanoic.yunanexus.user.entity.DTO.RegisterDTO;
+import cc.nanoic.yunanexus.user.entity.DTO.UpdateUserInfoDTO;
 import cc.nanoic.yunanexus.user.entity.ServiceVersion;
 import cc.nanoic.yunanexus.user.entity.UserInfo;
 import cc.nanoic.yunanexus.user.entity.Users;
@@ -218,32 +219,13 @@ public class UserController {
      */
     @GetMapping("/me")
     public Result<?> currentUser(@RequestHeader(value = "Authorization", required = false) String authorization) {
-        if (!StringUtils.hasText(authorization) || !authorization.startsWith("Bearer ")) {
-            return Result.fail(R.PARAM_ERROR, "Authorization格式错误");
+        Result<Users> currentUserResult = resolveCurrentUser(authorization);
+        if (currentUserResult.getCode() != R.SUCCESS.getCode() || currentUserResult.getData() == null) {
+            return currentUserResult;
         }
 
-        Result<Map<String, Object>> parsedResp;
-        try {
-            parsedResp = authInternalClient.parseToken(authorization);
-        } catch (Exception e) {
-            return Result.fail(R.SERVER_ERROR, "认证服务暂时不可用");
-        }
-
-        if (parsedResp == null || parsedResp.getCode() != R.SUCCESS.getCode() || parsedResp.getData() == null) {
-            return Result.fail(R.NOT_LOGIN, "token无效或已过期");
-        }
-
-        // 解析UserId
-        Long userId = parseLong(parsedResp.getData().get("userId"));
-
-        if (userId == null) {
-            return Result.fail(R.NOT_LOGIN, "token用户信息无效");
-        }
-
-        Users user = usersService.getById(userId);
-        if (user == null) {
-            return Result.fail(R.ACCOUNT_ERROR, "用户不存在");
-        }
+        Users user = currentUserResult.getData();
+        Long userId = user.getId();
 
         UserInfo userInfo = userInfoMapper.selectOne(
                 new LambdaQueryWrapper<UserInfo>()
@@ -253,6 +235,35 @@ public class UserController {
 
         UserInfoVO userInfoVO = buildUserInfoVO(user, userInfo);
         return Result.success(userInfoVO);
+    }
+
+    /**
+     * 编辑当前用户信息
+     * @param authorization accessToken
+     * @param updateUserInfoDTO 更新内容
+     * @return 更新后的结果
+     */
+    @PutMapping("/me")
+    public Result<?> updateCurrentUser(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                       @RequestBody UpdateUserInfoDTO updateUserInfoDTO) {
+        Result<Users> currentUserResult = resolveCurrentUser(authorization);
+        if (currentUserResult.getCode() != R.SUCCESS.getCode() || currentUserResult.getData() == null) {
+            return currentUserResult;
+        }
+
+        Users user = currentUserResult.getData();
+        Long userId = user.getId();
+
+        usersService.updateCurrentUserInfo(userId, updateUserInfoDTO);
+
+        UserInfo userInfo = userInfoMapper.selectOne(
+                new LambdaQueryWrapper<UserInfo>()
+                        .eq(UserInfo::getUserId, userId)
+                        .last("LIMIT 1")
+        );
+
+        UserInfoVO userInfoVO = buildUserInfoVO(user, userInfo);
+        return Result.success(userInfoVO, "用户信息更新成功");
     }
 
     /**
@@ -294,6 +305,35 @@ public class UserController {
         UserInfoVO userInfoVO = buildUserInfoVO(user, userInfo);
 
         return Result.success(userInfoVO);
+    }
+
+    private Result<Users> resolveCurrentUser(String authorization) {
+        if (!StringUtils.hasText(authorization) || !authorization.startsWith("Bearer ")) {
+            return Result.fail(R.PARAM_ERROR, "Authorization格式错误");
+        }
+
+        Result<Map<String, Object>> parsedResp;
+        try {
+            parsedResp = authInternalClient.parseToken(authorization);
+        } catch (Exception e) {
+            return Result.fail(R.SERVER_ERROR, "认证服务暂时不可用");
+        }
+
+        if (parsedResp == null || parsedResp.getCode() != R.SUCCESS.getCode() || parsedResp.getData() == null) {
+            return Result.fail(R.NOT_LOGIN, "token无效或已过期");
+        }
+
+        Long userId = parseLong(parsedResp.getData().get("userId"));
+        if (userId == null) {
+            return Result.fail(R.NOT_LOGIN, "token用户信息无效");
+        }
+
+        Users user = usersService.getById(userId);
+        if (user == null) {
+            return Result.fail(R.ACCOUNT_ERROR, "用户不存在");
+        }
+
+        return Result.success(user);
     }
 
     /**

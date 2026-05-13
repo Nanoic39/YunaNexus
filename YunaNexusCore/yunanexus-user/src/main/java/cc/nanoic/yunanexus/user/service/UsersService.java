@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.user.service;
 
 import cc.nanoic.yunanexus.user.entity.DTO.RegisterDTO;
+import cc.nanoic.yunanexus.user.entity.DTO.UpdateUserInfoDTO;
 import cc.nanoic.yunanexus.user.entity.Users;
 import com.baomidou.mybatisplus.extension.service.IService;
 
@@ -63,4 +64,11 @@ public interface UsersService extends IService<Users> {
      * @return 校验结果
      */
     boolean isExistsEmail(String email);
+
+    /**
+     * 更新当前用户资料
+     * @param userId 用户ID
+     * @param updateUserInfoDTO 更新内容
+     */
+    void updateCurrentUserInfo(Long userId, UpdateUserInfoDTO updateUserInfoDTO);
 }
