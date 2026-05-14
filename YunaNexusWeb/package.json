@@ -1,0 +1,15 @@
+{
+  "name": "yunanexus-web",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "packageManager": "pnpm@10.11.0",
+  "scripts": {
+    "dev:main": "pnpm --dir apps/yunanexus-main dev",
+    "build:main": "pnpm --dir apps/yunanexus-main build",
+    "preview:main": "pnpm --dir apps/yunanexus-main preview"
+  },
+  "keywords": [],
+  "author": "YunaNexus|nanoic",
+  "license": "ISC"
+}

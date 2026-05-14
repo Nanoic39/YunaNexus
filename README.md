@@ -14,6 +14,24 @@ YunaNexus/
 │   ├── yunanexus-common-web/      # 提供 LocalDateTime/Result/Exception SDK
 │   ├── yunanexus-auth/            # 提供安全认证相关的后端支持
 │   └── yunanexus-user/            # 提供用户账户/权限相关的后端支持
+├── YunaNexusWeb/                  # YunaNexus 系列前端工作区 ( 🚧 开发中... )
+│   ├── apps/                      # 具体前端应用
+│   │   ├── yunanexus-main/        # 主站客户端前端
+│   │   └── yunanexus-admin/       # 管理端前端（预留/待开发）
+│   ├── packages/                  # 共享模块
+│   │   ├── config/                # ESLint/Prettier/TypeScript/公共开发 配置
+│   │   ├── ui/                    # 通用 UI 组件库
+│   │   ├── theme/                 # CSS变量、Tailwind、Nuxt UI主题
+│   │   ├── sdk/                   # API、types、contracts、request
+│   │   ├── stores/                # 跨应用共享 Pinia Store
+│   │   ├── composable/            # 跨应用共享 composable
+│   │   └── utils/                 # 纯工具函数
+│   ├── docs/                      # 前端约定、组件规范、开发文档
+│   ├── package.json               # workspace 前端工作区根配置
+│   ├── pnpm-workspace.yaml        # workspace 工作区声明文件
+│   ├── tsconfig.base.json         # 共享 TypeScript 基础配置
+│   ├── .env.example               # .env 模板
+│   └── .editorconfig              # 编辑器统一格式配置
 ├── sql-schema/                    # YunaNexusCore用到的SQL数据结构
 └── Assets/                        # 用于本项目仓库的素材文件(不影响具体项目内容)
     ├── Image/                     # 用于本仓库的图片类型文件
@@ -125,15 +143,15 @@ rocketmq:
 \[🚧头像、立绘、设定说明占位]<br/>
 \[🚧OC小作文占位.]
 
-## 🚩 备注(带*的为必须处理的内容)：
+## 🚩 备注(带*>的为必须处理的内容)：
 
-### RSA
+### [RSA]
 RSA相关配置在 `YunaNexusCore/yunanexus-common-security/src/main/resources/application.yaml` 中，不建议进行改动
 
-### *RocketMQ
+### *[RocketMQ]
 各个服务都有自己的 RocketMQ服务配置，运行前需要自行根据自己的RocketMQ环境配置 `name-server`
 
-### *OAuth
+### *[OAuth]
 YunaNexusCore的OAuth数据需要使用 `/sql-schema/scripts/` 中的 `oauth-info-init.py` 脚本进行初始化
 
 所有脚本所需的依赖位于requirements.txt文件中，可以使用 `pip install -r requirements.txt` 进行安装
@@ -160,3 +178,8 @@ pip install -r requirements.txt
 ```
 
 随后自行执行需要使用的脚本即可，如：`./oauth-info-init.py`
+
+## *[.env]
+前端环境变量位于`YunaNexusWeb/.env`，代码仓库中同级目录下仅存在`.env.example`
+
+使用时需要先创建文件`.env`并根据`.env.example`完善所有配置

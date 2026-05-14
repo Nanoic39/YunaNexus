@@ -56,3 +56,16 @@ build/
 postman/
 .postman/
 **/.venv
+
+### 前端项目 ###
+**/node_modules
+**/.pnpm-store
+**/.nuxt
+**/.output
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+**/.DS_Store
+**/coverage
+**/*.log
