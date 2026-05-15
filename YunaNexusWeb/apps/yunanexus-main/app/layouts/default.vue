@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, watch } from "vue";
+import { onBeforeUnmount, onMounted, watch } from "vue";
 import { sidebarMenus } from "../mocks/navigation";
+import AppThemeToggle from "../components/ui/AppThemeToggle.vue";
 
 const runtimeConfig = useRuntimeConfig();
 const route = useRoute();
@@ -42,8 +43,38 @@ const toggleGroup = (key: string) => {
     ? openKeys.value.filter((item) => item !== key)
     : [...openKeys.value, key];
 };
-const setHover = (key: string) => {
-  hoverKey.value = collapsed.value ? key : "";
+let hoverCloseTimer: ReturnType<typeof window.setTimeout> | null = null;
+
+const clearHoverCloseTimer = () => {
+  if (hoverCloseTimer !== null) {
+    window.clearTimeout(hoverCloseTimer);
+    hoverCloseTimer = null;
+  }
+};
+
+const openHoverMenu = (key: string) => {
+  if (!collapsed.value) {
+    return;
+  }
+  clearHoverCloseTimer();
+  hoverKey.value = key;
+};
+
+const closeHoverMenu = (key: string, event?: MouseEvent) => {
+  const nextTarget = event?.relatedTarget;
+  if (
+    nextTarget instanceof HTMLElement &&
+    nextTarget.closest(`[data-hover-menu-key="${key}"]`)
+  ) {
+    return;
+  }
+
+  clearHoverCloseTimer();
+  hoverCloseTimer = window.setTimeout(() => {
+    if (hoverKey.value === key) {
+      hoverKey.value = "";
+    }
+  }, 140);
 };
 const setDocumentScrollLocked = (locked: boolean) => {
   if (!import.meta.client) {
@@ -62,12 +93,163 @@ watch(
   { immediate: true },
 );
 
+let cleanupThemeListener: (() => void) | null = null;
+
 onBeforeUnmount(() => {
   setDocumentScrollLocked(false);
+  cleanupThemeListener?.();
+  clearHoverCloseTimer();
 });
 
 const closeMobileDrawer = () => {
   mobileDrawerOpen.value = false;
+};
+const themeMode = useState<"light" | "dark" | "system">(
+  "app-theme-mode",
+  () => "light",
+);
+let mediaQuery: MediaQueryList | null = null;
+
+type DocumentWithViewTransition = Document & {
+  startViewTransition?: (callback: () => void | Promise<void>) => {
+    finished: Promise<void>;
+  };
+};
+
+const getResolvedTheme = (mode: "light" | "dark" | "system") =>
+  mode === "system" &&
+  import.meta.client &&
+  window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : mode === "system"
+      ? "light"
+      : mode;
+
+const setThemeOrigin = (target?: HTMLElement | null) => {
+  if (!import.meta.client || !target) {
+    return;
+  }
+  const root = document.documentElement;
+  const rect = target.getBoundingClientRect();
+  root.style.setProperty(
+    "--yn-theme-origin-x",
+    `${rect.left + rect.width / 2}px`,
+  );
+  root.style.setProperty(
+    "--yn-theme-origin-y",
+    `${rect.top + rect.height / 2}px`,
+  );
+};
+
+const persistTheme = (mode: "light" | "dark" | "system") => {
+  if (!import.meta.client) {
+    return;
+  }
+  window.localStorage.setItem("yn-theme-mode", mode);
+};
+
+const applyTheme = async (
+  mode: "light" | "dark" | "system",
+  origin?: HTMLElement | null,
+) => {
+  if (!import.meta.client) return;
+  const root = document.documentElement;
+  const next = getResolvedTheme(mode);
+  const doc = document as DocumentWithViewTransition;
+  setThemeOrigin(origin);
+
+  const commitTheme = () => {
+    root.dataset.theme = next;
+    root.style.colorScheme = next;
+  };
+
+  if (
+    !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
+    doc.startViewTransition
+  ) {
+    root.classList.remove("yn-theme-transitioning");
+    void root.offsetWidth;
+    root.classList.add("yn-theme-transitioning");
+    const transition = doc.startViewTransition(() => {
+      commitTheme();
+    });
+    await transition.finished.finally(() => {
+      root.classList.remove("yn-theme-transitioning");
+    });
+  } else {
+    commitTheme();
+  }
+
+  persistTheme(mode);
+};
+
+const cycleTheme = async (origin?: HTMLElement | null) => {
+  const nextMode =
+    themeMode.value === "light"
+      ? "dark"
+      : themeMode.value === "dark"
+        ? "system"
+        : "light";
+  themeMode.value = nextMode;
+  await applyTheme(nextMode, origin);
+};
+
+onMounted(() => {
+  if (!import.meta.client) return;
+  const saved = window.localStorage.getItem("yn-theme-mode");
+  if (saved === "light" || saved === "dark" || saved === "system") {
+    themeMode.value = saved;
+  }
+  mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  const syncTheme = () => themeMode.value === "system" && applyTheme("system");
+  mediaQuery.addEventListener("change", syncTheme);
+  cleanupThemeListener = () =>
+    mediaQuery?.removeEventListener("change", syncTheme);
+  applyTheme(themeMode.value);
+});
+
+const contextMenu = useAppContextMenu();
+
+const setThemeMode = async (
+  mode: "light" | "dark" | "system",
+  origin?: HTMLElement | null,
+) => {
+  themeMode.value = mode;
+  await applyTheme(mode, origin);
+};
+
+const handleThemeToggle = async (origin: HTMLElement | null) => {
+  await cycleTheme(origin);
+};
+
+const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
+  contextMenu.open(
+    event,
+    [
+      {
+        key: "theme-light",
+        label: "浅色",
+        icon: "lucide:sun-medium",
+        checked: themeMode.value === "light",
+        action: () => setThemeMode("light", origin),
+      },
+      {
+        key: "theme-dark",
+        label: "深色",
+        icon: "lucide:moon-star",
+        checked: themeMode.value === "dark",
+        action: () => setThemeMode("dark", origin),
+      },
+      {
+        key: "theme-system",
+        label: "跟随系统",
+        icon: "lucide:monitor-cog",
+        checked: themeMode.value === "system",
+        action: () => setThemeMode("system", origin),
+      },
+    ],
+    origin,
+  );
 };
 </script>
 
@@ -94,8 +276,9 @@ const closeMobileDrawer = () => {
           v-for="menu in menus"
           :key="menu.key"
           class="app-menu-item"
-          @mouseenter="setHover(menu.key)"
-          @mouseleave="setHover('')"
+          :data-hover-menu-key="menu.key"
+          @mouseenter="openHoverMenu(menu.key)"
+          @mouseleave="closeHoverMenu(menu.key, $event)"
         >
           <NuxtLink
             v-if="menu.to"
@@ -147,8 +330,9 @@ const closeMobileDrawer = () => {
             <div
               v-if="collapsed && hoverKey === menu.key"
               class="app-nav-flyout"
-              @mouseenter="setHover(menu.key)"
-              @mouseleave="setHover('')"
+              :data-hover-menu-key="menu.key"
+              @mouseenter="openHoverMenu(menu.key)"
+              @mouseleave="closeHoverMenu(menu.key, $event)"
             >
               <div class="app-nav-flyout-title">{{ menu.label }}</div>
               <div v-if="menu.children?.length" class="app-nav-flyout-list">
@@ -190,7 +374,14 @@ const closeMobileDrawer = () => {
           </button>
           <div class="app-topbar-title">仪表盘</div>
         </div>
-        <div class="app-topbar-actions"><a href="/login">登录</a></div>
+        <div class="app-topbar-actions">
+          <AppThemeToggle
+            :mode="themeMode"
+            @toggle="handleThemeToggle"
+            @request-menu="handleThemeMenu"
+          />
+          <a href="/login">登录</a>
+        </div>
       </header>
       <main class="app-content">
         <div class="app-content-inner"><slot /></div>
@@ -238,8 +429,8 @@ const closeMobileDrawer = () => {
   pointer-events: none;
   background: linear-gradient(
     to top,
-    rgba(255, 255, 255, 0.96),
-    rgba(255, 255, 255, 0)
+    color-mix(in srgb, var(--yn-color-surface) 96%, transparent),
+    color-mix(in srgb, var(--yn-color-surface) 0%, transparent)
   );
 }
 .app-brand {
@@ -297,11 +488,16 @@ const closeMobileDrawer = () => {
   gap: 10px;
   padding: 0 12px;
   border-radius: var(--yn-radius-medium);
-  border: 1px solid var(--yn-color-border-subtle);
-  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--yn-color-border-medium);
+  background: color-mix(
+    in srgb,
+    var(--yn-color-surface-raised) 88%,
+    var(--yn-color-surface)
+  );
   color: var(--yn-color-text-secondary);
   font-size: 14px;
   font-weight: 600;
+  box-shadow: var(--yn-shadow-card);
   backdrop-filter: blur(10px);
 }
 .app-shell-collapsed .app-sidebar-toggle {
@@ -312,8 +508,13 @@ const closeMobileDrawer = () => {
   font-size: 20px;
 }
 .app-sidebar-toggle:hover {
-  background: var(--yn-color-surface-raised);
+  background: color-mix(
+    in srgb,
+    var(--yn-color-surface-raised) 100%,
+    var(--yn-color-surface)
+  );
   color: var(--yn-color-text-primary);
+  border-color: var(--yn-color-border-strong);
 }
 .app-sidebar-nav,
 .app-nav-children,
@@ -390,7 +591,7 @@ const closeMobileDrawer = () => {
 }
 .app-nav-flyout {
   position: absolute;
-  left: calc(100% + 2px);
+  left: calc(100% + 16px);
   top: -4px;
   z-index: 40;
   min-width: 220px;
@@ -399,6 +600,14 @@ const closeMobileDrawer = () => {
   border-radius: var(--yn-radius-large);
   background: var(--yn-color-surface);
   box-shadow: var(--yn-shadow-overlay);
+}
+.app-nav-flyout::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 100%;
+  width: 16px;
+  height: 100%;
 }
 .nav-children-enter-active,
 .nav-children-leave-active,
@@ -459,16 +668,26 @@ const closeMobileDrawer = () => {
   width: 40px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--yn-color-border-subtle);
+  border: 1px solid var(--yn-color-border-medium);
   border-radius: var(--yn-radius-medium);
-  background: rgba(255, 255, 255, 0.72);
+  background: color-mix(
+    in srgb,
+    var(--yn-color-surface-raised) 88%,
+    var(--yn-color-surface)
+  );
   color: var(--yn-color-text-secondary);
   cursor: pointer;
+  box-shadow: var(--yn-shadow-card);
   backdrop-filter: blur(10px);
 }
 .app-topbar-menu-button:hover {
-  background: var(--yn-color-surface-raised);
+  background: color-mix(
+    in srgb,
+    var(--yn-color-surface-raised) 100%,
+    var(--yn-color-surface)
+  );
   color: var(--yn-color-text-primary);
+  border-color: var(--yn-color-border-strong);
 }
 .app-topbar-menu-button :deep(svg) {
   font-size: 20px;
@@ -477,6 +696,11 @@ const closeMobileDrawer = () => {
   color: var(--yn-color-text-primary);
   font-size: 16px;
   font-weight: 700;
+}
+.app-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .app-topbar-actions a {
   color: var(--yn-color-primary);
@@ -496,6 +720,9 @@ const closeMobileDrawer = () => {
   }
   .app-topbar-menu-button {
     display: inline-flex;
+  }
+  .app-topbar-actions {
+    gap: 8px;
   }
   .app-sidebar {
     position: fixed;

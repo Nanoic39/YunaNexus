@@ -22,7 +22,6 @@ import cc.nanoic.yunanexus.user.service.PingService;
 import cc.nanoic.yunanexus.user.service.UsersService;
 import cc.nanoic.yunanexus.user.utils.FormatTime;
 import cn.hutool.crypto.digest.BCrypt;
-import jakarta.annotation.Nullable;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.StringUtils;

@@ -30,6 +30,52 @@
   --yn-glow-large: 0 0 0 1px rgba(22, 163, 74, 0.2);
 }
 
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --yn-color-primary: #4ade80;
+  --yn-color-secondary: #fbbf24;
+  --yn-color-tertiary: #22d3ee;
+  --yn-color-background: #0f172a;
+  --yn-color-surface: #1e293b;
+  --yn-color-surface-raised: #334155;
+  --yn-color-text-primary: #f1f5f9;
+  --yn-color-text-secondary: #cbd5e1;
+  --yn-color-text-tertiary: #94a3b8;
+  --yn-color-border-subtle: #334155;
+  --yn-color-border-medium: #475569;
+  --yn-color-border-strong: #64748b;
+  --yn-shadow-card: 0 10px 28px rgba(2, 6, 23, 0.3);
+  --yn-shadow-overlay: 0 18px 42px rgba(2, 6, 23, 0.42);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html.yn-theme-transitioning::view-transition-old(root) {
+  z-index: 1;
+}
+
+html.yn-theme-transitioning::view-transition-new(root) {
+  z-index: 2;
+  animation: yn-theme-reveal 0.46s ease-in-out both;
+}
+
+@keyframes yn-theme-reveal {
+  from {
+    clip-path: circle(
+      0 at var(--yn-theme-origin-x, 50%) var(--yn-theme-origin-y, 50%)
+    );
+  }
+  to {
+    clip-path: circle(
+      160vmax at var(--yn-theme-origin-x, 50%) var(--yn-theme-origin-y, 50%)
+    );
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -38,6 +84,13 @@
 
 html {
   color-scheme: light;
+  background: var(--yn-color-background);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.yn-theme-transitioning::view-transition-new(root) {
+    animation: none;
+  }
 }
 
 html,
