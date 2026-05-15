@@ -179,6 +179,9 @@ pip install -r requirements.txt
 
 随后自行执行需要使用的脚本即可，如：`./oauth-info-init.py`
 
+## [前端]
+前端部分采用AI作为主力开发，我这里只专注于后端设计与开发，如果有更好的改进方案，欢迎提交Pull Request进行贡献
+
 ## *[.env]
 前端环境变量位于`YunaNexusWeb/.env`，代码仓库中同级目录下仅存在`.env.example`
 

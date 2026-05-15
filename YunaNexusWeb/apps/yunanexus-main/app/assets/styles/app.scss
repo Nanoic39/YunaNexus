@@ -1,0 +1,78 @@
+:root {
+  --yn-color-primary: #16a34a;
+  --yn-color-secondary: #d97706;
+  --yn-color-tertiary: #0891b2;
+
+  --yn-color-background: #f4f7fb;
+  --yn-color-surface: #ffffff;
+  --yn-color-surface-raised: #f8fafc;
+
+  --yn-color-text-primary: #0f172a;
+  --yn-color-text-secondary: #475569;
+  --yn-color-text-tertiary: #64748b;
+
+  --yn-color-border-subtle: #e2e8f0;
+  --yn-color-border-medium: #cbd5e1;
+  --yn-color-border-strong: #94a3b8;
+
+  --yn-font-sans: Inter, -apple-system, "Segoe UI", Helvetica, sans-serif;
+  --yn-font-mono:
+    "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+
+  --yn-radius-small: 4px;
+  --yn-radius-medium: 6px;
+  --yn-radius-large: 12px;
+
+  --yn-shadow-card: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --yn-shadow-overlay: 0 12px 36px rgba(15, 23, 42, 0.12);
+  --yn-glow-subtle: 0 0 0 1px rgba(22, 163, 74, 0.08);
+  --yn-glow-medium: 0 0 0 1px rgba(22, 163, 74, 0.14);
+  --yn-glow-large: 0 0 0 1px rgba(22, 163, 74, 0.2);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+}
+
+html,
+body,
+#__nuxt {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--yn-color-background);
+  color: var(--yn-color-text-primary);
+  font-family: var(--yn-font-sans), sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: var(--yn-color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: #15803d;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--yn-font-mono), sans-serif;
+}
