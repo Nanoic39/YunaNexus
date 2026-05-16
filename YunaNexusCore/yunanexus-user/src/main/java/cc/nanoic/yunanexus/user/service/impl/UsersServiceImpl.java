@@ -52,11 +52,13 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         return RandomUtil.randomNumbers(6);
     }
 
+    // 限流相关
     @Override
     public boolean isSendLimited(String email) {
         return !yunaRedisService.allowRequest(sendLimitKeyPrefix + email, 1, Duration.ofSeconds(60));
     }
 
+    // 限流相关
     @Override
     public boolean isCheckLimited(String email) {
         return !yunaRedisService.allowRequest(checkLimitKeyPrefix + email, 5, Duration.ofSeconds(60));

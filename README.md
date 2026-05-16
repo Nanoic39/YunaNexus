@@ -145,6 +145,31 @@ rocketmq:
 
 ## 🚩 备注(带*>的为必须处理的内容)：
 
+## [验证码]
+邮箱验证码：默认限速 1req/60s·1邮箱，这是写死在代码中的，暂无改动计划，有需要请自行修改
+相关文件：
+- 限流说明文本：`YunaNexusCore\yunanexus-user\src\main\java\cc\nanoic\yunanexus\user\controller\UserController.java`
+```java
+// 校验是否被限流
+if(usersService.isSendLimited(email)) {
+  return Result.fail(R.REQ_API_LIMIT, "请求过于频繁，请 60 秒后再试");
+}
+```
+- 限流具体数值：`YunaNexusCore\yunanexus-user\src\main\java\cc\nanoic\yunanexus\user\service\impl\UsersServiceImpl.java`
+```java
+// 修改第2、3个参数，分别为最大请求数和一段时间，意思是每【第三个参数】时间内最多请求【第二个参数】次
+@Override
+public boolean isSendLimited(String email) {
+  // 👇
+  return !yunaRedisService.allowRequest(sendLimitKeyPrefix + email, 1, Duration.ofSeconds(60));
+}
+@Override
+public boolean isCheckLimited(String email) {
+  // 👇
+  return !yunaRedisService.allowRequest(checkLimitKeyPrefix + email, 5, Duration.ofSeconds(60));
+}
+```
+
 ### [RSA]
 RSA相关配置在 `YunaNexusCore/yunanexus-common-security/src/main/resources/application.yaml` 中，不建议进行改动
 
