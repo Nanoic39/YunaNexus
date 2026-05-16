@@ -55,9 +55,12 @@ const handleRun = (item: AppContextMenuItem) => {
         :class="{
           'app-context-menu-node-disabled': item.disabled,
           'app-context-menu-node-danger': item.danger,
-          'app-context-menu-node-left': submenuDirectionMap[item.key] === 'left',
+          'app-context-menu-node-left':
+            submenuDirectionMap[item.key] === 'left',
         }"
-        @mouseenter="item.children?.length && updateSubmenuDirection(item.key, $event)"
+        @mouseenter="
+          item.children?.length && updateSubmenuDirection(item.key, $event)
+        "
       >
         <button
           class="app-context-menu-item"

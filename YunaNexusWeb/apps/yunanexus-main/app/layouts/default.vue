@@ -1,27 +1,87 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { sidebarMenus } from "../mocks/navigation";
 import AppThemeToggle from "../components/ui/AppThemeToggle.vue";
+import AppGlobalLoader from "../components/feedback/AppGlobalLoader.vue";
 
 const runtimeConfig = useRuntimeConfig();
 const route = useRoute();
 const siteTitle = runtimeConfig.public.siteTitle || "YunaNexus";
-const collapsed = useState<boolean>("app-sidebar-collapsed", () => false);
-const openKeys = useState<string[]>("app-sidebar-open-keys", () => [
-  "account",
-  "user",
-]);
-const savedOpenKeys = useState<string[]>("app-sidebar-saved-open-keys", () => [
-  "account",
-  "user",
-]);
+const defaultOpenKeys = ["account", "user"];
+const sidebarCollapsedCookie = useCookie<string>("yn-sidebar-collapsed", {
+  default: () => "0",
+  sameSite: "lax",
+});
+const sidebarOpenKeysCookie = useCookie<string>("yn-sidebar-open-keys", {
+  default: () => JSON.stringify(defaultOpenKeys),
+  sameSite: "lax",
+});
+const sidebarSavedOpenKeysCookie = useCookie<string>(
+  "yn-sidebar-saved-open-keys",
+  {
+    default: () => JSON.stringify(defaultOpenKeys),
+    sameSite: "lax",
+  },
+);
+const parseSidebarKeys = (value?: string | null) => {
+  try {
+    const parsed = value ? JSON.parse(value) : defaultOpenKeys;
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : [...defaultOpenKeys];
+  } catch {
+    return [...defaultOpenKeys];
+  }
+};
+const collapsed = useState<boolean>(
+  "app-sidebar-collapsed",
+  () => sidebarCollapsedCookie.value === "1",
+);
+const openKeys = useState<string[]>("app-sidebar-open-keys", () =>
+  parseSidebarKeys(sidebarOpenKeysCookie.value),
+);
+const savedOpenKeys = useState<string[]>("app-sidebar-saved-open-keys", () =>
+  parseSidebarKeys(sidebarSavedOpenKeysCookie.value),
+);
 const hoverKey = ref("");
 const mobileDrawerOpen = useState<boolean>(
   "app-mobile-drawer-open",
   () => false,
 );
-const menus = sidebarMenus;
+const authApi = useAuthApi();
+const isAuthenticated = computed(() => !!authApi.accessToken.value);
+const menus = computed(() =>
+  sidebarMenus
+    .map((menu) => ({
+      ...menu,
+      children: menu.children?.filter((child) =>
+        isAuthenticated.value
+          ? child.key !== "login" && child.key !== "register"
+          : true,
+      ),
+    }))
+    .filter((menu) => menu.to || menu.children?.length),
+);
+const userName = computed(
+  () =>
+    authApi.currentUser.value?.nickname?.trim() ||
+    authApi.currentUser.value?.uuid ||
+    "已登录用户",
+);
+const userAvatarText = computed(() => userName.value.slice(0, 1).toUpperCase());
+const userUuid = computed(() => authApi.currentUser.value?.uuid || "");
+const userHint = computed(() => (userUuid.value ? "个人中心" : "当前已登录"));
+const authGroups = computed(
+  () => authApi.permissionSnapshot.value?.roles?.filter(Boolean) || [],
+);
+const userEntryOpen = ref(false);
+const userEntryRef = ref<HTMLElement | null>(null);
 useHead({ titleTemplate: `${siteTitle} | %s` });
+const persistSidebarState = () => {
+  sidebarCollapsedCookie.value = collapsed.value ? "1" : "0";
+  sidebarOpenKeysCookie.value = JSON.stringify(openKeys.value);
+  sidebarSavedOpenKeysCookie.value = JSON.stringify(savedOpenKeys.value);
+};
 const isOpen = (key: string) => openKeys.value.includes(key);
 const isActive = (to?: string) => !!to && route.path === to;
 const toggleSidebar = () => {
@@ -36,12 +96,15 @@ const toggleSidebar = () => {
     openKeys.value = [...savedOpenKeys.value];
   }
   collapsed.value = !collapsed.value;
+  persistSidebarState();
 };
 const toggleGroup = (key: string) => {
   if (collapsed.value) return;
   openKeys.value = isOpen(key)
     ? openKeys.value.filter((item) => item !== key)
     : [...openKeys.value, key];
+  savedOpenKeys.value = [...openKeys.value];
+  persistSidebarState();
 };
 let hoverCloseTimer: ReturnType<typeof window.setTimeout> | null = null;
 
@@ -70,7 +133,7 @@ const closeHoverMenu = (key: string, event?: MouseEvent) => {
   }
 
   clearHoverCloseTimer();
-  hoverCloseTimer = window.setTimeout(() => {
+  hoverCloseTimer = setTimeout(() => {
     if (hoverKey.value === key) {
       hoverKey.value = "";
     }
@@ -99,10 +162,30 @@ onBeforeUnmount(() => {
   setDocumentScrollLocked(false);
   cleanupThemeListener?.();
   clearHoverCloseTimer();
+  if (import.meta.client) {
+    document.removeEventListener("pointerdown", handleDocumentPointerDown);
+  }
 });
 
 const closeMobileDrawer = () => {
   mobileDrawerOpen.value = false;
+};
+const closeUserEntry = () => {
+  userEntryOpen.value = false;
+};
+const toggleUserEntry = () => {
+  userEntryOpen.value = !userEntryOpen.value;
+};
+const logout = async () => {
+  await authApi.logout();
+  closeUserEntry();
+  await navigateTo("/login");
+};
+const handleDocumentPointerDown = (event: MouseEvent) => {
+  const target = event.target;
+  if (target instanceof Node && !userEntryRef.value?.contains(target)) {
+    closeUserEntry();
+  }
 };
 const themeMode = useState<"light" | "dark" | "system">(
   "app-theme-mode",
@@ -151,6 +234,7 @@ const persistTheme = (mode: "light" | "dark" | "system") => {
 const applyTheme = async (
   mode: "light" | "dark" | "system",
   origin?: HTMLElement | null,
+  options?: { skipTransition?: boolean },
 ) => {
   if (!import.meta.client) return;
   const root = document.documentElement;
@@ -164,6 +248,7 @@ const applyTheme = async (
   };
 
   if (
+    !options?.skipTransition &&
     !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
     doc.startViewTransition
   ) {
@@ -196,6 +281,7 @@ const cycleTheme = async (origin?: HTMLElement | null) => {
 
 onMounted(() => {
   if (!import.meta.client) return;
+  document.addEventListener("pointerdown", handleDocumentPointerDown);
   const saved = window.localStorage.getItem("yn-theme-mode");
   if (saved === "light" || saved === "dark" || saved === "system") {
     themeMode.value = saved;
@@ -205,7 +291,7 @@ onMounted(() => {
   mediaQuery.addEventListener("change", syncTheme);
   cleanupThemeListener = () =>
     mediaQuery?.removeEventListener("change", syncTheme);
-  applyTheme(themeMode.value);
+  applyTheme(themeMode.value, null, { skipTransition: true });
 });
 
 const contextMenu = useAppContextMenu();
@@ -268,7 +354,7 @@ const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
         <span class="app-brand-mark">YN</span>
         <div v-if="!collapsed" class="app-brand-meta">
           <div class="app-brand-text">YunaNexus</div>
-          <div class="app-brand-subtitle">Main Workspace</div>
+          <div class="app-brand-subtitle">工作台</div>
         </div>
       </div>
       <nav class="app-sidebar-nav">
@@ -380,11 +466,80 @@ const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
             @toggle="handleThemeToggle"
             @request-menu="handleThemeMenu"
           />
-          <a href="/login">登录</a>
+          <NuxtLink
+            v-if="!isAuthenticated"
+            class="app-topbar-login-link"
+            to="/login"
+            >登录</NuxtLink
+          >
+          <div v-else ref="userEntryRef" class="app-user-entry-wrap">
+            <button
+              class="app-user-entry"
+              type="button"
+              @click="toggleUserEntry"
+            >
+              <span class="app-user-avatar">{{ userAvatarText }}</span>
+              <span class="app-user-meta">
+                <strong class="app-user-name">{{ userName }}</strong>
+                <small class="app-user-hint">{{ userHint }}</small>
+              </span>
+              <Icon
+                name="lucide:chevron-down"
+                class="app-user-entry-arrow"
+                :class="{ 'app-user-entry-arrow-open': userEntryOpen }"
+              />
+            </button>
+            <Transition name="user-card-panel">
+              <section v-if="userEntryOpen" class="app-user-card">
+                <div class="app-user-card-header">
+                  <span class="app-user-avatar app-user-avatar-large">{{
+                    userAvatarText
+                  }}</span>
+                  <div class="app-user-card-meta">
+                    <strong class="app-user-card-name">{{ userName }}</strong>
+                    <span class="app-user-card-id">{{
+                      userUuid || "未获取到用户 UUID"
+                    }}</span>
+                  </div>
+                </div>
+                <div class="app-user-card-section">
+                  <div class="app-user-card-label">身份组</div>
+                  <div class="app-user-groups">
+                    <span
+                      v-for="group in authGroups.length
+                        ? authGroups
+                        : ['暂无身份组']"
+                      :key="group"
+                      class="app-user-group-tag"
+                      >{{ group }}</span
+                    >
+                  </div>
+                </div>
+                <div class="app-user-card-actions">
+                  <NuxtLink
+                    class="app-user-card-link"
+                    to="/profile"
+                    @click="closeUserEntry"
+                    >查看个人资料</NuxtLink
+                  >
+                  <button
+                    class="app-user-card-logout"
+                    type="button"
+                    @click="logout"
+                  >
+                    退出登录
+                  </button>
+                </div>
+              </section>
+            </Transition>
+          </div>
         </div>
       </header>
       <main class="app-content">
-        <div class="app-content-inner"><slot /></div>
+        <div class="app-content-inner">
+          <AppGlobalLoader scope="content" />
+          <slot />
+        </div>
       </main>
     </div>
   </div>
@@ -615,6 +770,7 @@ const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
 .nav-flyout-leave-active {
   transition: all 0.2s ease;
 }
+
 .nav-children-enter-from,
 .nav-children-leave-to {
   opacity: 0;
@@ -702,17 +858,153 @@ const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
   align-items: center;
   gap: 12px;
 }
-.app-topbar-actions a {
+.app-topbar-login-link {
   color: var(--yn-color-primary);
   font-size: 14px;
   font-weight: 600;
+}
+.app-user-entry-wrap {
+  position: relative;
+}
+.app-user-entry {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--yn-color-border-medium);
+  border-radius: var(--yn-radius-medium);
+  background: var(--yn-color-surface-raised);
+  padding: 5px 10px 5px 5px;
+  color: var(--yn-color-text-primary);
+}
+.app-user-avatar {
+  display: inline-flex;
+  height: 28px;
+  width: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--yn-radius-small);
+  background: var(--yn-color-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.app-user-avatar-large {
+  height: 44px;
+  width: 44px;
+  font-size: 16px;
+}
+.app-user-entry-arrow {
+  font-size: 16px;
+  color: var(--yn-color-text-tertiary);
+  transition: transform 0.2s ease;
+}
+.app-user-entry-arrow-open {
+  transform: rotate(180deg);
+}
+.app-user-card {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  z-index: 30;
+  width: 320px;
+  border: 1px solid var(--yn-color-border-subtle);
+  border-radius: var(--yn-radius-large);
+  background: var(--yn-color-surface);
+  box-shadow: var(--yn-shadow-overlay);
+  padding: 14px;
+}
+.app-user-meta,
+.app-user-card-meta {
+  display: grid;
+  text-align: left;
+}
+.app-user-name,
+.app-user-card-name {
+  font-size: 13px;
+  line-height: 1.2;
+}
+.app-user-hint,
+.app-user-card-id {
+  color: var(--yn-color-text-tertiary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.app-user-card-id {
+  word-break: break-all;
+}
+.app-user-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--yn-color-border-subtle);
+}
+.app-user-card-section {
+  padding: 12px 0;
+}
+.app-user-card-label {
+  margin-bottom: 8px;
+  color: var(--yn-color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.app-user-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.app-user-group-tag {
+  border: 1px solid var(--yn-color-border-medium);
+  border-radius: var(--yn-radius-small);
+  background: var(--yn-color-surface-raised);
+  padding: 4px 8px;
+  color: var(--yn-color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.app-user-card-actions {
+  display: grid;
+  gap: 10px;
+}
+.app-user-card-link,
+.app-user-card-logout {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--yn-radius-medium);
+  font-size: 14px;
+  font-weight: 600;
+}
+.app-user-card-link {
+  border: 1px solid var(--yn-color-border-medium);
+  color: var(--yn-color-text-primary);
+  background: var(--yn-color-surface-raised);
+}
+.app-user-card-logout {
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
 }
 .app-content {
   padding: 24px;
 }
 .app-content-inner {
+  position: relative;
   min-height: calc(100vh - 112px);
+  isolation: isolate;
 }
+.user-card-panel-enter-active,
+.user-card-panel-leave-active {
+  transition: all 0.18s ease;
+}
+.user-card-panel-enter-from,
+.user-card-panel-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
 @media (max-width: 960px) {
   .app-shell,
   .app-shell-collapsed {
@@ -723,6 +1015,12 @@ const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
   }
   .app-topbar-actions {
     gap: 8px;
+  }
+  .app-user-entry {
+    padding-right: 6px;
+  }
+  .app-user-meta {
+    display: none;
   }
   .app-sidebar {
     position: fixed;

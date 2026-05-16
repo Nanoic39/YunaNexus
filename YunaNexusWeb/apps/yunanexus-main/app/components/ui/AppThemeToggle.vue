@@ -67,7 +67,7 @@ const handleContextMenu = (event: MouseEvent) => {
   align-items: center;
   justify-content: center;
   border: 1px solid var(--yn-color-border-subtle);
-  border-radius: 9999px;
+  border-radius: var(--yn-radius-medium);
   background: color-mix(in srgb, var(--yn-color-surface) 82%, transparent);
   color: var(--yn-color-text-secondary);
   box-shadow: var(--yn-shadow-card);
