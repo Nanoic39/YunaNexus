@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
+import AppButton from "../components/form/AppButton.vue";
+import AppCheckbox from "../components/form/AppCheckbox.vue";
+import AppFormField from "../components/form/AppFormField.vue";
+import AppInput from "../components/form/AppInput.vue";
 import { useAuthApi } from "~/composables/useAuthApi";
 
 useHead({
@@ -13,7 +17,7 @@ if (authApi.accessToken.value) {
   await navigateTo("/");
 }
 
-const isSubmitting = ref("");ref(false);
+const isSubmitting = ref(false);
 const submitError = ref("");
 
 const form = reactive({
@@ -32,7 +36,7 @@ const submitLogin = async () => {
   }
 
   submitError.value = "";
-  isSubmitting.value = "登录中";
+  isSubmitting.value = true;
 
   try {
     const result = await authApi.login({
@@ -50,7 +54,7 @@ const submitLogin = async () => {
     submitError.value =
       error instanceof Error ? error.message : "登录失败，请稍后重试";
   } finally {
-    isSubmitting.value = "";
+    isSubmitting.value = false;
   }
 };
 </script>
@@ -65,33 +69,26 @@ const submitLogin = async () => {
       </div>
 
       <form class="auth-form" @submit.prevent="submitLogin">
-        <label class="auth-field">
-          <span class="auth-label">用户名</span>
-          <input
+        <AppFormField label="用户名" required>
+          <AppInput
             v-model="form.account"
-            class="auth-input"
             type="text"
             placeholder="请输入用户名"
             autocomplete="username"
           />
-        </label>
+        </AppFormField>
 
-        <label class="auth-field">
-          <span class="auth-label">密码</span>
-          <input
+        <AppFormField label="密码" required>
+          <AppInput
             v-model="form.password"
-            class="auth-input"
             type="password"
             placeholder="请输入登录密码"
             autocomplete="current-password"
           />
-        </label>
+        </AppFormField>
 
         <div class="auth-row">
-          <label class="auth-check">
-            <input v-model="form.remember" type="checkbox" />
-            <span>记住当前设备</span>
-          </label>
+          <AppCheckbox v-model="form.remember">记住当前设备</AppCheckbox>
 
           <NuxtLink class="auth-text-link" to="/appeal">
             账号封禁申诉
@@ -102,13 +99,15 @@ const submitLogin = async () => {
           {{ submitError }}
         </p>
 
-        <button
+        <AppButton
           class="auth-submit"
           type="submit"
-          :disabled="!canSubmit || !!isSubmitting"
+          block
+          :loading="isSubmitting"
+          :disabled="!canSubmit || isSubmitting"
         >
-          {{ isSubmitting ? "登录中..." : "登录" }}
-        </button>
+          登录
+        </AppButton>
 
         <div class="auth-footer">
           <span>还没有账号？</span>
@@ -168,40 +167,8 @@ const submitLogin = async () => {
   gap: 16px;
 }
 
-.auth-field {
-  display: grid;
-  gap: 8px;
-}
-
-.auth-label {
-  color: var(--yn-color-text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.auth-input {
-  height: 46px;
-  width: 100%;
-  border: 1px solid var(--yn-color-border-medium);
-  border-radius: var(--yn-radius-medium);
-  background: var(--yn-color-surface-raised);
-  color: var(--yn-color-text-primary);
-  padding: 0 14px;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    background 0.2s ease;
-}
-
-.auth-input:focus {
-  outline: none;
-  border-color: var(--yn-color-primary);
-  box-shadow: var(--yn-glow-medium);
-}
-
 .auth-row,
-.auth-footer,
-.auth-check {
+.auth-footer {
   display: flex;
   align-items: center;
 }
@@ -214,36 +181,6 @@ const submitLogin = async () => {
 .auth-footer {
   justify-content: flex-start;
   gap: 12px;
-}
-
-.auth-check {
-  gap: 8px;
-  color: var(--yn-color-text-secondary);
-  font-size: 14px;
-}
-
-.auth-submit {
-  width: 100%;
-  min-height: 46px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--yn-color-primary);
-  border-radius: var(--yn-radius-medium);
-  background: var(--yn-color-primary);
-  color: #ffffff;
-  font-weight: 600;
-  cursor: pointer;
-  transition: filter 0.2s ease;
-}
-
-.auth-submit:hover:not(:disabled) {
-  filter: brightness(0.96);
-}
-
-.auth-submit:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .auth-text-link {

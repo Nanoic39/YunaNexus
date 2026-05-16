@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, reactive, ref } from "vue";
+import AppButton from "../components/form/AppButton.vue";
+import AppCheckbox from "../components/form/AppCheckbox.vue";
+import AppFormField from "../components/form/AppFormField.vue";
+import AppInput from "../components/form/AppInput.vue";
 import AppInputMenu from "../components/form/AppInputMenu.vue";
 import { useAuthApi } from "~/composables/useAuthApi";
 
@@ -15,9 +19,11 @@ if (authApi.accessToken.value) {
 const genderItems = ["未知", "男", "女"];
 const isSendingCode = ref(false);
 const isSubmitting = ref(false);
+const codeCountdown = ref(0);
 const codeMessage = ref("");
 const codeSuccess = ref(false);
 const submitMessage = ref("");
+let codeCountdownTimer: ReturnType<typeof window.setInterval> | null = null;
 
 const form = reactive({
   username: "",
@@ -30,6 +36,9 @@ const form = reactive({
   agreement: true,
 });
 const finalGender = computed(() => form.gender.trim());
+const codeButtonText = computed(() =>
+  codeCountdown.value > 0 ? `${codeCountdown.value} 秒后重发` : "发送验证码",
+);
 const canSubmit = computed(
   () =>
     finalGender.value.length > 0 &&
@@ -43,8 +52,29 @@ const canSubmit = computed(
     form.agreement,
 );
 
+const clearCodeCountdown = () => {
+  if (codeCountdownTimer !== null) {
+    window.clearInterval(codeCountdownTimer);
+    codeCountdownTimer = null;
+  }
+};
+
+const startCodeCountdown = () => {
+  clearCodeCountdown();
+  codeCountdown.value = 60;
+  codeCountdownTimer = setInterval(() => {
+    if (codeCountdown.value <= 1) {
+      codeCountdown.value = 0;
+      clearCodeCountdown();
+      return;
+    }
+    codeCountdown.value -= 1;
+  }, 1000);
+};
+
 const sendCode = async () => {
-  if (!form.email.trim() || isSendingCode.value) return;
+  if (!form.email.trim() || isSendingCode.value || codeCountdown.value > 0)
+    return;
   codeMessage.value = "";
   codeSuccess.value = false;
   isSendingCode.value = true;
@@ -55,6 +85,9 @@ const sendCode = async () => {
       result.tip ||
       result.msg ||
       (result.code === 200 ? "验证码已发送" : "发送失败，请稍后重试");
+    if (result.code === 200) {
+      startCodeCountdown();
+    }
   } catch (error) {
     codeMessage.value =
       error instanceof Error ? error.message : "发送失败，请稍后重试";
@@ -62,6 +95,10 @@ const sendCode = async () => {
     isSendingCode.value = false;
   }
 };
+
+onBeforeUnmount(() => {
+  clearCodeCountdown();
+});
 
 const submitRegister = async () => {
   if (!canSubmit.value || isSubmitting.value) return;
@@ -101,90 +138,79 @@ const submitRegister = async () => {
 
       <form class="register-form" @submit.prevent="submitRegister">
         <div class="register-grid">
-          <label class="register-field">
-            <span class="register-label">用户名</span>
-            <input
+          <AppFormField label="用户名" required>
+            <AppInput
               v-model="form.username"
-              class="register-input"
               type="text"
               placeholder="用于登录的唯一用户名"
               autocomplete="username"
             />
-          </label>
+          </AppFormField>
 
-          <label class="register-field">
-            <span class="register-label">昵称</span>
-            <input
+          <AppFormField label="昵称" required>
+            <AppInput
               v-model="form.nickname"
-              class="register-input"
               type="text"
               placeholder="请输入昵称"
             />
-          </label>
+          </AppFormField>
 
-          <label class="register-field">
-            <span class="register-label">电子邮箱</span>
-            <input
+          <AppFormField label="电子邮箱" required>
+            <AppInput
               v-model="form.email"
-              class="register-input"
               type="email"
               placeholder="请输入可接收验证码的邮箱"
               autocomplete="email"
             />
-          </label>
+          </AppFormField>
 
-          <label class="register-field">
-            <span class="register-label">性别</span>
+          <AppFormField label="性别" required>
             <AppInputMenu
               v-model="form.gender"
               :items="genderItems"
               :maxlength="10"
               placeholder="请选择或输入性别，最多10个字符"
             />
-          </label>
+          </AppFormField>
 
-          <label class="register-field">
-            <span class="register-label">密码</span>
-            <input
+          <AppFormField label="密码" required>
+            <AppInput
               v-model="form.password"
-              class="register-input"
               type="password"
               placeholder="至少 6 位密码"
               autocomplete="new-password"
             />
-          </label>
+          </AppFormField>
 
-          <label class="register-field">
-            <span class="register-label">确认密码</span>
-            <input
+          <AppFormField label="确认密码" required>
+            <AppInput
               v-model="form.confirmPassword"
-              class="register-input"
               type="password"
               placeholder="请再次输入密码"
               autocomplete="new-password"
             />
-          </label>
+          </AppFormField>
         </div>
 
         <div class="register-code-row">
-          <label class="register-field register-field-grow">
-            <span class="register-label">邮箱验证码</span>
-            <input
+          <AppFormField class="register-field-grow" label="邮箱验证码" required>
+            <AppInput
               v-model="form.code"
-              class="register-input"
               type="text"
               placeholder="请输入邮箱验证码"
             />
-          </label>
+          </AppFormField>
 
-          <button
+          <AppButton
             class="register-code-button"
             type="button"
-            :disabled="!form.email.trim() || isSendingCode"
+            variant="secondary"
+            :loading="isSendingCode"
+            :disabled="!form.email.trim() || isSendingCode || codeCountdown > 0"
             @click="sendCode"
           >
-            {{ isSendingCode ? "发送中..." : "发送验证码" }}
-          </button>
+            {{ codeButtonText }}
+          </AppButton>
         </div>
 
         <p
@@ -197,22 +223,23 @@ const submitRegister = async () => {
           {{ codeMessage }}
         </p>
 
-        <label class="register-check">
-          <input v-model="form.agreement" type="checkbox" />
-          <span>我已阅读并同意平台基础使用规则与账号安全说明</span>
-        </label>
+        <AppCheckbox v-model="form.agreement">
+          我已阅读并同意平台基础使用规则与账号安全说明
+        </AppCheckbox>
 
         <p v-if="submitMessage" class="register-message register-message-error">
           {{ submitMessage }}
         </p>
 
-        <button
+        <AppButton
           class="register-submit"
           type="submit"
+          block
+          :loading="isSubmitting"
           :disabled="!canSubmit || isSubmitting"
         >
-          {{ isSubmitting ? "提交中..." : "创建账号" }}
-        </button>
+          创建账号
+        </AppButton>
 
         <div class="register-footer">
           <span>已经有账号？</span>
@@ -278,39 +305,8 @@ const submitRegister = async () => {
   gap: 16px;
 }
 
-.register-field {
-  display: grid;
-  gap: 8px;
-}
-
 .register-field-grow {
   flex: 1;
-}
-
-.register-label {
-  color: var(--yn-color-text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.register-input {
-  height: 46px;
-  width: 100%;
-  border: 1px solid var(--yn-color-border-medium);
-  border-radius: var(--yn-radius-medium);
-  background: var(--yn-color-surface-raised);
-  color: var(--yn-color-text-primary);
-  padding: 0 14px;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    background 0.2s ease;
-}
-
-.register-input:focus {
-  outline: none;
-  border-color: var(--yn-color-primary);
-  box-shadow: var(--yn-glow-medium);
 }
 
 .register-code-row {
@@ -325,53 +321,8 @@ const submitRegister = async () => {
   line-height: 1.5;
 }
 
-.register-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--yn-color-text-secondary);
-  font-size: 14px;
-}
-
-.register-submit,
-.register-code-button {
-  display: inline-flex;
-  min-height: 46px;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--yn-radius-medium);
-  font-weight: 600;
-  transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease;
-}
-
-.register-submit {
-  width: 100%;
-  border: 1px solid var(--yn-color-primary);
-  background: var(--yn-color-primary);
-  color: #ffffff;
-  cursor: pointer;
-}
-
-.register-submit:hover:not(:disabled),
-.register-code-button:hover:not(:disabled) {
-  filter: brightness(0.96);
-}
-
-.register-submit:disabled,
-.register-code-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
 .register-code-button {
   min-width: 140px;
-  border: 1px solid var(--yn-color-border-medium);
-  background: var(--yn-color-surface-raised);
-  color: var(--yn-color-text-primary);
-  padding: 0 16px;
 }
 
 .register-footer {
