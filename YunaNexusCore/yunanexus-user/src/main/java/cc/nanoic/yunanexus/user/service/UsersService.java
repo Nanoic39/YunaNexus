@@ -71,4 +71,12 @@ public interface UsersService extends IService<Users> {
      * @param updateUserInfoDTO 更新内容
      */
     void updateCurrentUserInfo(Long userId, UpdateUserInfoDTO updateUserInfoDTO);
+
+    /**
+     * 内部同步用户头像文件uuid
+     * @param userId 用户ID
+     * @param avatarUuid 头像文件uuid
+     * @return 旧头像文件uuid
+     */
+    String updateAvatarUuid(Long userId, String avatarUuid);
 }

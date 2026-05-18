@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: YunaNexus-FileService
+  profiles:
+    active: @spring.profiles.active@
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: cc.nanoic.yunanexus.file.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+
+server:
+  port: 8300
+
+custom:
+  time:
+    time-zone: Asia/Shanghai
+
+yunanexus:
+  file:
+    storage:
+      local:
+        root-path: ${YUNANEXUS_FILE_STORAGE_ROOT:./storage/yunanexus-file}

@@ -13,6 +13,7 @@ YunaNexus/
 │   ├── yunanexus-common-rocketmq/ # 提供 RocketMQ SDK
 │   ├── yunanexus-common-web/      # 提供 LocalDateTime/Result/Exception SDK
 │   ├── yunanexus-auth/            # 提供安全认证相关的后端支持
+│   ├── yunanexus-file/            # 提供文件相关的后端支持 ( 🚧 开发中... )
 │   └── yunanexus-user/            # 提供用户账户/权限相关的后端支持
 ├── YunaNexusWeb/                  # YunaNexus 系列前端工作区 ( 🚧 开发中... )
 │   ├── apps/                      # 具体前端应用
@@ -203,6 +204,12 @@ pip install -r requirements.txt
 ```
 
 随后自行执行需要使用的脚本即可，如：`./oauth-info-init.py`
+
+## *[file]
+启动时配置环境变量可以修改本地存储文件的保存位置
+```bash
+$env:YUNANEXUS_FILE_STORAGE_ROOT="YOUR_ROOT_PATH\FILE_STORAGE_PATH"
+```
 
 ## [前端]
 前端部分采用AI作为主力开发，我这里只专注于后端设计与开发，如果有更好的改进方案，欢迎提交Pull Request进行贡献

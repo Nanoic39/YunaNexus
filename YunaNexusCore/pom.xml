@@ -21,6 +21,7 @@
         <module>yunanexus-common-rocketmq</module>
         <module>yunanexus-auth</module>
         <module>yunanexus-common-web</module>
+        <module>yunanexus-file</module>
     </modules>
 
     <!-- 版本管理 -->

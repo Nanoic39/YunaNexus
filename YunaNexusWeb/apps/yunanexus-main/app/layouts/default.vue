@@ -69,6 +69,10 @@ const userName = computed(
     "已登录用户",
 );
 const userAvatarText = computed(() => userName.value.slice(0, 1).toUpperCase());
+const userAvatarUuid = computed(() => authApi.currentUser.value?.avatarUuid || "");
+const userAvatarUrl = computed(() =>
+  userAvatarUuid.value ? `/api/file/avatar/${userAvatarUuid.value}` : "",
+);
 const userUuid = computed(() => authApi.currentUser.value?.uuid || "");
 const userHint = computed(() => (userUuid.value ? "个人中心" : "当前已登录"));
 const authGroups = computed(
@@ -478,7 +482,15 @@ const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
               type="button"
               @click="toggleUserEntry"
             >
-              <span class="app-user-avatar">{{ userAvatarText }}</span>
+              <span class="app-user-avatar">
+                <img
+                  v-if="userAvatarUrl"
+                  :src="userAvatarUrl"
+                  alt="用户头像"
+                  class="app-user-avatar-image"
+                />
+                <template v-else>{{ userAvatarText }}</template>
+              </span>
               <span class="app-user-meta">
                 <strong class="app-user-name">{{ userName }}</strong>
                 <small class="app-user-hint">{{ userHint }}</small>
@@ -492,9 +504,15 @@ const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
             <Transition name="user-card-panel">
               <section v-if="userEntryOpen" class="app-user-card">
                 <div class="app-user-card-header">
-                  <span class="app-user-avatar app-user-avatar-large">{{
-                    userAvatarText
-                  }}</span>
+                  <span class="app-user-avatar app-user-avatar-large">
+                    <img
+                      v-if="userAvatarUrl"
+                      :src="userAvatarUrl"
+                      alt="用户头像"
+                      class="app-user-avatar-image"
+                    />
+                    <template v-else>{{ userAvatarText }}</template>
+                  </span>
                   <div class="app-user-card-meta">
                     <strong class="app-user-card-name">{{ userName }}</strong>
                     <span class="app-user-card-id">{{
@@ -893,6 +911,12 @@ const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
   height: 44px;
   width: 44px;
   font-size: 16px;
+}
+.app-user-avatar-image {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
 }
 .app-user-entry-arrow {
   font-size: 16px;

@@ -92,30 +92,42 @@ const toPublicKeyPem = (base64Key: string) => {
 
 export const useAuthApi = () => {
   const runtimeConfig = useRuntimeConfig();
+  const accessCookieMaxAge = Number(
+    runtimeConfig.public.authAccessCookieMaxAge || 7200,
+  );
+  const refreshCookieMaxAge = Number(
+    runtimeConfig.public.authRefreshCookieMaxAge || 604800,
+  );
 
   const accessToken = useCookie<string | null>("yn-access-token", {
     default: () => null,
     sameSite: "lax",
+    maxAge: accessCookieMaxAge,
   });
   const refreshToken = useCookie<string | null>("yn-refresh-token", {
     default: () => null,
     sameSite: "lax",
+    maxAge: refreshCookieMaxAge,
   });
   const tokenType = useCookie<string | null>("yn-token-type", {
     default: () => null,
     sameSite: "lax",
+    maxAge: refreshCookieMaxAge,
   });
   const tokenExpiresIn = useCookie<number | null>("yn-token-expires-in", {
     default: () => null,
     sameSite: "lax",
+    maxAge: refreshCookieMaxAge,
   });
   const authScope = useCookie<string | null>("yn-auth-scope", {
     default: () => null,
     sameSite: "lax",
+    maxAge: refreshCookieMaxAge,
   });
   const tokenExpireAt = useCookie<number | null>("yn-token-expire-at", {
     default: () => null,
     sameSite: "lax",
+    maxAge: refreshCookieMaxAge,
   });
 
   const currentUser = useState<CurrentUser | null>(

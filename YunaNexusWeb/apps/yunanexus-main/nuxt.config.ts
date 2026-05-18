@@ -71,6 +71,10 @@ export default defineNuxtConfig({
       authBase: pickEnv("NUXT_PUBLIC_AUTH_BASE"),
       oauthClientUuid: pickEnv("NUXT_PUBLIC_OAUTH_CLIENT_UUID"),
       oauthClientSecret: pickEnv("NUXT_PUBLIC_OAUTH_CLIENT_SECRET"),
+      authAccessCookieMaxAge:
+        pickEnv("NUXT_PUBLIC_AUTH_ACCESS_COOKIE_MAX_AGE") || "7200",
+      authRefreshCookieMaxAge:
+        pickEnv("NUXT_PUBLIC_AUTH_REFRESH_COOKIE_MAX_AGE") || "604800",
     },
   },
 });
