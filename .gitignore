@@ -69,3 +69,6 @@ postman/
 **/.DS_Store
 **/coverage
 **/*.log
+
+### 文件存储 ###
+/storage

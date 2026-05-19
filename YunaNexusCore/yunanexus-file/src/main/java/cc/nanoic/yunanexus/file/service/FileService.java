@@ -3,6 +3,7 @@ package cc.nanoic.yunanexus.file.service;
 import cc.nanoic.yunanexus.common.web.common.BusinessException;
 import cc.nanoic.yunanexus.common.web.common.R;
 import cc.nanoic.yunanexus.file.client.UserInternalClient;
+import cc.nanoic.yunanexus.file.config.AvatarUploadProperties;
 import cc.nanoic.yunanexus.file.entity.FileObject;
 import cc.nanoic.yunanexus.file.entity.FileStorageNode;
 import cc.nanoic.yunanexus.file.entity.UserFile;
@@ -56,6 +57,9 @@ public class FileService {
     @Resource
     private UserInternalClient userInternalClient;
 
+    @Resource
+    private AvatarUploadProperties avatarUploadProperties;
+
     @Transactional
     public Map<String, Object> upload(
             Long userId,
@@ -64,8 +68,7 @@ public class FileService {
             Integer fileCategory,
             Integer publicStatus,
             String serviceName,
-            String oauthAppUuid
-    ) {
+            String oauthAppUuid) {
         return uploadInternal(userId, file, folderId, fileCategory, publicStatus, serviceName, oauthAppUuid, false);
     }
 
@@ -78,8 +81,7 @@ public class FileService {
             Integer publicStatus,
             String serviceName,
             String oauthAppUuid,
-            boolean allowReservedServiceName
-    ) {
+            boolean allowReservedServiceName) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(R.PARAM_ERROR, "上传文件不能为空");
         }
@@ -137,8 +139,11 @@ public class FileService {
             fileObjectMapper.updateById(fileObject);
         }
 
+        String logicalFileUuid = UUID.randomUUID().toString();
+        String logicalFileName = resolveLogicalFileName(originalFilename, safeServiceName, logicalFileUuid);
+
         UserFile userFile = new UserFile();
-        userFile.setFileUuid(UUID.randomUUID().toString());
+        userFile.setFileUuid(logicalFileUuid);
         userFile.setUserId(userId);
         userFile.setFolderId(folderId);
         userFile.setObjectId(fileObject.getId());
@@ -147,7 +152,7 @@ public class FileService {
         userFile.setServiceName(safeServiceName);
         userFile.setOauthAppUuid(StringUtils.hasText(oauthAppUuid) ? oauthAppUuid.trim() : null);
         userFile.setOriginName(originalFilename);
-        userFile.setFileName(originalFilename);
+        userFile.setFileName(logicalFileName);
         userFile.setFileSize(fileSize);
         userFile.setFileExt(ext);
         userFile.setFileMime(mime);
@@ -208,7 +213,8 @@ public class FileService {
     public Map<String, Object> getFileDetail(Long userId, String fileUuid) {
         UserFile item = requireManagedUserFile(userId, fileUuid, 0);
         FileObject fileObject = fileObjectMapper.selectById(item.getObjectId());
-        FileStorageNode node = fileObject == null ? null : fileStorageNodeMapper.selectById(fileObject.getPrimaryNodeId());
+        FileStorageNode node = fileObject == null ? null
+                : fileStorageNodeMapper.selectById(fileObject.getPrimaryNodeId());
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("fileUuid", item.getFileUuid());
         data.put("fileName", item.getFileName());
@@ -254,7 +260,9 @@ public class FileService {
         userFileMapper.updateById(item);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> uploadAvatar(Long userId, MultipartFile file) {
+        validateAvatarUpload(file);
         Map<String, Object> data = uploadInternal(userId, file, null, 0, 1, AVATAR_SERVICE_NAME, null, true);
         String avatarUuid = String.valueOf(data.get("fileUuid"));
         var result = userInternalClient.updateAvatar(userId, avatarUuid);
@@ -275,12 +283,12 @@ public class FileService {
 
     public List<Map<String, Object>> listRecycleFiles(Long userId) {
         return userFileMapper.selectList(new LambdaQueryWrapper<UserFile>()
-                        .eq(UserFile::getUserId, userId)
-                        .eq(UserFile::getStatus, 1)
-                        .eq(UserFile::getDeleteStage, 1)
-                        .ne(UserFile::getServiceName, AVATAR_SERVICE_NAME)
-                        .orderByDesc(UserFile::getDeletedAt)
-                        .orderByDesc(UserFile::getId))
+                .eq(UserFile::getUserId, userId)
+                .eq(UserFile::getStatus, 1)
+                .eq(UserFile::getDeleteStage, 1)
+                .ne(UserFile::getServiceName, AVATAR_SERVICE_NAME)
+                .orderByDesc(UserFile::getDeletedAt)
+                .orderByDesc(UserFile::getId))
                 .stream()
                 .map(item -> {
                     Map<String, Object> data = new LinkedHashMap<>();
@@ -309,7 +317,8 @@ public class FileService {
             throw new BusinessException(R.NOT_FOUND, "公开文件不存在或不可访问");
         }
         FileObject fileObject = fileObjectMapper.selectById(item.getObjectId());
-        FileStorageNode node = fileObject == null ? null : fileStorageNodeMapper.selectById(fileObject.getPrimaryNodeId());
+        FileStorageNode node = fileObject == null ? null
+                : fileStorageNodeMapper.selectById(fileObject.getPrimaryNodeId());
         if (fileObject == null || node == null) {
             throw new BusinessException(R.NOT_FOUND, "文件对象不存在或存储节点不可用");
         }
@@ -332,7 +341,8 @@ public class FileService {
             throw new BusinessException(R.NOT_FOUND, "头像文件不存在或不可访问");
         }
         FileObject fileObject = fileObjectMapper.selectById(item.getObjectId());
-        FileStorageNode node = fileObject == null ? null : fileStorageNodeMapper.selectById(fileObject.getPrimaryNodeId());
+        FileStorageNode node = fileObject == null ? null
+                : fileStorageNodeMapper.selectById(fileObject.getPrimaryNodeId());
         if (fileObject == null || node == null) {
             throw new BusinessException(R.NOT_FOUND, "头像对象不存在或存储节点不可用");
         }
@@ -359,11 +369,31 @@ public class FileService {
             return;
         }
         LocalDateTime now = LocalDateTime.now();
-        previousAvatar.setDeleteStage(1);
+        previousAvatar.setDeleteStage(2);
         previousAvatar.setDeletedAt(now);
-        previousAvatar.setRecycleExpireAt(now.plusDays(30));
+        previousAvatar.setRecycleExpireAt(null);
+        previousAvatar.setPreDeleteExpireAt(now.plusDays(60));
         previousAvatar.setDeletedBy(userId);
         userFileMapper.updateById(previousAvatar);
+    }
+
+    private void validateAvatarUpload(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(R.PARAM_ERROR, "头像文件不能为空");
+        }
+        if (file.getSize() > avatarUploadProperties.getMaxSizeBytes()) {
+            throw new BusinessException(R.PARAM_ERROR, "头像文件大小超过限制");
+        }
+        String contentType = file.getContentType();
+        if (!StringUtils.hasText(contentType)
+                || !avatarUploadProperties.getAllowedContentTypes().contains(contentType)) {
+            throw new BusinessException(R.PARAM_ERROR, "头像文件类型不受支持");
+        }
+        String extension = FileUtil.extName(file.getOriginalFilename());
+        if (!StringUtils.hasText(extension)
+                || !avatarUploadProperties.getAllowedExtensions().contains(extension.toLowerCase())) {
+            throw new BusinessException(R.PARAM_ERROR, "头像文件扩展名不受支持");
+        }
     }
 
     public List<Map<String, Object>> listUserFolders(Long userId, Long parentId) {
@@ -467,8 +497,15 @@ public class FileService {
                 today.getMonthValue(),
                 today.getDayOfMonth(),
                 objectUuid,
-                suffix
-        );
+                suffix);
+    }
+
+    private String resolveLogicalFileName(String originalFilename, String serviceName, String logicalFileUuid) {
+        if (!AVATAR_SERVICE_NAME.equals(serviceName)) {
+            return originalFilename;
+        }
+        String ext = FileUtil.extName(originalFilename);
+        return StringUtils.hasText(ext) ? "avatar-" + logicalFileUuid + "." + ext : "avatar-" + logicalFileUuid;
     }
 
     private int normalizeFileCategory(Integer fileCategory) {

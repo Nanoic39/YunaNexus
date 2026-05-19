@@ -69,6 +69,7 @@ export default defineNuxtConfig({
       siteTitle: pickEnv("NUXT_PUBLIC_SITE_TITLE"),
       apiBase: pickEnv("NUXT_PUBLIC_API_BASE"),
       authBase: pickEnv("NUXT_PUBLIC_AUTH_BASE"),
+      fileBase: pickEnv("NUXT_PUBLIC_FILE_BASE"),
       oauthClientUuid: pickEnv("NUXT_PUBLIC_OAUTH_CLIENT_UUID"),
       oauthClientSecret: pickEnv("NUXT_PUBLIC_OAUTH_CLIENT_SECRET"),
       authAccessCookieMaxAge:
