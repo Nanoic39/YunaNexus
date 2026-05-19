@@ -26,3 +26,7 @@ yunanexus:
     storage:
       local:
         root-path: ${YUNANEXUS_FILE_STORAGE_ROOT:./storage/yunanexus-file}
+    avatar:
+      max-size-bytes: ${YUNANEXUS_FILE_AVATAR_MAX_SIZE_BYTES:5242880}
+      allowed-content-types: ${YUNANEXUS_FILE_AVATAR_ALLOWED_CONTENT_TYPES:image/jpeg,image/png,image/webp}
+      allowed-extensions: ${YUNANEXUS_FILE_AVATAR_ALLOWED_EXTENSIONS:jpg,jpeg,png,webp}

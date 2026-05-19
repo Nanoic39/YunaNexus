@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { sidebarMenus } from "../mocks/navigation";
 import AppThemeToggle from "../components/ui/AppThemeToggle.vue";
 import AppGlobalLoader from "../components/feedback/AppGlobalLoader.vue";
@@ -49,13 +49,17 @@ const mobileDrawerOpen = useState<boolean>(
   () => false,
 );
 const authApi = useAuthApi();
+const layoutReady = ref(false);
+const authResolved = computed(
+  () => layoutReady.value && authApi.sessionReady.value,
+);
 const isAuthenticated = computed(() => !!authApi.accessToken.value);
 const menus = computed(() =>
   sidebarMenus
     .map((menu) => ({
       ...menu,
       children: menu.children?.filter((child) =>
-        isAuthenticated.value
+        authResolved.value && isAuthenticated.value
           ? child.key !== "login" && child.key !== "register"
           : true,
       ),
@@ -284,6 +288,7 @@ const cycleTheme = async (origin?: HTMLElement | null) => {
 };
 
 onMounted(() => {
+  layoutReady.value = true;
   if (!import.meta.client) return;
   document.addEventListener("pointerdown", handleDocumentPointerDown);
   const saved = window.localStorage.getItem("yn-theme-mode");
@@ -470,13 +475,14 @@ const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
             @toggle="handleThemeToggle"
             @request-menu="handleThemeMenu"
           />
-          <NuxtLink
-            v-if="!isAuthenticated"
-            class="app-topbar-login-link"
-            to="/login"
-            >登录</NuxtLink
-          >
-          <div v-else ref="userEntryRef" class="app-user-entry-wrap">
+          <template v-if="authResolved">
+            <NuxtLink
+              v-if="!isAuthenticated"
+              class="app-topbar-login-link"
+              to="/login"
+              >登录</NuxtLink
+            >
+            <div v-else ref="userEntryRef" class="app-user-entry-wrap">
             <button
               class="app-user-entry"
               type="button"
@@ -550,7 +556,9 @@ const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
                 </div>
               </section>
             </Transition>
-          </div>
+            </div>
+          </template>
+          <div v-else class="app-topbar-auth-placeholder" aria-hidden="true" />
         </div>
       </header>
       <main class="app-content">
@@ -880,6 +888,13 @@ const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
   color: var(--yn-color-primary);
   font-size: 14px;
   font-weight: 600;
+}
+
+.app-topbar-auth-placeholder {
+  width: 148px;
+  height: 40px;
+  border-radius: var(--yn-radius-medium);
+  background: color-mix(in srgb, var(--yn-color-surface-raised) 72%, transparent);
 }
 .app-user-entry-wrap {
   position: relative;

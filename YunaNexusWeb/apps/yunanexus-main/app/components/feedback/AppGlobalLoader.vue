@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const props = withDefaults(
   defineProps<{ scope?: "fullscreen" | "content" }>(),
@@ -7,6 +7,7 @@ const props = withDefaults(
 );
 
 const pageLoader = usePageLoader();
+const mounted = ref(false);
 const visible = ref(false);
 const loading = ref(false);
 
@@ -16,6 +17,7 @@ let loadingStartedAt = 0;
 
 const showDelayMs = 90;
 const minVisibleMs = 220;
+const immediateScopes = new Set(["fullscreen", "content"]);
 const shouldShow = computed(() =>
   props.scope === "fullscreen"
     ? pageLoader.showFullscreen.value
@@ -81,13 +83,17 @@ watch(
   shouldShow,
   (next) => {
     if (next) {
-      beginLoading(props.scope === "fullscreen");
+      beginLoading(immediateScopes.has(props.scope));
       return;
     }
     finishLoading();
   },
   { immediate: true },
 );
+
+onMounted(() => {
+  mounted.value = true;
+});
 
 onBeforeUnmount(() => {
   clearShowTimer();
@@ -98,7 +104,7 @@ onBeforeUnmount(() => {
 <template>
   <Transition name="app-global-loader">
     <div
-      v-if="visible"
+      v-if="mounted && visible"
       class="app-global-loader"
       :class="[
         `app-global-loader-${props.scope}`,

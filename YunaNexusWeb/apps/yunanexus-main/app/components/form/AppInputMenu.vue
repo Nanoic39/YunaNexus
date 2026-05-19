@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const props = withDefaults(
   defineProps<{
@@ -140,7 +140,9 @@ watch(
   },
 );
 
-window.addEventListener("mousedown", handleClickOutside);
+onMounted(() => {
+  window.addEventListener("mousedown", handleClickOutside);
+});
 
 onBeforeUnmount(() => {
   window.removeEventListener("mousedown", handleClickOutside);

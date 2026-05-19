@@ -20,18 +20,20 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const apiBase = runtimeConfig.public.apiBase;
-  if (!apiBase) {
+  const fileBase = runtimeConfig.public.fileBase;
+  if (!fileBase) {
     throw createError({
       statusCode: 500,
       statusMessage: "Proxy target is not configured",
       data: {
-        message: "用户服务地址未配置",
+        message: "文件服务地址未配置",
       },
     });
   }
 
-  const response = await fetch(joinUrl(apiBase, `/file/avatar/${avatarUuid}`));
+  // 确保两个路径参数都是字符串类型，避免类型不匹配错误
+  const avatarUuidStr = String(avatarUuid);
+  const response = await fetch(joinUrl(fileBase, `/file/avatar/${avatarUuidStr}`));
   setResponseStatus(event, response.status, response.statusText);
 
   if (!response.ok || !response.body) {
