@@ -31,10 +31,20 @@ type RegisterPayload = {
   verifyCode: string;
 };
 
+type UpdateProfilePayload = {
+  nickname: string;
+  gender: string;
+  birthday: string | null;
+};
+
 type CurrentUser = {
   uuid?: string;
   nickname?: string | null;
   avatarUuid?: string | null;
+  gender?: string | null;
+  birthday?: string | null;
+  createTime?: string | null;
+  updateTime?: string | null;
 };
 
 type PermissionSnapshot = {
@@ -360,6 +370,47 @@ export const useAuthApi = () => {
     });
   };
 
+  const updateProfile = async (payload: UpdateProfilePayload) => {
+    const authorization = getAuthorizationHeader();
+    if (!authorization) {
+      throw new Error("请先登录");
+    }
+    const result = await requestResult<CurrentUser>("/api/user/me", {
+      method: "PUT",
+      headers: { Authorization: authorization },
+      body: {
+        nickname: payload.nickname,
+        gender: payload.gender,
+        birthday: payload.birthday || null,
+      },
+    });
+    if (result.code === SUCCESS_CODE) {
+      currentUser.value = result.data ?? currentUser.value;
+    }
+    return result;
+  };
+
+  const uploadAvatar = async (file: File) => {
+    const authorization = getAuthorizationHeader();
+    if (!authorization) {
+      throw new Error("请先登录");
+    }
+    const formData = new FormData();
+    formData.append("file", file);
+    const result = await requestResult<Record<string, unknown>>(
+      "/api/file/avatar/upload",
+      {
+        method: "POST",
+        headers: { Authorization: authorization },
+        body: formData,
+      },
+    );
+    if (result.code === SUCCESS_CODE) {
+      await fetchCurrentUser();
+    }
+    return result;
+  };
+
   const logout = async () => {
     const authorization = getAuthorizationHeader();
 
@@ -379,15 +430,25 @@ export const useAuthApi = () => {
 
   const restoreSession = async () => {
     try {
-      if (!accessToken.value) {
+      const hasRefreshToken = !!refreshToken.value;
+      const hasAccessToken = !!accessToken.value;
+      const accessExpiredOrMissing =
+        !hasAccessToken ||
+        !tokenExpireAt.value ||
+        tokenExpireAt.value <= Date.now() + REFRESH_ADVANCE_MS;
+
+      if (!hasAccessToken && !hasRefreshToken) {
         sessionReady.value = true;
         currentUser.value = null;
         return null;
       }
-      if (
-        tokenExpireAt.value &&
-        tokenExpireAt.value <= Date.now() + REFRESH_ADVANCE_MS
-      ) {
+
+      if (accessExpiredOrMissing) {
+        if (!hasRefreshToken) {
+          clearSession();
+          return null;
+        }
+
         const refreshResult = await refreshSession();
         if (!refreshResult || refreshResult.code !== SUCCESS_CODE) {
           sessionReady.value = true;
@@ -396,6 +457,7 @@ export const useAuthApi = () => {
       } else {
         scheduleSilentRefresh();
       }
+
       if (!currentUser.value || !permissionSnapshot.value) {
         await Promise.all([
           fetchCurrentUser(),
@@ -425,6 +487,8 @@ export const useAuthApi = () => {
     login,
     register,
     sendRegisterCode,
+    updateProfile,
+    uploadAvatar,
     fetchCurrentUser,
     fetchPermissionSnapshot,
     refreshSession,

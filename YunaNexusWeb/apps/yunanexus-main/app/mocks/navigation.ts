@@ -46,22 +46,9 @@ export const sidebarMenus: SidebarMenuItem[] = [
     ],
   },
   {
-    key: "user",
-    label: "用户中心",
-    icon: "lucide:panel-left-open",
-    children: [
-      {
-        key: "profile",
-        label: "个人资料",
-        icon: "lucide:user-round",
-        to: "/profile",
-      },
-      {
-        key: "profile-edit",
-        label: "编辑资料",
-        icon: "lucide:square-pen",
-        to: "/profile/edit",
-      },
-    ],
+    key: "profile",
+    label: "个人资料",
+    icon: "lucide:user-round",
+    to: "/profile",
   },
 ];

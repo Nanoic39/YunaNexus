@@ -108,7 +108,7 @@ public class FileController {
     }
 
     @GetMapping("/public/{fileUuid}")
-    public ResponseEntity<InputStreamResource> publicFile(@PathVariable String fileUuid) {
+    public ResponseEntity<InputStreamResource> publicFile(@PathVariable("fileUuid") String fileUuid) {
         var object = fileService.getPublicFile(fileUuid);
         MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
         if (object.contentType() != null && !object.contentType().isBlank()) {
@@ -122,7 +122,7 @@ public class FileController {
     }
 
     @GetMapping("/avatar/{avatarUuid}")
-    public ResponseEntity<InputStreamResource> avatarFile(@PathVariable String avatarUuid) {
+    public ResponseEntity<InputStreamResource> avatarFile(@PathVariable("avatarUuid") String avatarUuid) {
         var object = fileService.getAvatarPublicFile(avatarUuid);
         MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
         if (object.contentType() != null && !object.contentType().isBlank()) {

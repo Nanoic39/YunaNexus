@@ -265,6 +265,16 @@ public class UserController {
         return Result.success(userInfoVO, "用户信息更新成功");
     }
 
+    @PostMapping("/internal/user/avatar")
+    public Result<?> updateAvatarUuidInternal(@RequestParam("userId") Long userId,
+                                              @RequestParam("avatarUuid") String avatarUuid) {
+        String previousAvatarUuid = usersService.updateAvatarUuid(userId, avatarUuid);
+        Map<String, Object> data = new HashMap<>();
+        data.put("avatarUuid", avatarUuid);
+        data.put("previousAvatarUuid", previousAvatarUuid);
+        return Result.success(data, "头像关联更新成功");
+    }
+
     /**
      * 外部使用的查询其它(或自己)信息的接口
      * @param userUuid 待查询的用户uuid

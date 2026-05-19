@@ -173,6 +173,40 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String updateAvatarUuid(Long userId, String avatarUuid) {
+        if (userId == null || !StringUtils.hasText(avatarUuid)) {
+            throw new BusinessException(R.PARAM_ERROR, "用户ID和头像uuid不能为空");
+        }
+
+        UserInfo userInfo = userInfoMapper.selectOne(
+                new LambdaQueryWrapper<UserInfo>()
+                        .eq(UserInfo::getUserId, userId)
+                        .last("LIMIT 1")
+        );
+
+        String normalizedAvatarUuid = avatarUuid.trim();
+        LocalDateTime now = LocalDateTime.now();
+        if (userInfo == null) {
+            Users user = getById(userId);
+            userInfo = new UserInfo();
+            userInfo.setUserId(userId);
+            userInfo.setNickname(user == null ? "用户" + userId : user.getUsername());
+            userInfo.setGender("未知");
+            userInfo.setAvatarUuid(normalizedAvatarUuid);
+            userInfo.setUpdateTime(now);
+            userInfoMapper.insert(userInfo);
+            return null;
+        }
+
+        String previousAvatarUuid = normalize(userInfo.getAvatarUuid());
+        userInfo.setAvatarUuid(normalizedAvatarUuid);
+        userInfo.setUpdateTime(now);
+        userInfoMapper.updateById(userInfo);
+        return previousAvatarUuid;
+    }
+
+    @Override
     public boolean isExistsUser(String username) {
         return this.getOne(new LambdaQueryWrapper<Users>().eq(Users::getUsername, username)) != null;
     }
