@@ -39,8 +39,9 @@ YunaNexus/
     └── 开发笔记/                    # 对开发过程中遇到的问题/思考的记录
 ```
 
-## 🔧 application-local.yaml配置文件(开发完毕后该板块会被替换为项目运行指南，届时代码仓库中会提供模板文件)
-
+## 🔧 .yaml配置文件(开发完毕后该板块会被替换为项目运行指南，届时代码仓库中会提供模板文件)
+> " * " 表示通用，否则会专门给出对应的文件
+### * > application-local.yaml
 位于`YunaNexusCore/yunanexus-{xxx}/src/main/resources/`下
 
 与`application.yaml`同一层级
@@ -92,6 +93,56 @@ rocketmq:
   name-server: 127.0.0.1:9876 # RocketMQ默认地址，生产/消费均需要配置
   producer: # 生产者需要配置，消费者只需要在注解中声明即可
     group: { group-name }-Producer # -Producer可以不要，这里是为了规范
+```
+
+### core-file > application.yaml
+位于`YunaNexusCore/yunanexus-{xxx}/src/main/resources/`下
+```yaml
+spring:
+  application:
+    name: YunaNexus-FileService
+  profiles:
+    active: @spring.profiles.active@
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: cc.nanoic.yunanexus.file.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+
+server:
+  port: { port } # 服务端口
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: ${YUNANEXUS_FILE_MAX_UPLOAD_SIZE:800MB} # 最大文件大小
+      max-request-size: ${YUNANEXUS_FILE_MAX_REQUEST_SIZE:800MB} # 最大请求大小
+
+custom:
+  time:
+    time-zone: Asia/Shanghai
+
+yunanexus:
+  file:
+    upload: # 上传限制
+      direct-upload-threshold-bytes: ${YUNANEXUS_FILE_DIRECT_UPLOAD_THRESHOLD_BYTES:524288000} # 分片大小 500MB
+      normal-user-max-file-size-bytes: ${YUNANEXUS_FILE_NORMAL_USER_MAX_FILE_SIZE_BYTES:2147483648} # 普通用户最大文件大小 2GB
+      normal-user-max-space-bytes: ${YUNANEXUS_FILE_NORMAL_USER_MAX_SPACE_BYTES:53687091200} # 普通用户默认最大上传空间 50GB
+      chunk-size-bytes: ${YUNANEXUS_FILE_CHUNK_SIZE_BYTES:16777216}
+      temp-root-path: ${YUNANEXUS_FILE_TEMP_ROOT_PATH:./storage/yunanexus-file-temp}
+    storage:
+      local:
+        root-path: ${YUNANEXUS_FILE_STORAGE_ROOT:./storage/yunanexus-file}
+    avatar:
+      max-size-bytes: ${YUNANEXUS_FILE_AVATAR_MAX_SIZE_BYTES:5242880}
+      allowed-content-types: ${YUNANEXUS_FILE_AVATAR_ALLOWED_CONTENT_TYPES:image/jpeg,image/png,image/webp}
+      allowed-extensions: ${YUNANEXUS_FILE_AVATAR_ALLOWED_EXTENSIONS:jpg,jpeg,png,webp}
+
 ```
 
 ***

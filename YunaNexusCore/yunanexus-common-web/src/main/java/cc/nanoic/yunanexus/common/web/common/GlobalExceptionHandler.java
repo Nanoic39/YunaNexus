@@ -3,6 +3,7 @@ package cc.nanoic.yunanexus.common.web.common;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
@@ -26,6 +27,12 @@ public class GlobalExceptionHandler {
     public Result<?> handleIllegalArgumentException(IllegalArgumentException e) {
         log.error("参数错误：{}", e.getMessage());
         return Result.fail(R.PARAM_ERROR, e.getMessage());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public Result<?> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
+        log.error("上传文件过大", e);
+        return Result.fail(R.PARAM_ERROR, "上传文件大小超过服务端限制", "文件过大，请压缩后重试");
     }
 
     @ExceptionHandler(Exception.class)

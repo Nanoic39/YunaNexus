@@ -469,8 +469,8 @@ export const useAuthApi = () => {
       sessionReady.value = true;
       return currentUser.value;
     } catch {
-      clearSession();
-      return null;
+      sessionReady.value = true;
+      return currentUser.value;
     }
   };
 

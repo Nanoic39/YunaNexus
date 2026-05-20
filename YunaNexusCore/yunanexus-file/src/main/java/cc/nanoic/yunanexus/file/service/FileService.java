@@ -4,6 +4,7 @@ import cc.nanoic.yunanexus.common.web.common.BusinessException;
 import cc.nanoic.yunanexus.common.web.common.R;
 import cc.nanoic.yunanexus.file.client.UserInternalClient;
 import cc.nanoic.yunanexus.file.config.AvatarUploadProperties;
+import cc.nanoic.yunanexus.file.config.FileUploadProperties;
 import cc.nanoic.yunanexus.file.entity.FileObject;
 import cc.nanoic.yunanexus.file.entity.FileStorageNode;
 import cc.nanoic.yunanexus.file.entity.UserFile;
@@ -60,6 +61,9 @@ public class FileService {
     @Resource
     private AvatarUploadProperties avatarUploadProperties;
 
+    @Resource
+    private FileUploadProperties fileUploadProperties;
+
     @Transactional
     public Map<String, Object> upload(
             Long userId,
@@ -69,11 +73,25 @@ public class FileService {
             Integer publicStatus,
             String serviceName,
             String oauthAppUuid) {
+        validateUserUploadPolicy(userId, file == null ? 0L : file.getSize(), false);
         return uploadInternal(userId, file, folderId, fileCategory, publicStatus, serviceName, oauthAppUuid, false);
     }
 
     @Transactional
-    private Map<String, Object> uploadInternal(
+    public Map<String, Object> uploadByChunk(
+            Long userId,
+            MultipartFile file,
+            Long folderId,
+            Integer fileCategory,
+            Integer publicStatus,
+            String serviceName,
+            String oauthAppUuid) {
+        validateUserUploadPolicy(userId, file == null ? 0L : file.getSize(), true);
+        return uploadInternal(userId, file, folderId, fileCategory, publicStatus, serviceName, oauthAppUuid, false);
+    }
+
+    @Transactional
+    public Map<String, Object> uploadInternal(
             Long userId,
             MultipartFile file,
             Long folderId,
@@ -305,6 +323,11 @@ public class FileService {
                 }).toList();
     }
 
+    public StorageObjectResource downloadUserFile(Long userId, String fileUuid) {
+        UserFile item = requireManagedUserFile(userId, fileUuid, 0);
+        return loadStorageObject(item, "读取用户文件失败");
+    }
+
     public StorageObjectResource getPublicFile(String fileUuid) {
         UserFile item = userFileMapper.selectOne(new LambdaQueryWrapper<UserFile>()
                 .eq(UserFile::getFileUuid, fileUuid)
@@ -316,18 +339,7 @@ public class FileService {
         if (item == null) {
             throw new BusinessException(R.NOT_FOUND, "公开文件不存在或不可访问");
         }
-        FileObject fileObject = fileObjectMapper.selectById(item.getObjectId());
-        FileStorageNode node = fileObject == null ? null
-                : fileStorageNodeMapper.selectById(fileObject.getPrimaryNodeId());
-        if (fileObject == null || node == null) {
-            throw new BusinessException(R.NOT_FOUND, "文件对象不存在或存储节点不可用");
-        }
-        try {
-            return storageDriverRegistry.requireDriver(node.getStorageVendor())
-                    .getObject(node, fileObject.getObjectKey(), item.getFileMime(), item.getFileName());
-        } catch (IOException e) {
-            throw new BusinessException(R.SERVER_ERROR, "读取公开文件失败");
-        }
+        return loadStorageObject(item, "读取公开文件失败");
     }
 
     public StorageObjectResource getAvatarPublicFile(String avatarUuid) {
@@ -340,17 +352,20 @@ public class FileService {
         if (item == null) {
             throw new BusinessException(R.NOT_FOUND, "头像文件不存在或不可访问");
         }
+        return loadStorageObject(item, "读取用户头像失败");
+    }
+
+    private StorageObjectResource loadStorageObject(UserFile item, String errorMessage) {
         FileObject fileObject = fileObjectMapper.selectById(item.getObjectId());
-        FileStorageNode node = fileObject == null ? null
-                : fileStorageNodeMapper.selectById(fileObject.getPrimaryNodeId());
+        FileStorageNode node = fileObject == null ? null : fileStorageNodeMapper.selectById(fileObject.getPrimaryNodeId());
         if (fileObject == null || node == null) {
-            throw new BusinessException(R.NOT_FOUND, "头像对象不存在或存储节点不可用");
+            throw new BusinessException(R.NOT_FOUND, "文件对象不存在或存储节点不可用");
         }
         try {
             return storageDriverRegistry.requireDriver(node.getStorageVendor())
-                    .getObject(node, fileObject.getObjectKey(), item.getFileMime(), item.getFileName());
+                    .getObject(node, fileObject.getObjectKey(), item.getFileMime(), item.getOriginName());
         } catch (IOException e) {
-            throw new BusinessException(R.SERVER_ERROR, "读取用户头像失败");
+            throw new BusinessException(R.SERVER_ERROR, errorMessage);
         }
     }
 
@@ -506,6 +521,31 @@ public class FileService {
         }
         String ext = FileUtil.extName(originalFilename);
         return StringUtils.hasText(ext) ? "avatar-" + logicalFileUuid + "." + ext : "avatar-" + logicalFileUuid;
+    }
+
+    private void validateUserUploadPolicy(Long userId, long fileSize, boolean fromChunk) {
+        if (fileSize <= 0) {
+            throw new BusinessException(R.PARAM_ERROR, "上传文件不能为空");
+        }
+        if (fileSize > fileUploadProperties.getNormalUserMaxFileSizeBytes()) {
+            throw new BusinessException(R.PARAM_ERROR, "普通用户单文件最大支持 2GB");
+        }
+        if (!fromChunk && fileSize > fileUploadProperties.getDirectUploadThresholdBytes()) {
+            throw new BusinessException(R.PARAM_ERROR, "超过 500MB 的文件请走分片上传");
+        }
+        long usedSpace = userFileMapper.selectList(new LambdaQueryWrapper<UserFile>()
+                        .eq(UserFile::getUserId, userId)
+                        .eq(UserFile::getStatus, 1)
+                        .eq(UserFile::getDeleteStage, 0)
+                        .ne(UserFile::getServiceName, AVATAR_SERVICE_NAME))
+                .stream()
+                .map(UserFile::getFileSize)
+                .filter(Objects::nonNull)
+                .mapToLong(Long::longValue)
+                .sum();
+        if (usedSpace + fileSize > fileUploadProperties.getNormalUserMaxSpaceBytes()) {
+            throw new BusinessException(R.PARAM_ERROR, "当前账户剩余空间不足");
+        }
     }
 
     private int normalizeFileCategory(Integer fileCategory) {

@@ -3,6 +3,10 @@ spring:
     name: YunaNexus-FileService
   profiles:
     active: @spring.profiles.active@
+  servlet:
+    multipart:
+      max-file-size: ${YUNANEXUS_FILE_MAX_UPLOAD_SIZE:800MB}
+      max-request-size: ${YUNANEXUS_FILE_MAX_REQUEST_SIZE:800MB}
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
@@ -23,6 +27,12 @@ custom:
 
 yunanexus:
   file:
+    upload:
+      direct-upload-threshold-bytes: ${YUNANEXUS_FILE_DIRECT_UPLOAD_THRESHOLD_BYTES:524288000}
+      normal-user-max-file-size-bytes: ${YUNANEXUS_FILE_NORMAL_USER_MAX_FILE_SIZE_BYTES:2147483648}
+      normal-user-max-space-bytes: ${YUNANEXUS_FILE_NORMAL_USER_MAX_SPACE_BYTES:53687091200}
+      chunk-size-bytes: ${YUNANEXUS_FILE_CHUNK_SIZE_BYTES:16777216}
+      temp-root-path: ${YUNANEXUS_FILE_TEMP_ROOT_PATH:./storage/yunanexus-file-temp}
     storage:
       local:
         root-path: ${YUNANEXUS_FILE_STORAGE_ROOT:./storage/yunanexus-file}

@@ -126,4 +126,46 @@ CREATE TABLE `user_file` (
     INDEX `idx_oauth_app_uuid` (`oauth_app_uuid`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户文件逻辑表' ROW_FORMAT = Dynamic;
 
+-- 分片上传任务表
+DROP TABLE IF EXISTS `file_upload_task`;
+CREATE TABLE `file_upload_task` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `upload_id` VARCHAR(64) NOT NULL,
+    `user_id` BIGINT NOT NULL,
+    `folder_id` BIGINT NULL,
+    `file_name` VARCHAR(255) NOT NULL,
+    `file_size` BIGINT NOT NULL,
+    `file_ext` VARCHAR(50) NULL,
+    `file_mime` VARCHAR(100) NULL,
+    `chunk_size` BIGINT NOT NULL,
+    `total_chunks` INT NOT NULL,
+    `uploaded_chunks` INT NOT NULL DEFAULT 0,
+    `file_category` TINYINT NOT NULL DEFAULT 1,
+    `public_status` TINYINT NOT NULL DEFAULT 0,
+    `service_name` VARCHAR(100) NOT NULL DEFAULT 'main-site',
+    `oauth_app_uuid` VARCHAR(36) NULL,
+    `status` TINYINT NOT NULL DEFAULT 0,
+    `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE INDEX `ui_upload_id` (`upload_id`),
+    INDEX `idx_user_status` (`user_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 分片记录表
+DROP TABLE IF EXISTS `file_upload_chunk`;
+CREATE TABLE `file_upload_chunk` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `upload_id` VARCHAR(64) NOT NULL,
+    `chunk_index` INT NOT NULL,
+    `chunk_size` BIGINT NOT NULL,
+    `etag` VARCHAR(128) NULL,
+    `status` TINYINT NOT NULL DEFAULT 1,
+    `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE INDEX `ui_upload_chunk` (`upload_id`, `chunk_index`),
+    INDEX `idx_upload_id` (`upload_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

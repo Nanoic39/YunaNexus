@@ -51,4 +51,10 @@ export const sidebarMenus: SidebarMenuItem[] = [
     icon: "lucide:user-round",
     to: "/profile",
   },
+  {
+    key: "files",
+    label: "文件管理",
+    icon: "lucide:folder-kanban",
+    to: "/files",
+  },
 ];
