@@ -13,27 +13,6 @@ const joinUrl = (baseURL: string, path: string) => {
   return `${normalizedBase}${normalizedPath}`;
 };
 
-const parseRangeHeader = (value: string | undefined | null) => {
-  if (!value) {
-    return null;
-  }
-  const match = value.match(/bytes=(\d+)-(\d*)/i);
-  if (!match) {
-    return null;
-  }
-  const start = Number(match[1]);
-  const end = match[2] ? Number(match[2]) : start + 8 * 1024 * 1024 - 1;
-  if (
-    !Number.isFinite(start) ||
-    !Number.isFinite(end) ||
-    start < 0 ||
-    end < start
-  ) {
-    return null;
-  }
-  return { start, end };
-};
-
 export default defineEventHandler(async (event) => {
   const runtimeConfig = useRuntimeConfig();
   const accessToken = getCookie(event, "yn-access-token");
@@ -41,18 +20,14 @@ export default defineEventHandler(async (event) => {
   const authorization =
     getHeader(event, "authorization") ||
     (accessToken ? `${tokenType} ${accessToken}` : undefined);
-  const rangeHeader = getHeader(event, "range");
-  const range = parseRangeHeader(rangeHeader);
-  const fileUuid = getRouterParam(event, "fileUuid");
+  const folderUuid = getRouterParam(event, "folderUuid");
   const fileBase = runtimeConfig.public.fileBase;
 
-  if (!fileUuid) {
+  if (!folderUuid) {
     throw createError({
       statusCode: 400,
       statusMessage: "Bad Request",
-      data: {
-        message: "fileUuid 不能为空",
-      },
+      data: { message: "folderUuid 不能为空" },
     });
   }
 
@@ -60,20 +35,20 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 500,
       statusMessage: "Proxy target is not configured",
-      data: {
-        message: "文件服务地址未配置",
-      },
+      data: { message: "文件服务地址未配置" },
     });
   }
 
-  const downloadPath = range
-    ? `/file/download/chunk?fileUuid=${encodeURIComponent(String(fileUuid))}&start=${range.start}&end=${range.end}`
-    : `/file/download?fileUuid=${encodeURIComponent(String(fileUuid))}`;
-
-  const response = await fetch(joinUrl(fileBase, downloadPath), {
-    method: "GET",
-    headers: authorization ? { Authorization: authorization } : undefined,
-  });
+  const response = await fetch(
+    joinUrl(
+      fileBase,
+      `/file/folder/download?folderUuid=${encodeURIComponent(String(folderUuid))}`,
+    ),
+    {
+      method: "GET",
+      headers: authorization ? { Authorization: authorization } : undefined,
+    },
+  );
 
   setResponseStatus(event, response.status, response.statusText);
 
@@ -82,29 +57,18 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: response.status,
       statusMessage: response.statusText,
-      data: {
-        message: rawText || "文件下载失败",
-      },
+      data: { message: rawText || "目录下载失败" },
     });
   }
 
   const contentType = response.headers.get("content-type");
-  const contentLength = response.headers.get("content-length");
   const contentDisposition = response.headers.get("content-disposition");
-  const contentRange = response.headers.get("content-range");
 
   if (contentType) {
     setHeader(event, "Content-Type", contentType);
   }
-  if (contentLength) {
-    setHeader(event, "Content-Length", Number(contentLength));
-  }
   if (contentDisposition) {
     setHeader(event, "Content-Disposition", contentDisposition);
-  }
-  if (contentRange) {
-    setHeader(event, "Content-Range", contentRange);
-    setHeader(event, "Accept-Ranges", "bytes");
   }
 
   return response.body;

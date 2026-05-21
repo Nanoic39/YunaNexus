@@ -14,6 +14,5 @@ public interface StorageDriver {
             FileStorageNode node,
             String objectKey,
             String contentType,
-            String downloadName
-    ) throws IOException;
+            String downloadName) throws IOException;
 }

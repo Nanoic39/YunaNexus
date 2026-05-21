@@ -24,6 +24,46 @@ export type UserManagedFileItem = {
   recycleExpireAt?: string | null;
 };
 
+export type UserFolderItem = {
+  id?: number | null;
+  folderUuid: string;
+  folderName: string;
+  folderType?: number | null;
+  serviceName?: string | null;
+  oauthAppUuid?: string | null;
+  folderPath?: string | null;
+  depth?: number | null;
+  parentId?: number | null;
+  createTime?: string | null;
+};
+
+export type UserStorageSummary = {
+  totalBytes: number;
+  usedBytes: number;
+  remainingBytes: number;
+  usagePercent: number;
+  fileCount: number;
+};
+
+export type UserFileDetail = {
+  fileUuid: string;
+  fileName: string;
+  originName?: string | null;
+  fileSize: number;
+  fileExt?: string | null;
+  fileMime?: string | null;
+  fileHash?: string | null;
+  fileCategory?: number | null;
+  publicStatus?: number | null;
+  serviceName?: string | null;
+  folderId?: number | null;
+  createTime?: string | null;
+  objectUuid?: string | null;
+  primaryNodeCode?: string | null;
+  primaryNodeName?: string | null;
+  refCount?: number | null;
+};
+
 export type FileUploadProgress = {
   phase: "preparing" | "uploading" | "merging" | "done";
   loadedBytes: number;
@@ -91,7 +131,10 @@ const createProgressPayload = (
   totalChunks?: number,
 ): FileUploadProgress => {
   const safeTotal = totalBytes > 0 ? totalBytes : 1;
-  const percent = Math.max(0, Math.min(100, Math.round((loadedBytes / safeTotal) * 100)));
+  const percent = Math.max(
+    0,
+    Math.min(100, Math.round((loadedBytes / safeTotal) * 100)),
+  );
   const text =
     phase === "merging"
       ? "正在合并文件…"
@@ -100,7 +143,15 @@ const createProgressPayload = (
         : totalChunks && totalChunks > 1
           ? `上传中 ${chunkIndex ?? 0}/${totalChunks} · ${percent}%`
           : `上传中 ${percent}%`;
-  return { phase, loadedBytes, totalBytes, percent, chunkIndex, totalChunks, text };
+  return {
+    phase,
+    loadedBytes,
+    totalBytes,
+    percent,
+    chunkIndex,
+    totalChunks,
+    text,
+  };
 };
 
 export const useFileApi = () => {
@@ -146,6 +197,80 @@ export const useFileApi = () => {
     );
   };
 
+  const listFolders = async (parentId?: number | null) => {
+    return await requestResult<UserFolderItem[]>("/api/file/folder/list", {
+      method: "GET",
+      query: parentId == null ? undefined : { parentId },
+    });
+  };
+
+  const getFileDetail = async (fileUuid: string) => {
+    return await requestResult<UserFileDetail>("/api/file/detail", {
+      method: "GET",
+      query: { fileUuid },
+    });
+  };
+
+  const getStorageSummary = async () => {
+    return await requestResult<UserStorageSummary>(
+      "/api/file/storage/summary",
+      {
+        method: "GET",
+      },
+    );
+  };
+
+  const createFolder = async (folderName: string, parentId?: number | null) => {
+    return await requestResult<UserFolderItem>("/api/file/folder/create", {
+      method: "POST",
+      body: {
+        folderName,
+        parentId: parentId ?? null,
+      },
+    });
+  };
+
+  const renameFolder = async (folderUuid: string, folderName: string) => {
+    return await requestResult<UserFolderItem>("/api/file/folder/rename", {
+      method: "POST",
+      body: { folderUuid, folderName },
+    });
+  };
+
+  const moveFolder = async (
+    folderUuid: string,
+    targetParentUuid?: string | null,
+  ) => {
+    return await requestResult<UserFolderItem>("/api/file/folder/move", {
+      method: "POST",
+      body: { folderUuid, targetParentUuid: targetParentUuid ?? null },
+    });
+  };
+
+  const deleteFolder = async (folderUuid: string) => {
+    return await requestResult<null>("/api/file/folder/delete", {
+      method: "POST",
+      body: { folderUuid },
+    });
+  };
+
+  const renameFile = async (fileUuid: string, fileName: string) => {
+    return await requestResult<UserManagedFileItem>("/api/file/rename", {
+      method: "POST",
+      body: { fileUuid, fileName },
+    });
+  };
+
+  const moveFile = async (
+    fileUuid: string,
+    targetFolderUuid?: string | null,
+  ) => {
+    return await requestResult<UserManagedFileItem>("/api/file/move", {
+      method: "POST",
+      body: { fileUuid, targetFolderUuid: targetFolderUuid ?? null },
+    });
+  };
+
   const uploadByXhr = async (
     url: string,
     formData: FormData,
@@ -156,31 +281,37 @@ export const useFileApi = () => {
       throw new Error("当前环境不支持上传");
     }
 
-    return await new Promise<ResultEnvelope<Record<string, unknown>>>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", url, true);
-      xhr.setRequestHeader("Authorization", getAuthorizationHeader());
-      xhr.upload.onprogress = (event) => {
-        if (!event.lengthComputable) {
-          return;
-        }
-        onProgress?.(createProgressPayload("uploading", event.loaded, totalBytes));
-      };
-      xhr.onload = () => {
-        try {
-          const response = JSON.parse(xhr.responseText || "null") as ResultEnvelope<Record<string, unknown>>;
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(response);
+    return await new Promise<ResultEnvelope<Record<string, unknown>>>(
+      (resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", url, true);
+        xhr.setRequestHeader("Authorization", getAuthorizationHeader());
+        xhr.upload.onprogress = (event) => {
+          if (!event.lengthComputable) {
             return;
           }
-          reject(new Error(response?.tip || response?.msg || "文件上传失败"));
-        } catch {
-          reject(new Error(xhr.responseText || "文件上传失败"));
-        }
-      };
-      xhr.onerror = () => reject(new Error("文件上传失败"));
-      xhr.send(formData);
-    });
+          onProgress?.(
+            createProgressPayload("uploading", event.loaded, totalBytes),
+          );
+        };
+        xhr.onload = () => {
+          try {
+            const response = JSON.parse(
+              xhr.responseText || "null",
+            ) as ResultEnvelope<Record<string, unknown>>;
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(response);
+              return;
+            }
+            reject(new Error(response?.tip || response?.msg || "文件上传失败"));
+          } catch {
+            reject(new Error(xhr.responseText || "文件上传失败"));
+          }
+        };
+        xhr.onerror = () => reject(new Error("文件上传失败"));
+        xhr.send(formData);
+      },
+    );
   };
 
   const uploadFile = async (
@@ -196,20 +327,28 @@ export const useFileApi = () => {
       if (folderId != null) {
         formData.append("folderId", String(folderId));
       }
-      const result = await uploadByXhr("/api/file/upload", formData, file.size, onProgress);
+      const result = await uploadByXhr(
+        "/api/file/upload",
+        formData,
+        file.size,
+        onProgress,
+      );
       onProgress?.(createProgressPayload("done", file.size, file.size));
       return result;
     }
 
-    const initResult = await requestResult<Record<string, unknown>>("/api/file/chunk/init", {
-      method: "POST",
-      body: {
-        fileName: file.name,
-        fileSize: file.size,
-        contentType: file.type || "application/octet-stream",
-        folderId: folderId ?? null,
+    const initResult = await requestResult<Record<string, unknown>>(
+      "/api/file/chunk/init",
+      {
+        method: "POST",
+        body: {
+          fileName: file.name,
+          fileSize: file.size,
+          contentType: file.type || "application/octet-stream",
+          folderId: folderId ?? null,
+        },
       },
-    });
+    );
     const uploadId = String(initResult.data?.uploadId || "");
     const totalChunks = Number(initResult.data?.totalChunks || 0);
     if (!uploadId || !totalChunks) {
@@ -224,26 +363,70 @@ export const useFileApi = () => {
       const formData = new FormData();
       formData.append("uploadId", uploadId);
       formData.append("chunkIndex", String(chunkIndex));
-      formData.append("file", file.slice(start, end), `${file.name}.part${chunkIndex}`);
-      await uploadByXhr("/api/file/chunk/upload", formData, file.size, (progress) => {
-        onProgress?.(createProgressPayload(
-          "uploading",
-          uploadedBytes + Math.min(progress.loadedBytes, chunkSize),
-          file.size,
-          chunkIndex + 1,
-          totalChunks,
-        ));
-      });
+      formData.append(
+        "file",
+        file.slice(start, end),
+        `${file.name}.part${chunkIndex}`,
+      );
+      await uploadByXhr(
+        "/api/file/chunk/upload",
+        formData,
+        file.size,
+        (progress) => {
+          onProgress?.(
+            createProgressPayload(
+              "uploading",
+              uploadedBytes + Math.min(progress.loadedBytes, chunkSize),
+              file.size,
+              chunkIndex + 1,
+              totalChunks,
+            ),
+          );
+        },
+      );
       uploadedBytes += chunkSize;
     }
 
-    onProgress?.(createProgressPayload("merging", file.size, file.size, totalChunks, totalChunks));
-    const result = await requestResult<Record<string, unknown>>("/api/file/chunk/complete", {
-      method: "POST",
-      body: { uploadId },
-    });
-    onProgress?.(createProgressPayload("done", file.size, file.size, totalChunks, totalChunks));
+    onProgress?.(
+      createProgressPayload(
+        "merging",
+        file.size,
+        file.size,
+        totalChunks,
+        totalChunks,
+      ),
+    );
+    const result = await requestResult<Record<string, unknown>>(
+      "/api/file/chunk/complete",
+      {
+        method: "POST",
+        body: { uploadId },
+      },
+    );
+    onProgress?.(
+      createProgressPayload(
+        "done",
+        file.size,
+        file.size,
+        totalChunks,
+        totalChunks,
+      ),
+    );
     return result;
+  };
+
+  const downloadByAnchor = (url: string, fileName?: string) => {
+    if (!import.meta.client) {
+      return;
+    }
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    if (fileName) {
+      anchor.download = fileName;
+    }
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
   };
 
   const deleteFile = async (fileUuid: string) => {
@@ -275,10 +458,13 @@ export const useFileApi = () => {
         const start = chunkIndex * CHUNK_SIZE_BYTES;
         const end = Math.min(item.fileSize - 1, start + CHUNK_SIZE_BYTES - 1);
         onProgress?.(`下载中 ${chunkIndex + 1}/${totalChunks}`);
-        const response = await fetch(`/api/file/download/chunk?fileUuid=${encodeURIComponent(item.fileUuid)}&start=${start}&end=${end}`, {
-          method: "GET",
-          headers: { Authorization: getAuthorizationHeader() },
-        });
+        const response = await fetch(
+          `/api/file/download/chunk?fileUuid=${encodeURIComponent(item.fileUuid)}&start=${start}&end=${end}`,
+          {
+            method: "GET",
+            headers: { Authorization: getAuthorizationHeader() },
+          },
+        );
         if (!response.ok) {
           const rawText = await response.text();
           throw new Error(rawText || "文件下载失败");
@@ -297,10 +483,13 @@ export const useFileApi = () => {
       return;
     }
 
-    const response = await fetch(`/api/file/download/${encodeURIComponent(item.fileUuid)}`, {
-      method: "GET",
-      headers: { Authorization: getAuthorizationHeader() },
-    });
+    const response = await fetch(
+      `/api/file/download/${encodeURIComponent(item.fileUuid)}`,
+      {
+        method: "GET",
+        headers: { Authorization: getAuthorizationHeader() },
+      },
+    );
 
     if (!response.ok) {
       const rawText = await response.text();
@@ -328,12 +517,29 @@ export const useFileApi = () => {
     window.URL.revokeObjectURL(objectUrl);
   };
 
+  const downloadFolder = (folder: UserFolderItem) => {
+    downloadByAnchor(
+      `/api/file/folder/download/${encodeURIComponent(folder.folderUuid)}`,
+      `${folder.folderName || "folder"}.zip`,
+    );
+  };
+
   return {
     listFiles,
     listRecycleFiles,
+    listFolders,
+    getFileDetail,
+    getStorageSummary,
+    createFolder,
+    renameFolder,
+    moveFolder,
+    deleteFolder,
+    renameFile,
+    moveFile,
     uploadFile,
     deleteFile,
     restoreFile,
     downloadFile,
+    downloadFolder,
   };
 };

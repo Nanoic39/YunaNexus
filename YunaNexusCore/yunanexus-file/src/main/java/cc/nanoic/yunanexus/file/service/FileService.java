@@ -19,12 +19,15 @@ import cc.nanoic.yunanexus.file.storage.StorageObjectResource;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -33,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Service
 public class FileService {
@@ -278,6 +283,56 @@ public class FileService {
         userFileMapper.updateById(item);
     }
 
+    @Transactional
+    public Map<String, Object> renameFile(Long userId, String fileUuid, String fileName) {
+        UserFile item = requireManagedUserFile(userId, fileUuid, 0);
+        String safeFileName = requireItemName(fileName);
+        assertFileNameAvailable(userId, item.getFolderId(), item.getServiceName(), safeFileName, item.getId());
+        item.setFileName(safeFileName);
+        item.setOriginName(safeFileName);
+        item.setFileExt(FileUtil.extName(safeFileName));
+        userFileMapper.updateById(item);
+        return Map.of(
+                "fileUuid", item.getFileUuid(),
+                "fileName", item.getFileName(),
+                "originName", item.getOriginName(),
+                "fileExt", item.getFileExt());
+    }
+
+    @Transactional
+    public Map<String, Object> moveFile(Long userId, String fileUuid, String targetFolderUuid) {
+        UserFile item = requireManagedUserFile(userId, fileUuid, 0);
+        UserFolder targetFolder = StringUtils.hasText(targetFolderUuid) ? requireFolder(userId, targetFolderUuid)
+                : null;
+        Long targetFolderId = targetFolder == null ? null : targetFolder.getId();
+        String targetServiceName = targetFolder == null ? DEFAULT_SERVICE_NAME : targetFolder.getServiceName();
+        assertFileNameAvailable(userId, targetFolderId, targetServiceName, item.getFileName(), item.getId());
+        item.setFolderId(targetFolderId);
+        item.setServiceName(targetServiceName);
+        item.setOauthAppUuid(targetFolder == null ? null : targetFolder.getOauthAppUuid());
+        userFileMapper.update(
+                null,
+                new LambdaUpdateWrapper<UserFile>()
+                        .eq(UserFile::getId, item.getId())
+                        .set(UserFile::getFolderId, item.getFolderId())
+                        .set(UserFile::getServiceName, item.getServiceName())
+                        .set(UserFile::getOauthAppUuid, item.getOauthAppUuid()));
+        return Map.of(
+                "fileUuid", item.getFileUuid(),
+                "folderId", item.getFolderId() == null ? "" : item.getFolderId(),
+                "serviceName", item.getServiceName());
+    }
+
+    public void streamFolderAsZip(Long userId, String folderUuid, OutputStream outputStream) {
+        UserFolder folder = requireFolder(userId, folderUuid);
+        try (ZipOutputStream zipOutputStream = new ZipOutputStream(outputStream)) {
+            writeFolderZipEntry(userId, folder, folder.getFolderName(), zipOutputStream);
+            zipOutputStream.finish();
+        } catch (IOException e) {
+            throw new BusinessException(R.SERVER_ERROR, "文件夹压缩下载失败");
+        }
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> uploadAvatar(Long userId, MultipartFile file) {
         validateAvatarUpload(file);
@@ -323,6 +378,34 @@ public class FileService {
                 }).toList();
     }
 
+    /**
+     * 获取用户存储摘要
+     *
+     * @param userId 用户id
+     * @return 返回结果
+     */
+    public Map<String, Object> getUserStorageSummary(Long userId) {
+        List<UserFile> items = userFileMapper.selectList(new LambdaQueryWrapper<UserFile>()
+                .eq(UserFile::getUserId, userId)
+                .eq(UserFile::getStatus, 1)
+                .eq(UserFile::getDeleteStage, 0)
+                .ne(UserFile::getServiceName, AVATAR_SERVICE_NAME));
+        long usedBytes = items.stream()
+                .map(UserFile::getFileSize)
+                .filter(Objects::nonNull)
+                .mapToLong(Long::longValue)
+                .sum();
+        long totalBytes = fileUploadProperties.getNormalUserMaxSpaceBytes();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("totalBytes", totalBytes);
+        data.put("usedBytes", usedBytes);
+        data.put("remainingBytes", Math.max(0, totalBytes - usedBytes));
+        data.put("usagePercent",
+                totalBytes <= 0 ? 0 : Math.min(100, (int) Math.round((double) usedBytes * 100 / totalBytes)));
+        data.put("fileCount", items.size());
+        return data;
+    }
+
     public StorageObjectResource downloadUserFile(Long userId, String fileUuid) {
         UserFile item = requireManagedUserFile(userId, fileUuid, 0);
         return loadStorageObject(item, "读取用户文件失败");
@@ -357,7 +440,8 @@ public class FileService {
 
     private StorageObjectResource loadStorageObject(UserFile item, String errorMessage) {
         FileObject fileObject = fileObjectMapper.selectById(item.getObjectId());
-        FileStorageNode node = fileObject == null ? null : fileStorageNodeMapper.selectById(fileObject.getPrimaryNodeId());
+        FileStorageNode node = fileObject == null ? null
+                : fileStorageNodeMapper.selectById(fileObject.getPrimaryNodeId());
         if (fileObject == null || node == null) {
             throw new BusinessException(R.NOT_FOUND, "文件对象不存在或存储节点不可用");
         }
@@ -416,6 +500,7 @@ public class FileService {
                 .eq(UserFolder::getUserId, userId)
                 .eq(UserFolder::getStatus, 1)
                 .eq(UserFolder::getDeleteStage, 0)
+                .eq(UserFolder::getFolderType, 0)
                 .orderByAsc(UserFolder::getSortNo)
                 .orderByAsc(UserFolder::getId);
 
@@ -427,6 +512,7 @@ public class FileService {
 
         return userFolderMapper.selectList(wrapper).stream().map(item -> {
             Map<String, Object> data = new LinkedHashMap<>();
+            data.put("id", item.getId());
             data.put("folderUuid", item.getFolderUuid());
             data.put("folderName", item.getFolderName());
             data.put("folderType", item.getFolderType());
@@ -438,6 +524,222 @@ public class FileService {
             data.put("createTime", item.getCreateTime());
             return data;
         }).toList();
+    }
+
+    @Transactional
+    public Map<String, Object> createFolder(Long userId, Long parentId, String folderName) {
+        String safeFolderName = StringUtils.hasText(folderName) ? folderName.trim() : "";
+        if (!StringUtils.hasText(safeFolderName) || safeFolderName.contains("/") || safeFolderName.contains("\\")) {
+            throw new BusinessException(R.PARAM_ERROR, "目录名称不合法");
+        }
+        UserFolder parent = parentId == null ? null : requireFolder(userId, parentId);
+        String serviceName = parent != null && StringUtils.hasText(parent.getServiceName()) ? parent.getServiceName()
+                : DEFAULT_SERVICE_NAME;
+        Long exists = userFolderMapper.selectCount(new LambdaQueryWrapper<UserFolder>()
+                .eq(UserFolder::getUserId, userId)
+                .eq(UserFolder::getStatus, 1)
+                .eq(UserFolder::getDeleteStage, 0)
+                .eq(UserFolder::getServiceName, serviceName)
+                .eq(UserFolder::getParentId, parentId)
+                .eq(UserFolder::getFolderName, safeFolderName));
+        if (exists != null && exists > 0) {
+            throw new BusinessException(R.PARAM_ERROR, "同级目录下已存在同名目录");
+        }
+        UserFolder folder = new UserFolder();
+        folder.setFolderUuid(UUID.randomUUID().toString());
+        folder.setUserId(userId);
+        folder.setParentId(parentId);
+        folder.setFolderName(safeFolderName);
+        folder.setFolderType(0);
+        folder.setServiceName(serviceName);
+        folder.setOauthAppUuid(parent == null ? null : parent.getOauthAppUuid());
+        folder.setFolderPath(parent == null ? "/" + safeFolderName : parent.getFolderPath() + "/" + safeFolderName);
+        folder.setDepth(parent == null ? 1 : (parent.getDepth() == null ? 1 : parent.getDepth() + 1));
+        folder.setSortNo(0);
+        folder.setStatus(1);
+        folder.setDeleteStage(0);
+        userFolderMapper.insert(folder);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id", folder.getId());
+        data.put("folderUuid", folder.getFolderUuid());
+        data.put("folderName", folder.getFolderName());
+        data.put("parentId", folder.getParentId());
+        data.put("folderPath", folder.getFolderPath());
+        data.put("depth", folder.getDepth());
+        return data;
+    }
+
+    @Transactional
+    public Map<String, Object> renameFolder(Long userId, String folderUuid, String folderName) {
+        UserFolder folder = requireFolder(userId, folderUuid);
+        String safeFolderName = requireFolderName(folderName);
+        assertFolderNameAvailable(userId, folder.getParentId(), folder.getServiceName(), safeFolderName,
+                folder.getId());
+        folder.setFolderName(safeFolderName);
+        refreshFolderPath(userId, folder);
+        return Map.of("folderUuid", folder.getFolderUuid(), "folderName", folder.getFolderName(), "folderPath",
+                folder.getFolderPath());
+    }
+
+    @Transactional
+    public Map<String, Object> moveFolder(Long userId, String folderUuid, String targetParentUuid) {
+        UserFolder folder = requireFolder(userId, folderUuid);
+        UserFolder targetParent = StringUtils.hasText(targetParentUuid) ? requireFolder(userId, targetParentUuid)
+                : null;
+        if (targetParent != null && (Objects.equals(folder.getId(), targetParent.getId())
+                || targetParent.getFolderPath().startsWith(folder.getFolderPath() + "/"))) {
+            throw new BusinessException(R.PARAM_ERROR, "不能把目录移动到自身或子目录中");
+        }
+        folder.setParentId(targetParent == null ? null : targetParent.getId());
+        folder.setServiceName(targetParent == null ? DEFAULT_SERVICE_NAME : targetParent.getServiceName());
+        folder.setOauthAppUuid(targetParent == null ? null : targetParent.getOauthAppUuid());
+        assertFolderNameAvailable(userId, folder.getParentId(), folder.getServiceName(), folder.getFolderName(),
+                folder.getId());
+        refreshFolderPath(userId, folder);
+        return Map.of("folderUuid", folder.getFolderUuid(), "parentId", folder.getParentId(), "folderPath",
+                folder.getFolderPath());
+    }
+
+    @Transactional
+    public void deleteFolder(Long userId, String folderUuid) {
+        List<UserFolder> folders = collectFolderSubtree(userId, requireFolder(userId, folderUuid));
+        LocalDateTime now = LocalDateTime.now();
+        for (UserFolder folder : folders) {
+            folder.setDeleteStage(1);
+            folder.setDeletedAt(now);
+            folder.setRecycleExpireAt(now.plusDays(30));
+            userFolderMapper.updateById(folder);
+            userFileMapper
+                    .selectList(new LambdaQueryWrapper<UserFile>().eq(UserFile::getUserId, userId)
+                            .eq(UserFile::getFolderId, folder.getId()).eq(UserFile::getStatus, 1)
+                            .eq(UserFile::getDeleteStage, 0).ne(UserFile::getServiceName, AVATAR_SERVICE_NAME))
+                    .forEach(file -> {
+                        file.setDeleteStage(1);
+                        file.setDeletedAt(now);
+                        file.setRecycleExpireAt(now.plusDays(30));
+                        file.setDeletedBy(userId);
+                        userFileMapper.updateById(file);
+                    });
+        }
+    }
+
+    private List<UserFolder> collectFolderSubtree(Long userId, UserFolder root) {
+        List<UserFolder> result = new java.util.ArrayList<>();
+        result.add(root);
+        userFolderMapper
+                .selectList(new LambdaQueryWrapper<UserFolder>().eq(UserFolder::getUserId, userId)
+                        .eq(UserFolder::getParentId, root.getId()).eq(UserFolder::getStatus, 1)
+                        .eq(UserFolder::getDeleteStage, 0))
+                .forEach(child -> result.addAll(collectFolderSubtree(userId, child)));
+        return result;
+    }
+
+    private void writeFolderZipEntry(Long userId, UserFolder folder, String relativePath,
+            ZipOutputStream zipOutputStream)
+            throws IOException {
+        String directoryPath = relativePath.endsWith("/") ? relativePath : relativePath + "/";
+        zipOutputStream.putNextEntry(new ZipEntry(directoryPath));
+        zipOutputStream.closeEntry();
+
+        List<UserFile> files = userFileMapper.selectList(new LambdaQueryWrapper<UserFile>()
+                .eq(UserFile::getUserId, userId)
+                .eq(UserFile::getFolderId, folder.getId())
+                .eq(UserFile::getStatus, 1)
+                .eq(UserFile::getDeleteStage, 0)
+                .ne(UserFile::getServiceName, AVATAR_SERVICE_NAME)
+                .orderByAsc(UserFile::getId));
+        for (UserFile file : files) {
+            StorageObjectResource resource = loadStorageObject(file, "读取文件夹内容失败");
+            try (InputStream inputStream = resource.inputStream()) {
+                zipOutputStream.putNextEntry(new ZipEntry(directoryPath + file.getOriginName()));
+                inputStream.transferTo(zipOutputStream);
+                zipOutputStream.closeEntry();
+            }
+        }
+
+        List<UserFolder> childFolders = userFolderMapper.selectList(new LambdaQueryWrapper<UserFolder>()
+                .eq(UserFolder::getUserId, userId)
+                .eq(UserFolder::getParentId, folder.getId())
+                .eq(UserFolder::getStatus, 1)
+                .eq(UserFolder::getDeleteStage, 0)
+                .orderByAsc(UserFolder::getSortNo)
+                .orderByAsc(UserFolder::getId));
+        for (UserFolder child : childFolders) {
+            writeFolderZipEntry(userId, child, directoryPath + child.getFolderName(), zipOutputStream);
+        }
+    }
+
+    private void refreshFolderPath(Long userId, UserFolder folder) {
+        UserFolder parent = folder.getParentId() == null ? null : requireFolder(userId, folder.getParentId());
+        folder.setDepth(parent == null ? 1 : (parent.getDepth() == null ? 1 : parent.getDepth() + 1));
+        folder.setFolderPath(
+                parent == null ? "/" + folder.getFolderName() : parent.getFolderPath() + "/" + folder.getFolderName());
+        userFolderMapper.update(
+                null,
+                new LambdaUpdateWrapper<UserFolder>()
+                        .eq(UserFolder::getId, folder.getId())
+                        .set(UserFolder::getFolderName, folder.getFolderName())
+                        .set(UserFolder::getParentId, folder.getParentId())
+                        .set(UserFolder::getServiceName, folder.getServiceName())
+                        .set(UserFolder::getOauthAppUuid, folder.getOauthAppUuid())
+                        .set(UserFolder::getDepth, folder.getDepth())
+                        .set(UserFolder::getFolderPath, folder.getFolderPath()));
+        userFolderMapper.selectList(new LambdaQueryWrapper<UserFolder>().eq(UserFolder::getUserId, userId)
+                .eq(UserFolder::getParentId, folder.getId()).eq(UserFolder::getStatus, 1)
+                .eq(UserFolder::getDeleteStage, 0)).forEach(child -> refreshFolderPath(userId, child));
+    }
+
+    private String requireFolderName(String folderName) {
+        String safeFolderName = StringUtils.hasText(folderName) ? folderName.trim() : "";
+        if (!StringUtils.hasText(safeFolderName) || safeFolderName.contains("/") || safeFolderName.contains("\\")) {
+            throw new BusinessException(R.PARAM_ERROR, "目录名称不合法");
+        }
+        return safeFolderName;
+    }
+
+    private String requireItemName(String itemName) {
+        String safeItemName = StringUtils.hasText(itemName) ? itemName.trim() : "";
+        if (!StringUtils.hasText(safeItemName) || safeItemName.contains("/") || safeItemName.contains("\\")) {
+            throw new BusinessException(R.PARAM_ERROR, "名称不合法");
+        }
+        return safeItemName;
+    }
+
+    private void assertFolderNameAvailable(Long userId, Long parentId, String serviceName, String folderName,
+            Long excludeId) {
+        LambdaQueryWrapper<UserFolder> wrapper = new LambdaQueryWrapper<UserFolder>().eq(UserFolder::getUserId, userId)
+                .eq(UserFolder::getStatus, 1).eq(UserFolder::getDeleteStage, 0)
+                .eq(UserFolder::getServiceName, serviceName).eq(UserFolder::getFolderName, folderName);
+        if (parentId == null)
+            wrapper.isNull(UserFolder::getParentId);
+        else
+            wrapper.eq(UserFolder::getParentId, parentId);
+        if (excludeId != null)
+            wrapper.ne(UserFolder::getId, excludeId);
+        if (Boolean.TRUE.equals(userFolderMapper.selectCount(wrapper) > 0))
+            throw new BusinessException(R.PARAM_ERROR, "同级目录下已存在同名目录");
+    }
+
+    private void assertFileNameAvailable(Long userId, Long folderId, String serviceName, String fileName,
+            Long excludeId) {
+        LambdaQueryWrapper<UserFile> wrapper = new LambdaQueryWrapper<UserFile>()
+                .eq(UserFile::getUserId, userId)
+                .eq(UserFile::getStatus, 1)
+                .eq(UserFile::getDeleteStage, 0)
+                .eq(UserFile::getServiceName, serviceName)
+                .eq(UserFile::getFileName, fileName)
+                .ne(UserFile::getServiceName, AVATAR_SERVICE_NAME);
+        if (folderId == null) {
+            wrapper.isNull(UserFile::getFolderId);
+        } else {
+            wrapper.eq(UserFile::getFolderId, folderId);
+        }
+        if (excludeId != null) {
+            wrapper.ne(UserFile::getId, excludeId);
+        }
+        if ((userFileMapper.selectCount(wrapper) != null) && userFileMapper.selectCount(wrapper) > 0) {
+            throw new BusinessException(R.PARAM_ERROR, "当前目录下已存在同名文件");
+        }
     }
 
     private UserFile requireManagedUserFile(Long userId, String fileUuid, int deleteStage) {
@@ -458,17 +760,33 @@ public class FileService {
         if (folderId == null) {
             return;
         }
+        requireFolder(userId, folderId);
+    }
 
+    private UserFolder requireFolder(Long userId, Long folderId) {
         UserFolder folder = userFolderMapper.selectOne(new LambdaQueryWrapper<UserFolder>()
                 .eq(UserFolder::getId, folderId)
                 .eq(UserFolder::getUserId, userId)
                 .eq(UserFolder::getStatus, 1)
                 .eq(UserFolder::getDeleteStage, 0)
                 .last("limit 1"));
-
         if (folder == null) {
             throw new BusinessException(R.NOT_FOUND, "目标目录不存在或不可用");
         }
+        return folder;
+    }
+
+    private UserFolder requireFolder(Long userId, String folderUuid) {
+        UserFolder folder = userFolderMapper.selectOne(new LambdaQueryWrapper<UserFolder>()
+                .eq(UserFolder::getFolderUuid, folderUuid)
+                .eq(UserFolder::getUserId, userId)
+                .eq(UserFolder::getStatus, 1)
+                .eq(UserFolder::getDeleteStage, 0)
+                .last("limit 1"));
+        if (folder == null) {
+            throw new BusinessException(R.NOT_FOUND, "目标目录不存在或不可用");
+        }
+        return folder;
     }
 
     private FileStorageNode selectWritableNode() {
@@ -534,10 +852,10 @@ public class FileService {
             throw new BusinessException(R.PARAM_ERROR, "超过 500MB 的文件请走分片上传");
         }
         long usedSpace = userFileMapper.selectList(new LambdaQueryWrapper<UserFile>()
-                        .eq(UserFile::getUserId, userId)
-                        .eq(UserFile::getStatus, 1)
-                        .eq(UserFile::getDeleteStage, 0)
-                        .ne(UserFile::getServiceName, AVATAR_SERVICE_NAME))
+                .eq(UserFile::getUserId, userId)
+                .eq(UserFile::getStatus, 1)
+                .eq(UserFile::getDeleteStage, 0)
+                .ne(UserFile::getServiceName, AVATAR_SERVICE_NAME))
                 .stream()
                 .map(UserFile::getFileSize)
                 .filter(Objects::nonNull)

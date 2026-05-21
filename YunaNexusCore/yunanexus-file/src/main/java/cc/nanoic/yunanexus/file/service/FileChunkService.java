@@ -133,8 +133,8 @@ public class FileChunkService {
     public Map<String, Object> completeChunkUpload(Long userId, String uploadId) {
         FileUploadTask task = requireTask(userId, uploadId);
         long uploadedCount = fileUploadChunkMapper.selectCount(
-                new LambdaQueryWrapper<FileUploadChunk>().eq(FileUploadChunk::getUploadId, uploadId).eq(FileUploadChunk::getStatus, 1)
-        );
+                new LambdaQueryWrapper<FileUploadChunk>().eq(FileUploadChunk::getUploadId, uploadId)
+                        .eq(FileUploadChunk::getStatus, 1));
         if (uploadedCount != task.getTotalChunks()) {
             throw new BusinessException(R.PARAM_ERROR, "仍有分片未上传完成");
         }
@@ -146,8 +146,7 @@ public class FileChunkService {
                     "file",
                     task.getFileName(),
                     task.getFileMime(),
-                    mergedFile
-            );
+                    mergedFile);
             Map<String, Object> result = fileService.uploadByChunk(
                     userId,
                     multipartFile,
@@ -155,8 +154,7 @@ public class FileChunkService {
                     task.getFileCategory(),
                     task.getPublicStatus(),
                     task.getServiceName(),
-                    task.getOauthAppUuid()
-            );
+                    task.getOauthAppUuid());
             task.setStatus(2);
             fileUploadTaskMapper.updateById(task);
             safeCleanupUpload(uploadId, mergedFile);
@@ -188,8 +186,10 @@ public class FileChunkService {
             return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
                     .contentType(mediaType)
                     .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                    .header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + (start + bytes.length - 1) + "/" + contentLength)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename(object.downloadName()).build().toString())
+                    .header(HttpHeaders.CONTENT_RANGE,
+                            "bytes " + start + "-" + (start + bytes.length - 1) + "/" + contentLength)
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            ContentDisposition.inline().filename(object.downloadName()).build().toString())
                     .contentLength(bytes.length)
                     .body(bytes);
         } catch (IOException e) {
@@ -199,10 +199,10 @@ public class FileChunkService {
 
     private void ensureUserSpaceEnough(Long userId, long fileSize) {
         long usedSpace = userFileMapper.selectList(new LambdaQueryWrapper<UserFile>()
-                        .eq(UserFile::getUserId, userId)
-                        .eq(UserFile::getStatus, 1)
-                        .eq(UserFile::getDeleteStage, 0)
-                        .ne(UserFile::getServiceName, "user-avatar"))
+                .eq(UserFile::getUserId, userId)
+                .eq(UserFile::getStatus, 1)
+                .eq(UserFile::getDeleteStage, 0)
+                .ne(UserFile::getServiceName, "user-avatar"))
                 .stream()
                 .map(UserFile::getFileSize)
                 .filter(Objects::nonNull)
@@ -267,8 +267,7 @@ public class FileChunkService {
         try (OutputStream outputStream = Files.newOutputStream(
                 mergedFile,
                 java.nio.file.StandardOpenOption.CREATE,
-                java.nio.file.StandardOpenOption.TRUNCATE_EXISTING
-        )) {
+                java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)) {
             for (int i = 0; i < task.getTotalChunks(); i++) {
                 Path chunkPath = uploadDir.resolve(i + ".part");
                 if (!Files.exists(chunkPath)) {

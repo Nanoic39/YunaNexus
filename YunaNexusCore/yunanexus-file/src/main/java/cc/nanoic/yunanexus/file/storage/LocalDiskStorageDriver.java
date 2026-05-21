@@ -43,8 +43,7 @@ public class LocalDiskStorageDriver implements StorageDriver {
             FileStorageNode node,
             String objectKey,
             String contentType,
-            String downloadName
-    ) throws IOException {
+            String downloadName) throws IOException {
         Path target = resolveTargetPath(objectKey);
         if (!Files.exists(target) || !Files.isRegularFile(target)) {
             throw new IOException("目标文件不存在");
@@ -53,8 +52,7 @@ public class LocalDiskStorageDriver implements StorageDriver {
                 Files.newInputStream(target),
                 Files.size(target),
                 contentType,
-                downloadName
-        );
+                downloadName);
     }
 
     private Path resolveTargetPath(String objectKey) throws IOException {
