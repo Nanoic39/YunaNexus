@@ -22,21 +22,23 @@ public class CurrentUserResolver {
      * @return UserId
      */
     public Long requireUserId(String authorization) {
-        if (!StringUtils.hasText(authorization) || !authorization.startsWith("Bearer ")) {
-            throw new BusinessException(R.NOT_LOGIN, "请先登录后再操作文件");
-        }
-
-        Result<Map<String, Object>> result = authInternalClient.parse(authorization);
-        if (result == null || result.getCode() != 200 || result.getData() == null) {
-            throw new BusinessException(R.NOT_LOGIN, "登录状态无效或已过期");
-        }
-
-        Long userId = parseLong(result.getData().get("userId"));
+        Long userId = resolveUserId(authorization);
         if (userId == null) {
             throw new BusinessException(R.NOT_LOGIN, "无法解析当前用户");
         }
 
         return userId;
+    }
+
+    public Long resolveUserId(String authorization) {
+        if (!StringUtils.hasText(authorization) || !authorization.startsWith("Bearer ")) {
+            return null;
+        }
+        Result<Map<String, Object>> result = authInternalClient.parse(authorization);
+        if (result == null || result.getCode() != 200 || result.getData() == null) {
+            return null;
+        }
+        return parseLong(result.getData().get("userId"));
     }
 
 

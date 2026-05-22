@@ -83,6 +83,7 @@ yunanexus:
         - /ping
         - /security/rsa/public-key
         - /file/public/**
+        - /file/share/**
         - /file/avatar/**
       ip-whitelist: ${YUNAGATEWAY_IP_WHITELIST:}
       ip-blacklist: ${YUNAGATEWAY_IP_BLACKLIST:}
