@@ -64,6 +64,30 @@ export type UserFileDetail = {
   refCount?: number | null;
 };
 
+export type UserFileShareItem = {
+  shareUuid: string;
+  shareCode: string;
+  sharePath: string;
+  fileUuid: string;
+  fileName: string;
+  originName?: string | null;
+  fileSize: number;
+  fileExt?: string | null;
+  fileMime?: string | null;
+  viewAuthMode: number;
+  downloadAuthMode: number;
+  hasExtractCode: boolean;
+  viewCount: number;
+  downloadCount: number;
+  maxDownloadCount?: number | null;
+  downloadLimitReached?: boolean;
+  expireAt?: string | null;
+  status?: number | null;
+  createTime?: string | null;
+  lastViewedAt?: string | null;
+  lastDownloadedAt?: string | null;
+};
+
 export type FileUploadProgress = {
   phase: "preparing" | "uploading" | "merging" | "done";
   loadedBytes: number;
@@ -173,6 +197,26 @@ export const useFileApi = () => {
         ...options,
         headers: {
           Authorization: getAuthorizationHeader(),
+          ...((options.headers as Record<string, string> | undefined) ?? {}),
+        },
+      });
+    } catch (error) {
+      throw new Error(resolveFetchErrorMessage(error, "请求失败，请稍后重试"));
+    }
+  };
+
+  const requestOptionalAuthResult = async <T>(
+    url: string,
+    options: Record<string, unknown> = {},
+  ) => {
+    try {
+      const authorization = authApi.accessToken.value
+        ? `${authApi.tokenType.value || "Bearer"} ${authApi.accessToken.value}`
+        : "";
+      return await $fetch<ResultEnvelope<T>>(url, {
+        ...options,
+        headers: {
+          ...(authorization ? { Authorization: authorization } : {}),
           ...((options.headers as Record<string, string> | undefined) ?? {}),
         },
       });
@@ -524,6 +568,57 @@ export const useFileApi = () => {
     );
   };
 
+  const listFileShares = async (fileUuid: string) => {
+    return await requestResult<UserFileShareItem[]>("/api/file/share/list", {
+      method: "GET",
+      query: { fileUuid },
+    });
+  };
+
+  const createFileShare = async (payload: {
+    fileUuid: string;
+    extractCode?: string | null;
+    expireAt?: string | null;
+    maxDownloadCount?: number | null;
+    viewAuthMode?: number | null;
+    downloadAuthMode?: number | null;
+  }) => {
+    return await requestResult<UserFileShareItem>("/api/file/share/create", {
+      method: "POST",
+      body: payload,
+    });
+  };
+
+  const revokeFileShare = async (shareUuid: string) => {
+    return await requestResult<null>("/api/file/share/revoke", {
+      method: "POST",
+      body: { shareUuid },
+    });
+  };
+
+  const getShareInfo = async (shareCode: string) => {
+    return await requestOptionalAuthResult<UserFileShareItem>(
+      "/api/file/share/info",
+      {
+        method: "GET",
+        query: { shareCode },
+      },
+    );
+  };
+
+  const accessShare = async (shareCode: string, extractCode?: string | null) => {
+    return await requestOptionalAuthResult<UserFileShareItem>(
+      "/api/file/share/access",
+      {
+        method: "POST",
+        body: {
+          shareCode,
+          extractCode: extractCode || null,
+        },
+      },
+    );
+  };
+
   return {
     listFiles,
     listRecycleFiles,
@@ -541,5 +636,10 @@ export const useFileApi = () => {
     restoreFile,
     downloadFile,
     downloadFolder,
+    listFileShares,
+    createFileShare,
+    revokeFileShare,
+    getShareInfo,
+    accessShare,
   };
 };

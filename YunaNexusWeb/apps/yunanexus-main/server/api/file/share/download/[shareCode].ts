@@ -48,9 +48,14 @@ export default defineEventHandler(async (event) => {
     ? `/file/share/download?shareCode=${encodeURIComponent(String(shareCode))}&extractCode=${encodeURIComponent(String(extractCode))}`
     : `/file/share/download?shareCode=${encodeURIComponent(String(shareCode))}`;
 
+  const range = getHeader(event, "range");
+
   const response = await fetch(joinUrl(fileBase, downloadPath), {
     method: "GET",
-    headers: authorization ? { Authorization: authorization } : undefined,
+    headers: {
+      ...(authorization ? { Authorization: authorization } : {}),
+      ...(range ? { Range: range } : {}),
+    },
   });
 
   setResponseStatus(event, response.status, response.statusText);
@@ -67,6 +72,8 @@ export default defineEventHandler(async (event) => {
   const contentType = response.headers.get("content-type");
   const contentLength = response.headers.get("content-length");
   const contentDisposition = response.headers.get("content-disposition");
+  const contentRange = response.headers.get("content-range");
+  const acceptRanges = response.headers.get("accept-ranges");
 
   if (contentType) {
     setHeader(event, "Content-Type", contentType);
@@ -76,6 +83,12 @@ export default defineEventHandler(async (event) => {
   }
   if (contentDisposition) {
     setHeader(event, "Content-Disposition", contentDisposition);
+  }
+  if (contentRange) {
+    setHeader(event, "Content-Range", contentRange);
+  }
+  if (acceptRanges) {
+    setHeader(event, "Accept-Ranges", acceptRanges);
   }
 
   return response.body;

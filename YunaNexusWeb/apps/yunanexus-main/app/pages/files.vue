@@ -6,6 +6,7 @@ import {
   useFileApi,
   type FileUploadProgress,
   type UserFileDetail,
+  type UserFileShareItem,
   type UserFolderItem,
   type UserManagedFileItem,
   type UserStorageSummary,
@@ -101,6 +102,17 @@ const previewLoading = ref(false);
 const previewUrl = ref("");
 const previewText = ref("");
 const previewError = ref("");
+
+const sharePanelOpen = ref(false);
+const shareLoading = ref(false);
+const shareSubmitting = ref(false);
+const shareTargetFile = ref<UserManagedFileItem | null>(null);
+const shareItems = ref<UserFileShareItem[]>([]);
+const shareExtractCode = ref("");
+const shareExpireAt = ref("");
+const shareMaxDownloadCount = ref("");
+const shareViewAuthMode = ref<0 | 1>(0);
+const shareDownloadAuthMode = ref<0 | 1>(0);
 
 const namePanelOpen = ref(false);
 const namePanelMode = ref<NamePanelMode | null>(null);
@@ -367,6 +379,13 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
+const buildShareAbsoluteUrl = (sharePath: string) => {
+  if (!import.meta.client) {
+    return sharePath;
+  }
+  return new URL(sharePath, window.location.origin).toString();
+};
+
 const getAuthorizationHeader = () =>
   `${authApi.tokenType.value || "Bearer"} ${authApi.accessToken.value || ""}`;
 
@@ -583,6 +602,110 @@ const openFileDetail = async (item: UserManagedFileItem) => {
     toast.error(error instanceof Error ? error.message : "文件详情加载失败");
   } finally {
     detailLoading.value = false;
+  }
+};
+
+const resetShareForm = () => {
+  shareExtractCode.value = "";
+  shareExpireAt.value = "";
+  shareMaxDownloadCount.value = "";
+  shareViewAuthMode.value = 0;
+  shareDownloadAuthMode.value = 0;
+};
+
+const closeSharePanel = () => {
+  sharePanelOpen.value = false;
+  shareTargetFile.value = null;
+  shareItems.value = [];
+  shareLoading.value = false;
+  shareSubmitting.value = false;
+  resetShareForm();
+};
+
+const loadShareItems = async (fileUuid: string) => {
+  shareLoading.value = true;
+  try {
+    const result = await fileApi.listFileShares(fileUuid);
+    shareItems.value = result.data || [];
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "分享列表加载失败");
+  } finally {
+    shareLoading.value = false;
+  }
+};
+
+const openSharePanel = async (item: UserManagedFileItem) => {
+  shareTargetFile.value = item;
+  sharePanelOpen.value = true;
+  resetShareForm();
+  await loadShareItems(item.fileUuid);
+};
+
+const openSharePanelFromDetail = async () => {
+  if (!selectedFileDetail.value) {
+    return;
+  }
+  await openSharePanel({
+    fileUuid: selectedFileDetail.value.fileUuid,
+    fileName: selectedFileDetail.value.fileName,
+    originName: selectedFileDetail.value.originName,
+    fileSize: selectedFileDetail.value.fileSize,
+    fileExt: selectedFileDetail.value.fileExt,
+    fileMime: selectedFileDetail.value.fileMime,
+    folderId: selectedFileDetail.value.folderId,
+  } as UserManagedFileItem);
+};
+
+const submitSharePanel = async () => {
+  if (!shareTargetFile.value) {
+    return;
+  }
+  shareSubmitting.value = true;
+  try {
+    const result = await fileApi.createFileShare({
+      fileUuid: shareTargetFile.value.fileUuid,
+      extractCode: shareExtractCode.value.trim() || null,
+      expireAt: shareExpireAt.value || null,
+      maxDownloadCount: shareMaxDownloadCount.value
+        ? Number(shareMaxDownloadCount.value)
+        : null,
+      viewAuthMode: shareViewAuthMode.value,
+      downloadAuthMode: shareDownloadAuthMode.value,
+    });
+    toast.success(result.msg || "分享创建成功");
+    resetShareForm();
+    await loadShareItems(shareTargetFile.value.fileUuid);
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "创建分享失败");
+  } finally {
+    shareSubmitting.value = false;
+  }
+};
+
+const revokeShareItem = async (shareUuid: string) => {
+  if (!shareTargetFile.value) {
+    return;
+  }
+  try {
+    const result = await fileApi.revokeFileShare(shareUuid);
+    toast.success(result.msg || "分享已取消");
+    await loadShareItems(shareTargetFile.value.fileUuid);
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "取消分享失败");
+  }
+};
+
+const copyShareLink = async (sharePath: string) => {
+  const target = buildShareAbsoluteUrl(sharePath);
+  if (!import.meta.client || !navigator.clipboard) {
+    toast.info(target);
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(target);
+    toast.success("分享链接已复制");
+  } catch {
+    toast.info(target);
   }
 };
 
@@ -1032,6 +1155,12 @@ const openFileContextMenu = (event: MouseEvent, item: UserManagedFileItem) => {
       action: () => handleDownloadFile(item),
     },
     {
+      key: `share-${item.fileUuid}`,
+      label: "分享文件",
+      icon: "lucide:share-2",
+      action: () => openSharePanel(item),
+    },
+    {
       key: `delete-${item.fileUuid}`,
       label: "移入回收站",
       icon: "lucide:trash-2",
@@ -1445,6 +1574,13 @@ onBeforeUnmount(() => {
                 >
                   下载
                 </button>
+                <button
+                  v-if="entry.kind === 'file'"
+                  type="button"
+                  @click="openSharePanel(entry.file)"
+                >
+                  分享
+                </button>
                 <button type="button" @click="openDeletePanel([entry])">
                   删除
                 </button>
@@ -1630,6 +1766,148 @@ onBeforeUnmount(() => {
     </Teleport>
 
     <Teleport to="body">
+      <section v-if="sharePanelOpen" class="files-modal-mask">
+        <div class="files-modal-panel files-share-panel">
+          <div class="files-modal-header">
+            <div class="files-share-panel-title">
+              <strong>文件分享</strong>
+              <span>{{
+                shareTargetFile?.originName || shareTargetFile?.fileName || "未选择文件"
+              }}</span>
+            </div>
+            <button
+              class="files-modal-close"
+              type="button"
+              @click="closeSharePanel"
+            >
+              <Icon name="lucide:x" />
+            </button>
+          </div>
+
+          <div class="files-share-form">
+            <label class="files-share-field">
+              <span>提取码</span>
+              <input
+                v-model="shareExtractCode"
+                class="files-modal-input"
+                type="text"
+                maxlength="8"
+                placeholder="留空表示无需提取码"
+              />
+            </label>
+
+            <label class="files-share-field">
+              <span>过期时间</span>
+              <input
+                v-model="shareExpireAt"
+                class="files-modal-input"
+                type="datetime-local"
+              />
+            </label>
+
+            <label class="files-share-field">
+              <span>下载次数上限</span>
+              <input
+                v-model="shareMaxDownloadCount"
+                class="files-modal-input"
+                type="number"
+                min="1"
+                placeholder="留空表示不限"
+              />
+            </label>
+
+            <label class="files-share-field">
+              <span>查看权限</span>
+              <select
+                v-model.number="shareViewAuthMode"
+                class="files-share-select"
+              >
+                <option :value="0">免登录查看</option>
+                <option :value="1">登录后查看</option>
+              </select>
+            </label>
+
+            <label class="files-share-field">
+              <span>下载权限</span>
+              <select
+                v-model.number="shareDownloadAuthMode"
+                class="files-share-select"
+              >
+                <option :value="0">免登录下载</option>
+                <option :value="1">登录后下载</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="files-modal-actions">
+            <AppButton variant="secondary" @click="closeSharePanel"
+              >关闭</AppButton
+            >
+            <AppButton :loading="shareSubmitting" @click="submitSharePanel">
+              创建分享
+            </AppButton>
+          </div>
+
+          <div class="files-share-list">
+            <div v-if="shareLoading" class="files-preview-empty">
+              正在加载分享列表…
+            </div>
+            <article
+              v-for="share in shareItems"
+              :key="share.shareUuid"
+              class="files-share-item"
+            >
+              <div class="files-share-item-main">
+                <strong>{{ buildShareAbsoluteUrl(share.sharePath) }}</strong>
+                <span>
+                  {{
+                    share.status === 1
+                      ? share.hasExtractCode
+                        ? "启用提取码"
+                        : "无需提取码"
+                      : "已取消"
+                  }}
+                  ·
+                  {{
+                    share.viewAuthMode === 1 ? "登录查看" : "免登录查看"
+                  }}
+                  ·
+                  {{
+                    share.downloadAuthMode === 1 ? "登录下载" : "免登录下载"
+                  }}
+                </span>
+                <span>
+                  查看 {{ share.viewCount }} 次 · 下载 {{ share.downloadCount }}
+                  次
+                  <template v-if="share.maxDownloadCount">
+                    / {{ share.maxDownloadCount }}
+                  </template>
+                  · 过期 {{ formatDateTime(share.expireAt) }}
+                </span>
+              </div>
+              <div class="files-share-item-actions">
+                <button type="button" @click="copyShareLink(share.sharePath)">
+                  复制链接
+                </button>
+                <button
+                  type="button"
+                  :disabled="share.status !== 1"
+                  @click="revokeShareItem(share.shareUuid)"
+                >
+                  取消分享
+                </button>
+              </div>
+            </article>
+
+            <div v-if="!shareLoading && !shareItems.length" class="files-preview-empty">
+              当前文件还没有分享记录
+            </div>
+          </div>
+        </div>
+      </section>
+    </Teleport>
+
+    <Teleport to="body">
       <div
         v-if="detailPanelOpen"
         class="files-detail-drawer-mask"
@@ -1638,13 +1916,22 @@ onBeforeUnmount(() => {
         <section class="files-detail-modal" role="dialog" aria-modal="true">
           <div class="files-modal-header">
             <strong>文件详情</strong>
-            <button
-              class="files-modal-close"
-              type="button"
-              @click="closeDetail"
-            >
-              <Icon name="lucide:x" />
-            </button>
+            <div class="files-detail-header-actions">
+              <AppButton
+                v-if="selectedFileDetail"
+                variant="secondary"
+                @click="openSharePanelFromDetail"
+              >
+                分享
+              </AppButton>
+              <button
+                class="files-modal-close"
+                type="button"
+                @click="closeDetail"
+              >
+                <Icon name="lucide:x" />
+              </button>
+            </div>
           </div>
 
           <div
@@ -1835,7 +2122,8 @@ onBeforeUnmount(() => {
 .files-upload-item-meta,
 .files-upload-panel-actions,
 .files-modal-header,
-.files-modal-actions {
+.files-modal-actions,
+.files-detail-header-actions {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2418,6 +2706,97 @@ onBeforeUnmount(() => {
   padding: 0 14px;
 }
 
+.files-share-panel {
+  width: min(880px, calc(100vw - 24px));
+}
+
+.files-share-panel-title {
+  display: grid;
+  gap: 4px;
+}
+
+.files-share-panel-title span {
+  color: var(--yn-color-text-tertiary);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.files-share-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.files-share-field {
+  display: grid;
+  gap: 8px;
+}
+
+.files-share-field span {
+  color: var(--yn-color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.files-share-select {
+  min-height: 44px;
+  border: 1px solid var(--yn-color-border-medium);
+  border-radius: var(--yn-radius-medium);
+  background: var(--yn-color-surface-raised);
+  color: var(--yn-color-text-primary);
+  padding: 0 14px;
+}
+
+.files-share-list {
+  display: grid;
+  gap: 12px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.files-share-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--yn-color-border-subtle);
+  border-radius: var(--yn-radius-medium);
+  background: var(--yn-color-surface-raised);
+}
+
+.files-share-item-main {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.files-share-item-main strong {
+  color: var(--yn-color-text-primary);
+  word-break: break-all;
+}
+
+.files-share-item-main span {
+  color: var(--yn-color-text-tertiary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.files-share-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.files-share-item-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--yn-color-border-subtle);
+  border-radius: var(--yn-radius-medium);
+  background: var(--yn-color-surface);
+  color: var(--yn-color-text-secondary);
+}
+
 .files-modal-close {
   display: inline-flex;
   width: 32px;
@@ -2474,8 +2853,8 @@ onBeforeUnmount(() => {
 }
 
 .files-detail-modal {
-  width: min(920px, calc(100vw - 24px));
-  height: min(88vh, 900px);
+  width: min(1280px, calc(100vw - 40px));
+  height: min(90vh, 980px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
@@ -2489,8 +2868,8 @@ onBeforeUnmount(() => {
 .files-detail-body {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(340px, 420px);
+  gap: 20px;
   overflow: hidden;
 }
 
@@ -2500,7 +2879,7 @@ onBeforeUnmount(() => {
 
 .files-preview-shell {
   display: grid;
-  min-height: 260px;
+  min-height: 320px;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--yn-color-border-subtle);
@@ -2526,7 +2905,7 @@ onBeforeUnmount(() => {
   align-self: start;
   height: auto;
   aspect-ratio: 16 / 9;
-  min-height: clamp(220px, 36vh, 420px);
+  min-height: clamp(300px, 52vh, 620px);
 }
 
 .files-preview-image,
@@ -2731,6 +3110,18 @@ onBeforeUnmount(() => {
     height: min(92vh, 920px);
   }
 
+  .files-share-form {
+    grid-template-columns: 1fr;
+  }
+
+  .files-share-item {
+    grid-template-columns: 1fr;
+  }
+
+  .files-share-item-actions {
+    justify-content: flex-start;
+  }
+
   .files-detail-body {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
@@ -2771,6 +3162,10 @@ onBeforeUnmount(() => {
     height: calc(100dvh - 24px);
     padding: 16px;
     gap: 12px;
+  }
+
+  .files-share-panel {
+    width: 100%;
   }
 
   .files-preview-shell {

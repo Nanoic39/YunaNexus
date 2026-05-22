@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useFileApi, type UserFileShareItem } from "../../composables/useFileApi";
+import {
+  useFileApi,
+  type UserFileShareItem,
+} from "../../composables/useFileApi";
 import { useAuthApi } from "../../composables/useAuthApi";
 import AppButton from "../../components/form/AppButton.vue";
 
@@ -47,7 +50,9 @@ const previewKind = computed(() => {
 });
 
 const isLoggedIn = computed(() => !!authApi.accessToken.value);
-const requiresLoginForView = computed(() => shareInfo.value?.viewAuthMode === 1);
+const requiresLoginForView = computed(
+  () => shareInfo.value?.viewAuthMode === 1,
+);
 const requiresLoginForDownload = computed(
   () => shareInfo.value?.downloadAuthMode === 1,
 );
@@ -63,6 +68,20 @@ const canAttemptAutoAccess = computed(() => {
   }
   return true;
 });
+
+const sessionAccessKey = computed(() => `yn_share_accessed_${shareCode.value}`);
+
+const restoreSessionAccess = () => {
+  if (!import.meta.client) {
+    return false;
+  }
+  if (sessionStorage.getItem(sessionAccessKey.value) !== "1") {
+    return false;
+  }
+  accessGranted.value = true;
+  loadPreview();
+  return true;
+};
 
 const formatBytes = (value?: number | null) => {
   const size = Number(value || 0);
@@ -93,7 +112,7 @@ const revokePreviewUrl = () => {
   if (
     previewUrl.value &&
     import.meta.client &&
-    !previewUrl.value.startsWith("/api/file/share/download/")
+    !previewUrl.value.startsWith("/api/file/share/")
   ) {
     URL.revokeObjectURL(previewUrl.value);
   }
@@ -105,6 +124,13 @@ const resetPreview = () => {
   previewText.value = "";
   previewError.value = "";
   previewLoading.value = false;
+};
+
+const buildPreviewUrl = () => {
+  const query = extractCode.value.trim()
+    ? `?extractCode=${encodeURIComponent(extractCode.value.trim().toUpperCase())}`
+    : "";
+  return `/api/file/share/preview/${encodeURIComponent(shareCode.value)}${query}`;
 };
 
 const buildDownloadUrl = () => {
@@ -128,12 +154,12 @@ const loadPreview = async () => {
     previewKind.value === "video" ||
     previewKind.value === "audio"
   ) {
-    previewUrl.value = buildDownloadUrl();
+    previewUrl.value = buildPreviewUrl();
     return;
   }
   previewLoading.value = true;
   try {
-    const response = await fetch(buildDownloadUrl(), { method: "GET" });
+    const response = await fetch(buildPreviewUrl(), { method: "GET" });
     if (!response.ok) {
       const rawText = await response.text();
       throw new Error(rawText || "分享预览加载失败");
@@ -162,6 +188,9 @@ const loadShareInfo = async () => {
 };
 
 const accessShare = async () => {
+  if (accessLoading.value || accessGranted.value) {
+    return;
+  }
   accessLoading.value = true;
   accessError.value = "";
   try {
@@ -171,6 +200,9 @@ const accessShare = async () => {
     );
     shareInfo.value = result.data;
     accessGranted.value = true;
+    if (import.meta.client) {
+      sessionStorage.setItem(sessionAccessKey.value, "1");
+    }
     await loadPreview();
   } catch (error) {
     accessGranted.value = false;
@@ -188,16 +220,24 @@ const triggerDownload = () => {
   }
   const anchor = document.createElement("a");
   anchor.href = buildDownloadUrl();
-  anchor.download = shareInfo.value?.originName || shareInfo.value?.fileName || "shared-file";
+  anchor.download =
+    shareInfo.value?.originName || shareInfo.value?.fileName || "shared-file";
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
 };
 
 watch(
-  [shareInfo, () => authApi.sessionReady.value, () => authApi.accessToken.value],
+  [
+    shareInfo,
+    () => authApi.sessionReady.value,
+    () => authApi.accessToken.value,
+  ],
   async () => {
     if (!shareInfo.value || accessGranted.value || accessLoading.value) {
+      return;
+    }
+    if (restoreSessionAccess()) {
       return;
     }
     if (canAttemptAutoAccess.value) {
@@ -208,6 +248,9 @@ watch(
 
 onMounted(async () => {
   await loadShareInfo();
+  if (restoreSessionAccess()) {
+    return;
+  }
   if (canAttemptAutoAccess.value) {
     await accessShare();
   }
@@ -303,11 +346,7 @@ onBeforeUnmount(() => {
               >
                 立即登录
               </AppButton>
-              <AppButton
-                v-else
-                :loading="accessLoading"
-                @click="accessShare"
-              >
+              <AppButton v-else :loading="accessLoading" @click="accessShare">
                 验证并查看
               </AppButton>
               <AppButton
@@ -336,9 +375,7 @@ onBeforeUnmount(() => {
         <div v-if="!accessGranted" class="share-empty">
           通过访问校验后即可在此处预览文件内容。
         </div>
-        <div v-else-if="previewLoading" class="share-empty">
-          正在加载预览…
-        </div>
+        <div v-else-if="previewLoading" class="share-empty">正在加载预览…</div>
         <div v-else-if="previewError" class="share-empty">
           {{ previewError }}
         </div>
@@ -353,6 +390,7 @@ onBeforeUnmount(() => {
           :src="previewUrl"
           class="share-preview-media"
           controls
+          controlslist="nodownload"
           preload="metadata"
           playsinline
         />
@@ -361,6 +399,7 @@ onBeforeUnmount(() => {
           :src="previewUrl"
           class="share-preview-audio"
           controls
+          controlslist="nodownload"
           preload="metadata"
         />
         <pre
@@ -368,9 +407,7 @@ onBeforeUnmount(() => {
           class="share-preview-text"
           >{{ previewText }}</pre
         >
-        <div v-else class="share-empty">
-          当前文件类型暂不支持在线预览。
-        </div>
+        <div v-else class="share-empty">当前文件类型暂不支持在线预览。</div>
       </section>
     </div>
   </section>
@@ -462,7 +499,11 @@ onBeforeUnmount(() => {
   padding: 0 12px;
   border: 1px solid var(--yn-color-border-medium);
   border-radius: var(--yn-radius-small);
-  background: color-mix(in srgb, var(--yn-color-primary) 8%, var(--yn-color-surface));
+  background: color-mix(
+    in srgb,
+    var(--yn-color-primary) 8%,
+    var(--yn-color-surface)
+  );
   color: var(--yn-color-text-primary);
   font-family: var(--yn-font-mono), monospace;
   font-size: 12px;
@@ -514,6 +555,7 @@ onBeforeUnmount(() => {
 }
 
 .share-preview-panel {
+  padding: 0;
   min-height: 520px;
   background:
     linear-gradient(
@@ -527,7 +569,7 @@ onBeforeUnmount(() => {
 .share-empty {
   display: grid;
   place-items: center;
-  min-height: 220px;
+  min-height: 520px;
   border: 1px dashed var(--yn-color-border-medium);
   border-radius: var(--yn-radius-medium);
   color: var(--yn-color-text-tertiary);
@@ -537,6 +579,8 @@ onBeforeUnmount(() => {
 
 .share-preview-image,
 .share-preview-media {
+  min-height: 520px;
+  border-radius: var(--yn-radius-large);
   width: 100%;
   max-height: min(72vh, 840px);
   object-fit: contain;

@@ -168,4 +168,32 @@ CREATE TABLE `file_upload_chunk` (
     INDEX `idx_upload_id` (`upload_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 用户文件分享表
+DROP TABLE IF EXISTS `user_file_share`;
+CREATE TABLE `user_file_share` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '分享主键id',
+    `share_uuid` VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '分享唯一标识(uuid)',
+    `share_code` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '分享码(对外短码)',
+    `user_id` BIGINT NOT NULL COMMENT '发起分享的用户id',
+    `file_uuid` VARCHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '被分享的文件uuid',
+    `extract_code` VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '提取码(空则无需提取码)',
+    `view_auth_mode` TINYINT NOT NULL DEFAULT 1 COMMENT '查看权限模式(0: 免登录, 1: 需登录)',
+    `download_auth_mode` TINYINT NOT NULL DEFAULT 1 COMMENT '下载权限模式(0: 免登录, 1: 需登录)',
+    `max_download_count` BIGINT NOT NULL DEFAULT 0 COMMENT '最大下载次数(0=不限)',
+    `download_count` BIGINT NOT NULL DEFAULT 0 COMMENT '已下载次数',
+    `view_count` BIGINT NOT NULL DEFAULT 0 COMMENT '已查看次数',
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态(0: 已取消, 1: 有效, 2: 已过期)',
+    `expire_at` DATETIME NULL COMMENT '过期时间(NULL=永久有效)',
+    `last_viewed_at` DATETIME NULL COMMENT '最近查看时间',
+    `last_downloaded_at` DATETIME NULL COMMENT '最近下载时间',
+    `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`) USING BTREE,
+    UNIQUE INDEX `ui_share_uuid` (`share_uuid` ASC) USING BTREE,
+    UNIQUE INDEX `ui_share_code` (`share_code` ASC) USING BTREE,
+    INDEX `idx_user_id` (`user_id`) USING BTREE,
+    INDEX `idx_file_uuid` (`file_uuid`) USING BTREE,
+    INDEX `idx_status_expire` (`status`, `expire_at`) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户文件分享表' ROW_FORMAT = Dynamic;
+
 SET FOREIGN_KEY_CHECKS = 1;

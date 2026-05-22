@@ -3,17 +3,23 @@ package cc.nanoic.yunanexus.file.controller;
 import cc.nanoic.yunanexus.common.web.common.Result;
 import cc.nanoic.yunanexus.file.service.FileChunkService;
 import cc.nanoic.yunanexus.file.service.FileService;
+import cc.nanoic.yunanexus.file.storage.StorageObjectResource;
 import cc.nanoic.yunanexus.file.support.CurrentUserResolver;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
+import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Map;
 
 @RestController
@@ -218,7 +224,7 @@ public class FileController {
      * 删除文件
      * 
      * @param authorization Token
-     * @param fileUuid      文件 UUID
+     * @param body
      * @return 删除结果
      */
     @PostMapping("/delete")
@@ -247,6 +253,38 @@ public class FileController {
         Object targetFolderUuid = body.get("targetFolderUuid");
         return Result.success(fileService.moveFile(userId, String.valueOf(body.get("fileUuid")),
                 targetFolderUuid == null ? null : String.valueOf(targetFolderUuid)));
+    }
+
+    @GetMapping("/share/list")
+    public Result<?> listShares(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestParam("fileUuid") String fileUuid) {
+        Long userId = currentUserResolver.requireUserId(authorization);
+        return Result.success(fileService.listUserFileShares(userId, fileUuid));
+    }
+
+    @PostMapping("/share/create")
+    public Result<?> createShare(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody Map<String, Object> body) {
+        Long userId = currentUserResolver.requireUserId(authorization);
+        return Result.success(fileService.createUserFileShare(
+                userId,
+                String.valueOf(body.get("fileUuid")),
+                body.get("extractCode") == null ? null : String.valueOf(body.get("extractCode")),
+                parseDateTime(body.get("expireAt")),
+                parseLong(body.get("maxDownloadCount")),
+                parseInteger(body.get("viewAuthMode")),
+                parseInteger(body.get("downloadAuthMode"))));
+    }
+
+    @PostMapping("/share/revoke")
+    public Result<?> revokeShare(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody Map<String, Object> body) {
+        Long userId = currentUserResolver.requireUserId(authorization);
+        fileService.revokeUserFileShare(userId, String.valueOf(body.get("shareUuid")));
+        return Result.success("分享已取消");
     }
 
     /**
@@ -358,6 +396,104 @@ public class FileController {
                 .body(new InputStreamResource(object.inputStream()));
     }
 
+    @GetMapping("/share/info")
+    public Result<?> shareInfo(@RequestParam("shareCode") String shareCode) {
+        return Result.success(fileService.getUserFileShareInfo(shareCode));
+    }
+
+    @PostMapping("/share/access")
+    public Result<?> shareAccess(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody Map<String, Object> body) {
+        return Result.success(fileService.accessUserFileShare(
+                authorization,
+                String.valueOf(body.get("shareCode")),
+                body.get("extractCode") == null ? null : String.valueOf(body.get("extractCode"))));
+    }
+
+    @GetMapping("/share/preview")
+    public ResponseEntity<?> sharePreview(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestParam("shareCode") String shareCode,
+            @RequestParam(value = "extractCode", required = false) String extractCode,
+            HttpServletRequest request) {
+        var object = fileService.previewUserFileShare(authorization, shareCode, extractCode);
+        return resolveRangeResponse(request, object);
+    }
+
+    @GetMapping("/share/download")
+    public ResponseEntity<?> shareDownload(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestParam("shareCode") String shareCode,
+            @RequestParam(value = "extractCode", required = false) String extractCode,
+            HttpServletRequest request) {
+        var object = fileService.downloadUserFileShare(authorization, shareCode, extractCode);
+        return resolveRangeResponse(request, object);
+    }
+
+    private ResponseEntity<?> resolveRangeResponse(HttpServletRequest request, StorageObjectResource object) {
+        String rangeHeader = request.getHeader(HttpHeaders.RANGE);
+        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+            return handleRangeRequest(rangeHeader, object);
+        }
+        return buildFullStreamResponse(object);
+    }
+
+    private ResponseEntity<InputStreamResource> buildFullStreamResponse(StorageObjectResource object) {
+        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        if (object.contentType() != null && !object.contentType().isBlank()) {
+            mediaType = MediaType.parseMediaType(object.contentType());
+        }
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline().filename(object.downloadName()).build().toString())
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .contentLength(object.contentLength())
+                .body(new InputStreamResource(object.inputStream()));
+    }
+
+    private ResponseEntity<byte[]> handleRangeRequest(String rangeHeader, StorageObjectResource object) {
+        long totalLength = object.contentLength();
+        String rangeStr = rangeHeader.substring("bytes=".length());
+        String[] parts = rangeStr.split("-");
+        long start = Long.parseLong(parts[0]);
+        long end = parts.length > 1 && !parts[1].isEmpty() ? Long.parseLong(parts[1]) : totalLength - 1;
+
+        if (start >= totalLength) {
+            return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                    .header(HttpHeaders.CONTENT_RANGE, "bytes */" + totalLength)
+                    .build();
+        }
+
+        end = Math.min(end, totalLength - 1);
+        int rangeLength = (int) (end - start + 1);
+
+        try (InputStream is = object.inputStream()) {
+            is.skipNBytes(start);
+            byte[] buffer = new byte[rangeLength];
+            int totalRead = 0;
+            while (totalRead < rangeLength) {
+                int bytesRead = is.read(buffer, totalRead, rangeLength - totalRead);
+                if (bytesRead == -1) {
+                    break;
+                }
+                totalRead += bytesRead;
+            }
+            byte[] result = totalRead == rangeLength ? buffer : Arrays.copyOf(buffer, totalRead);
+            return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                    .header(HttpHeaders.CONTENT_RANGE,
+                            "bytes " + start + "-" + (start + totalRead - 1) + "/" + totalLength)
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            ContentDisposition.inline().filename(object.downloadName()).build().toString())
+                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                    .contentLength(totalRead)
+                    .body(result);
+        } catch (Exception e) {
+            throw new RuntimeException("读取文件流失败", e);
+        }
+    }
+
     /**
      * 下载用户头像
      * 
@@ -375,5 +511,26 @@ public class FileController {
                 .contentType(mediaType)
                 .contentLength(object.contentLength())
                 .body(new InputStreamResource(object.inputStream()));
+    }
+
+    private LocalDateTime parseDateTime(Object value) {
+        if (value == null || String.valueOf(value).isBlank()) {
+            return null;
+        }
+        return LocalDateTime.parse(String.valueOf(value));
+    }
+
+    private Long parseLong(Object value) {
+        if (value == null || String.valueOf(value).isBlank()) {
+            return null;
+        }
+        return Long.parseLong(String.valueOf(value));
+    }
+
+    private Integer parseInteger(Object value) {
+        if (value == null || String.valueOf(value).isBlank()) {
+            return null;
+        }
+        return Integer.parseInt(String.valueOf(value));
     }
 }

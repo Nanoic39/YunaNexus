@@ -8,14 +8,17 @@ import cc.nanoic.yunanexus.file.config.FileUploadProperties;
 import cc.nanoic.yunanexus.file.entity.FileObject;
 import cc.nanoic.yunanexus.file.entity.FileStorageNode;
 import cc.nanoic.yunanexus.file.entity.UserFile;
+import cc.nanoic.yunanexus.file.entity.UserFileShare;
 import cc.nanoic.yunanexus.file.entity.UserFolder;
 import cc.nanoic.yunanexus.file.mapper.FileObjectMapper;
 import cc.nanoic.yunanexus.file.mapper.FileStorageNodeMapper;
 import cc.nanoic.yunanexus.file.mapper.UserFileMapper;
+import cc.nanoic.yunanexus.file.mapper.UserFileShareMapper;
 import cc.nanoic.yunanexus.file.mapper.UserFolderMapper;
 import cc.nanoic.yunanexus.file.storage.StorageDriver;
 import cc.nanoic.yunanexus.file.storage.StorageDriverRegistry;
 import cc.nanoic.yunanexus.file.storage.StorageObjectResource;
+import cc.nanoic.yunanexus.file.support.CurrentUserResolver;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -44,6 +47,10 @@ public class FileService {
     private static final String DEFAULT_SERVICE_NAME = "main-site";
     private static final String AVATAR_SERVICE_NAME = "user-avatar";
     private static final String HASH_ALGO = "SHA256";
+    private static final int SHARE_STATUS_ACTIVE = 1;
+    private static final int SHARE_STATUS_REVOKED = 0;
+    private static final int SHARE_AUTH_ANONYMOUS = 0;
+    private static final int SHARE_AUTH_LOGIN = 1;
 
     @Resource
     private FileStorageNodeMapper fileStorageNodeMapper;
@@ -55,6 +62,9 @@ public class FileService {
     private UserFileMapper userFileMapper;
 
     @Resource
+    private UserFileShareMapper userFileShareMapper;
+
+    @Resource
     private UserFolderMapper userFolderMapper;
 
     @Resource
@@ -62,6 +72,9 @@ public class FileService {
 
     @Resource
     private UserInternalClient userInternalClient;
+
+    @Resource
+    private CurrentUserResolver currentUserResolver;
 
     @Resource
     private AvatarUploadProperties avatarUploadProperties;
@@ -438,6 +451,85 @@ public class FileService {
         return loadStorageObject(item, "读取用户头像失败");
     }
 
+    public List<Map<String, Object>> listUserFileShares(Long userId, String fileUuid) {
+        UserFile item = requireManagedUserFile(userId, fileUuid, 0);
+        return userFileShareMapper.selectList(new LambdaQueryWrapper<UserFileShare>()
+                .eq(UserFileShare::getUserId, userId)
+                .eq(UserFileShare::getFileUuid, item.getFileUuid())
+                .orderByDesc(UserFileShare::getStatus)
+                .orderByDesc(UserFileShare::getCreateTime)
+                .orderByDesc(UserFileShare::getId)).stream().map(share -> buildSharePayload(share, item)).toList();
+    }
+
+    @Transactional
+    public Map<String, Object> createUserFileShare(
+            Long userId,
+            String fileUuid,
+            String extractCode,
+            LocalDateTime expireAt,
+            Long maxDownloadCount,
+            Integer viewAuthMode,
+            Integer downloadAuthMode) {
+        UserFile item = requireManagedUserFile(userId, fileUuid, 0);
+        UserFileShare share = new UserFileShare();
+        share.setShareUuid(UUID.randomUUID().toString());
+        share.setShareCode(generateShareCode());
+        share.setUserId(userId);
+        share.setFileUuid(item.getFileUuid());
+        share.setExtractCode(normalizeExtractCode(extractCode));
+        share.setViewAuthMode(normalizeShareAuthMode(viewAuthMode));
+        share.setDownloadAuthMode(normalizeShareAuthMode(downloadAuthMode));
+        share.setMaxDownloadCount(normalizeMaxDownloadCount(maxDownloadCount));
+        share.setDownloadCount(0L);
+        share.setViewCount(0L);
+        share.setStatus(SHARE_STATUS_ACTIVE);
+        share.setExpireAt(normalizeShareExpireAt(expireAt));
+        userFileShareMapper.insert(share);
+        return buildSharePayload(share, item);
+    }
+
+    @Transactional
+    public void revokeUserFileShare(Long userId, String shareUuid) {
+        UserFileShare share = requireOwnedShare(userId, shareUuid);
+        share.setStatus(SHARE_STATUS_REVOKED);
+        userFileShareMapper.updateById(share);
+    }
+
+    public Map<String, Object> getUserFileShareInfo(String shareCode) {
+        UserFileShare share = requireAvailableShare(shareCode);
+        UserFile item = requireShareFile(share.getFileUuid());
+        return buildSharePayload(share, item);
+    }
+
+    @Transactional
+    public Map<String, Object> accessUserFileShare(String authorization, String shareCode, String extractCode) {
+        UserFileShare share = requireAvailableShare(shareCode);
+        UserFile item = requireShareFile(share.getFileUuid());
+        Long currentUserId = currentUserResolver.resolveUserId(authorization);
+        validateShareAccess(share, extractCode, currentUserId, false);
+        increaseShareViewCount(share);
+        return buildSharePayload(share, item);
+    }
+
+    @Transactional
+    public StorageObjectResource downloadUserFileShare(String authorization, String shareCode, String extractCode) {
+        UserFileShare share = requireAvailableShare(shareCode);
+        UserFile item = requireShareFile(share.getFileUuid());
+        Long currentUserId = currentUserResolver.resolveUserId(authorization);
+        validateShareAccess(share, extractCode, currentUserId, true);
+        increaseShareDownloadCount(share);
+        return loadStorageObject(item, "读取分享文件失败");
+    }
+
+    @Transactional
+    public StorageObjectResource previewUserFileShare(String authorization, String shareCode, String extractCode) {
+        UserFileShare share = requireAvailableShare(shareCode);
+        UserFile item = requireShareFile(share.getFileUuid());
+        Long currentUserId = currentUserResolver.resolveUserId(authorization);
+        validateShareAccess(share, extractCode, currentUserId, false);
+        return loadStorageObject(item, "读取分享预览失败");
+    }
+
     private StorageObjectResource loadStorageObject(UserFile item, String errorMessage) {
         FileObject fileObject = fileObjectMapper.selectById(item.getObjectId());
         FileStorageNode node = fileObject == null ? null
@@ -451,6 +543,157 @@ public class FileService {
         } catch (IOException e) {
             throw new BusinessException(R.SERVER_ERROR, errorMessage);
         }
+    }
+
+    private Map<String, Object> buildSharePayload(UserFileShare share, UserFile item) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("shareUuid", share.getShareUuid());
+        data.put("shareCode", share.getShareCode());
+        data.put("sharePath", "/share/" + share.getShareCode());
+        data.put("fileUuid", item.getFileUuid());
+        data.put("fileName", item.getFileName());
+        data.put("originName", item.getOriginName());
+        data.put("fileSize", item.getFileSize());
+        data.put("fileExt", item.getFileExt());
+        data.put("fileMime", item.getFileMime());
+        data.put("viewAuthMode", share.getViewAuthMode());
+        data.put("downloadAuthMode", share.getDownloadAuthMode());
+        data.put("hasExtractCode", StringUtils.hasText(share.getExtractCode()));
+        data.put("viewCount", share.getViewCount() == null ? 0L : share.getViewCount());
+        data.put("downloadCount", share.getDownloadCount() == null ? 0L : share.getDownloadCount());
+        data.put("maxDownloadCount", share.getMaxDownloadCount());
+        data.put("downloadLimitReached", isDownloadLimitReached(share));
+        data.put("expireAt", share.getExpireAt());
+        data.put("status", share.getStatus());
+        data.put("createTime", share.getCreateTime());
+        data.put("lastViewedAt", share.getLastViewedAt());
+        data.put("lastDownloadedAt", share.getLastDownloadedAt());
+        return data;
+    }
+
+    private UserFileShare requireOwnedShare(Long userId, String shareUuid) {
+        UserFileShare share = userFileShareMapper.selectOne(new LambdaQueryWrapper<UserFileShare>()
+                .eq(UserFileShare::getUserId, userId)
+                .eq(UserFileShare::getShareUuid, shareUuid)
+                .last("limit 1"));
+        if (share == null) {
+            throw new BusinessException(R.NOT_FOUND, "分享记录不存在");
+        }
+        return share;
+    }
+
+    private UserFileShare requireAvailableShare(String shareCode) {
+        UserFileShare share = userFileShareMapper.selectOne(new LambdaQueryWrapper<UserFileShare>()
+                .eq(UserFileShare::getShareCode, shareCode)
+                .eq(UserFileShare::getStatus, SHARE_STATUS_ACTIVE)
+                .last("limit 1"));
+        if (share == null) {
+            throw new BusinessException(R.NOT_FOUND, "分享链接不存在或已失效");
+        }
+        if (share.getExpireAt() != null && share.getExpireAt().isBefore(LocalDateTime.now())) {
+            throw new BusinessException(R.NOT_FOUND, "当前分享已过期");
+        }
+        return share;
+    }
+
+    private UserFile requireShareFile(String fileUuid) {
+        UserFile item = userFileMapper.selectOne(new LambdaQueryWrapper<UserFile>()
+                .eq(UserFile::getFileUuid, fileUuid)
+                .eq(UserFile::getStatus, 1)
+                .eq(UserFile::getDeleteStage, 0)
+                .ne(UserFile::getServiceName, AVATAR_SERVICE_NAME)
+                .last("limit 1"));
+        if (item == null) {
+            throw new BusinessException(R.NOT_FOUND, "分享文件不存在或已不可访问");
+        }
+        return item;
+    }
+
+    private void validateShareAccess(UserFileShare share, String extractCode, Long currentUserId, boolean forDownload) {
+        int authMode = forDownload
+                ? normalizeShareAuthMode(share.getDownloadAuthMode())
+                : normalizeShareAuthMode(share.getViewAuthMode());
+        if (authMode == SHARE_AUTH_LOGIN && currentUserId == null) {
+            throw new BusinessException(R.NOT_LOGIN, forDownload ? "当前分享需要登录后下载" : "当前分享需要登录后查看");
+        }
+        if (StringUtils.hasText(share.getExtractCode())
+                && !Objects.equals(share.getExtractCode(), normalizeExtractCode(extractCode))) {
+            throw new BusinessException(R.PARAM_ERROR, "提取码错误");
+        }
+        if (forDownload && isDownloadLimitReached(share)) {
+            throw new BusinessException(R.NO_PERMISSION, "当前分享下载次数已达上限");
+        }
+    }
+
+    private void increaseShareViewCount(UserFileShare share) {
+        LocalDateTime now = LocalDateTime.now();
+        userFileShareMapper.update(
+                null,
+                new LambdaUpdateWrapper<UserFileShare>()
+                        .eq(UserFileShare::getId, share.getId())
+                        .set(UserFileShare::getLastViewedAt, now)
+                        .setSql("view_count = coalesce(view_count, 0) + 1"));
+        share.setViewCount((share.getViewCount() == null ? 0L : share.getViewCount()) + 1);
+        share.setLastViewedAt(now);
+    }
+
+    private void increaseShareDownloadCount(UserFileShare share) {
+        LocalDateTime now = LocalDateTime.now();
+        userFileShareMapper.update(
+                null,
+                new LambdaUpdateWrapper<UserFileShare>()
+                        .eq(UserFileShare::getId, share.getId())
+                        .set(UserFileShare::getLastDownloadedAt, now)
+                        .setSql("download_count = coalesce(download_count, 0) + 1"));
+        share.setDownloadCount((share.getDownloadCount() == null ? 0L : share.getDownloadCount()) + 1);
+        share.setLastDownloadedAt(now);
+    }
+
+    private boolean isDownloadLimitReached(UserFileShare share) {
+        return share.getMaxDownloadCount() != null
+                && share.getMaxDownloadCount() > 0
+                && (share.getDownloadCount() == null ? 0L : share.getDownloadCount()) >= share.getMaxDownloadCount();
+    }
+
+    private int normalizeShareAuthMode(Integer authMode) {
+        return Objects.equals(authMode, SHARE_AUTH_LOGIN) ? SHARE_AUTH_LOGIN : SHARE_AUTH_ANONYMOUS;
+    }
+
+    private LocalDateTime normalizeShareExpireAt(LocalDateTime expireAt) {
+        if (expireAt == null) {
+            return null;
+        }
+        if (!expireAt.isAfter(LocalDateTime.now())) {
+            throw new BusinessException(R.PARAM_ERROR, "分享过期时间必须晚于当前时间");
+        }
+        return expireAt;
+    }
+
+    private Long normalizeMaxDownloadCount(Long maxDownloadCount) {
+        if (maxDownloadCount == null || maxDownloadCount <= 0) {
+            return null;
+        }
+        return maxDownloadCount;
+    }
+
+    private String normalizeExtractCode(String extractCode) {
+        if (!StringUtils.hasText(extractCode)) {
+            return null;
+        }
+        String safeCode = extractCode.trim().toUpperCase();
+        if (!safeCode.matches("[A-Z0-9]{4,8}")) {
+            throw new BusinessException(R.PARAM_ERROR, "提取码只能为 4-8 位大写字母或数字");
+        }
+        return safeCode;
+    }
+
+    private String generateShareCode() {
+        String shareCode = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        while (userFileShareMapper.selectCount(new LambdaQueryWrapper<UserFileShare>()
+                .eq(UserFileShare::getShareCode, shareCode)) > 0) {
+            shareCode = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        }
+        return shareCode;
     }
 
     private void recycleAvatarFile(Long userId, String previousAvatarUuid, String currentAvatarUuid) {
