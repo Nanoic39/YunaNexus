@@ -127,8 +127,15 @@ pipeline {
                     cd ${PROJECT_DIR}/docker
                     echo "Starting docker compose..."
                     docker compose down --remove-orphans 2>/dev/null || true
-                    docker compose up -d --wait --wait-timeout 300
+                    docker compose up -d
                 '''
+            }
+        }
+
+        stage('Wait for Startup') {
+            steps {
+                echo 'Waiting 90s for all services to finish cold start...'
+                sleep(90)
             }
         }
 

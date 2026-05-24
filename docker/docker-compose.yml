@@ -87,6 +87,8 @@ services:
     ports:
       - "8848:8848"
       - "9848:9848"
+    volumes:
+      - nacos-data:/home/nacos/data
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8848/nacos/v1/console/health/readiness || exit 1"]
       interval: 10s
@@ -141,9 +143,6 @@ services:
       NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR}
       NACOS_USERNAME: ${NACOS_AUTH_USERNAME}
       NACOS_PASSWORD: ${NACOS_AUTH_PASSWORD}
-    depends_on:
-      nacos:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - yunanexus-net
@@ -170,8 +169,6 @@ services:
       mysql:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      nacos:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -205,8 +202,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      nacos:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - yunanexus-net
@@ -236,8 +231,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      nacos:
-        condition: service_healthy
     restart: unless-stopped
     networks:
       - yunanexus-net
@@ -259,7 +252,7 @@ services:
       NUXT_PUBLIC_OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
     depends_on:
       gateway:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
     networks:
       - yunanexus-net
@@ -267,6 +260,7 @@ services:
 volumes:
   mysql-data:
   redis-data:
+  nacos-data:
   rocketmq-namesrv-data:
   rocketmq-namesrv-logs:
   rocketmq-broker-data:
