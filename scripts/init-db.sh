@@ -42,7 +42,6 @@ run_schema_if_empty() {
   fi
 }
 
-ensure_db nacos_config
 ensure_db core_yunanexus_auth
 ensure_db core_yunanexus_user
 ensure_db core_yunanexus_file

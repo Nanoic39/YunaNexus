@@ -84,12 +84,6 @@ services:
       NACOS_AUTH_IDENTITY_KEY: nacos
       NACOS_AUTH_IDENTITY_VALUE: nacos
       NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN}
-      SPRING_DATASOURCE_PLATFORM: mysql
-      MYSQL_SERVICE_HOST: mysql
-      MYSQL_SERVICE_PORT: 3306
-      MYSQL_SERVICE_DB_NAME: nacos_config
-      MYSQL_SERVICE_USER: root
-      MYSQL_SERVICE_PASSWORD: ${DB_ROOT_PASSWORD}
     ports:
       - "8848:8848"
       - "9848:9848"
@@ -99,11 +93,6 @@ services:
       timeout: 5s
       retries: 30
       start_period: 40s
-    depends_on:
-      mysql:
-        condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
     restart: unless-stopped
     networks:
       - yunanexus-net
