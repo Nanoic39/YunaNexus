@@ -22,7 +22,22 @@ pipeline {
             steps {
                 dir('YunaNexusCore') {
                     sh '''
-                        mvn clean package -DskipTests -P prod -q
+                        mvn clean package -DskipTests -P prod
+                        echo "=== Verifying fat JARs ==="
+                        for module in yunanexus-gateway yunanexus-auth yunanexus-user yunanexus-file; do
+                            jar_file="${module}/target/${module}-1.0.0.jar"
+                            if [ -f "$jar_file" ]; then
+                                size=$(stat -c%s "$jar_file" 2>/dev/null || echo 0)
+                                if [ "$size" -lt 1000000 ]; then
+                                    echo "WARNING: $jar_file is only ${size} bytes - NOT a fat JAR!"
+                                    unzip -p "$jar_file" META-INF/MANIFEST.MF 2>/dev/null | head -10
+                                else
+                                    echo "OK: $jar_file is ${size} bytes (fat JAR)"
+                                fi
+                            else
+                                echo "ERROR: $jar_file not found!"
+                            fi
+                        done
                         echo "Backend build completed"
                     '''
                 }
