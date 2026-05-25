@@ -40,7 +40,7 @@ stop_service() {
             done
             kill -9 "$pid" 2>/dev/null || true
         fi
-        rm -f "$pid_file"
+        rm -f "$pid_file" 2>/dev/null || sudo rm -f "$pid_file" 2>/dev/null || true
     fi
 }
 
@@ -65,25 +65,26 @@ start_service() {
 
     echo "Starting $name (port: $port)..."
 
-    nohup env SPRING_DATASOURCE_URL="jdbc:mysql://127.0.0.1:3306/core_yunanexus_${name}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true" \
-        SPRING_DATASOURCE_USERNAME="root" \
-        SPRING_DATASOURCE_PASSWORD="${DB_ROOT_PASSWORD}" \
-        NACOS_SERVER_ADDR="127.0.0.1:8848" \
-        NACOS_USERNAME="${NACOS_AUTH_USERNAME:-}" \
-        NACOS_PASSWORD="${NACOS_AUTH_PASSWORD:-}" \
-        REDIS_HOST="127.0.0.1" \
-        REDIS_PASSWORD="${REDIS_PASSWORD:-}" \
-        ROCKETMQ_NAME_SERVER="127.0.0.1:9876" \
-        YUNANEXUS_FILE_STORAGE_ROOT="${STORAGE_DIR}/yunanexus-file" \
-        YUNANEXUS_FILE_TEMP_ROOT_PATH="${STORAGE_DIR}/yunanexus-file-temp" \
-        JWT_SECRET="${JWT_SECRET}" \
-        MAIL_HOST="${MAIL_HOST}" \
-        MAIL_PORT="${MAIL_PORT}" \
-        MAIL_USERNAME="${MAIL_USERNAME}" \
-        MAIL_PASSWORD="${MAIL_PASSWORD}" \
-        MAIL_FROM_ADDRESS="${MAIL_FROM_ADDRESS}" \
-        MAIL_FROM_NAME="${MAIL_FROM_NAME:-YunaNexus}" \
-        java -Xms256m -Xmx512m -jar "$jar" >> "$log_file" 2>&1 &
+    export SPRING_DATASOURCE_URL="jdbc:mysql://127.0.0.1:3306/core_yunanexus_${name}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true"
+    export SPRING_DATASOURCE_USERNAME="root"
+    export SPRING_DATASOURCE_PASSWORD="${DB_ROOT_PASSWORD}"
+    export NACOS_SERVER_ADDR="127.0.0.1:8848"
+    export NACOS_USERNAME="${NACOS_AUTH_USERNAME:-}"
+    export NACOS_PASSWORD="${NACOS_AUTH_PASSWORD:-}"
+    export REDIS_HOST="127.0.0.1"
+    export REDIS_PASSWORD="${REDIS_PASSWORD:-}"
+    export ROCKETMQ_NAME_SERVER="127.0.0.1:9876"
+    export YUNANEXUS_FILE_STORAGE_ROOT="${STORAGE_DIR}/yunanexus-file"
+    export YUNANEXUS_FILE_TEMP_ROOT_PATH="${STORAGE_DIR}/yunanexus-file-temp"
+    export JWT_SECRET="${JWT_SECRET}"
+    export SPRING_MAIL_HOST="${SPRING_MAIL_HOST:-}"
+    export SPRING_MAIL_PORT="${SPRING_MAIL_PORT:-}"
+    export SPRING_MAIL_USERNAME="${SPRING_MAIL_USERNAME:-}"
+    export SPRING_MAIL_PASSWORD="${SPRING_MAIL_PASSWORD:-}"
+    export YUNANEXUS_MAIL_FROM_ADDRESS="${YUNANEXUS_MAIL_FROM_ADDRESS:-}"
+    export YUNANEXUS_MAIL_FROM_NAME="${YUNANEXUS_MAIL_FROM_NAME:-YunaNexus}"
+
+    nohup java -Xms256m -Xmx512m -jar "$jar" >> "$log_file" 2>&1 &
     echo $! > "$pid_file"
     echo "$name started (PID: $(cat "$pid_file"))"
 }
