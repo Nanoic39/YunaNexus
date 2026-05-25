@@ -8,7 +8,7 @@ LOG_DIR="${PROJECT_DIR}/logs"
 PID_DIR="${PROJECT_DIR}/pids"
 STORAGE_DIR="${PROJECT_DIR}/storage"
 
-ENV_FILE="${SCRIPT_DIR}/docker/.env"
+ENV_FILE="${PROJECT_DIR}/docker/.env"
 if [ ! -f "$ENV_FILE" ]; then
     echo "ERROR: $ENV_FILE not found"
     exit 1
@@ -65,48 +65,25 @@ start_service() {
 
     echo "Starting $name (port: $port)..."
 
-    local env_vars=(
-        "SPRING_DATASOURCE_URL=jdbc:mysql://127.0.0.1:3306/core_yunanexus_${name}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true"
-        "SPRING_DATASOURCE_USERNAME=root"
-        "SPRING_DATASOURCE_PASSWORD=${DB_ROOT_PASSWORD}"
-        "NACOS_SERVER_ADDR=127.0.0.1:8848"
-        "NACOS_USERNAME=${NACOS_AUTH_USERNAME:-nacos}"
-        "NACOS_PASSWORD=${NACOS_AUTH_PASSWORD:-nacos}"
-        "REDIS_HOST=127.0.0.1"
-        "REDIS_PASSWORD=${REDIS_PASSWORD:-}"
-        "ROCKETMQ_NAME_SERVER=127.0.0.1:9876"
-    )
-
-    case "$name" in
-        auth)
-            env_vars+=("JWT_SECRET=${JWT_SECRET}")
-            ;;
-        user)
-            env_vars+=(
-                "MAIL_HOST=${MAIL_HOST}"
-                "MAIL_PORT=${MAIL_PORT}"
-                "MAIL_USERNAME=${MAIL_USERNAME}"
-                "MAIL_PASSWORD=${MAIL_PASSWORD}"
-                "MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}"
-                "MAIL_FROM_NAME=${MAIL_FROM_NAME:-YunaNexus}"
-            )
-            ;;
-        file)
-            env_vars+=(
-                "YUNANEXUS_FILE_STORAGE_ROOT=${STORAGE_DIR}/yunanexus-file"
-                "YUNANEXUS_FILE_TEMP_ROOT_PATH=${STORAGE_DIR}/yunanexus-file-temp"
-            )
-            ;;
-    esac
-
-    declare -A env_map
-    for ev in "${env_vars[@]}"; do
-        key="${ev%%=*}"
-        val="${ev#*=}"
-        env_map["$key"]="$val"
-    done
-
-    nohup env "${!env_map[@]}" java -Xms256m -Xmx512m -jar "$jar" >> "$log_file" 2>&1 &
+    nohup env SPRING_DATASOURCE_URL="jdbc:mysql://127.0.0.1:3306/core_yunanexus_${name}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true" \
+        SPRING_DATASOURCE_USERNAME="root" \
+        SPRING_DATASOURCE_PASSWORD="${DB_ROOT_PASSWORD}" \
+        NACOS_SERVER_ADDR="127.0.0.1:8848" \
+        NACOS_USERNAME="${NACOS_AUTH_USERNAME:-}" \
+        NACOS_PASSWORD="${NACOS_AUTH_PASSWORD:-}" \
+        REDIS_HOST="127.0.0.1" \
+        REDIS_PASSWORD="${REDIS_PASSWORD:-}" \
+        ROCKETMQ_NAME_SERVER="127.0.0.1:9876" \
+        YUNANEXUS_FILE_STORAGE_ROOT="${STORAGE_DIR}/yunanexus-file" \
+        YUNANEXUS_FILE_TEMP_ROOT_PATH="${STORAGE_DIR}/yunanexus-file-temp" \
+        JWT_SECRET="${JWT_SECRET}" \
+        MAIL_HOST="${MAIL_HOST}" \
+        MAIL_PORT="${MAIL_PORT}" \
+        MAIL_USERNAME="${MAIL_USERNAME}" \
+        MAIL_PASSWORD="${MAIL_PASSWORD}" \
+        MAIL_FROM_ADDRESS="${MAIL_FROM_ADDRESS}" \
+        MAIL_FROM_NAME="${MAIL_FROM_NAME:-YunaNexus}" \
+        java -Xms256m -Xmx512m -jar "$jar" >> "$log_file" 2>&1 &
     echo $! > "$pid_file"
     echo "$name started (PID: $(cat "$pid_file"))"
 }
@@ -116,8 +93,9 @@ check_service() {
     local info="${SERVICES[$name]}"
     local port="${info%%|*}"
     local code
-    code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 2 --max-time 5 "http://127.0.0.1:${port}/" 2>/dev/null || echo "000")
-    if [ "$code" == "000" ]; then
+    code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 2 --max-time 5 "http://127.0.0.1:${port}/" 2>/dev/null)
+    code=${code:-000}
+    if [ "$code" = "000" ]; then
         echo "$name: DOWN"
     else
         echo "$name: UP (HTTP $code)"

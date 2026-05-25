@@ -79,10 +79,8 @@ services:
     container_name: yunanexus-nacos
     environment:
       MODE: standalone
-      NACOS_AUTH_ENABLE: true
-      NACOS_AUTH_IDENTITY_KEY: nacos
-      NACOS_AUTH_IDENTITY_VALUE: nacos
-      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN}
+      NACOS_AUTH_ENABLE: "false"
+      nacos.core.auth.enabled: "false"
     ports:
       - "8848:8848"
       - "9848:9848"
