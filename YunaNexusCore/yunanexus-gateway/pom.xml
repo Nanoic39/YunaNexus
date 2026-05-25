@@ -92,6 +92,12 @@
                 <configuration>
                     <addResources>true</addResources>
                 </configuration>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>repackage</goal></goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

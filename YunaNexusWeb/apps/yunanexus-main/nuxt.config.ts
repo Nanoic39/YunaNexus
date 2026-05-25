@@ -46,6 +46,11 @@ export default defineNuxtConfig({
       openAPI: false,
     },
   },
+  routeRules: {
+    "/api/**": {
+      proxy: "http://host.docker.internal:8000/**",
+    },
+  },
   compatibilityDate: "2025-07-15",
   modules: ["@nuxt/icon"],
   devtools: {

@@ -1,5 +1,4 @@
 services:
-  # ==================== 反向代理 ====================
   nginx:
     image: nginx:alpine
     container_name: yunanexus-nginx
@@ -10,11 +9,11 @@ services:
     depends_on:
       frontend:
         condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     networks:
       - yunanexus-net
-
-  # ==================== 中间件 ====================
 
   mysql:
     image: mysql:8.4
@@ -130,112 +129,6 @@ services:
     networks:
       - yunanexus-net
 
-  # ==================== 微服务 ====================
-
-  gateway:
-    build:
-      context: ../YunaNexusCore/yunanexus-gateway
-      dockerfile: Dockerfile
-    container_name: yunanexus-gateway
-    ports:
-      - "8000:8000"
-    environment:
-      NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR}
-      NACOS_USERNAME: ${NACOS_AUTH_USERNAME}
-      NACOS_PASSWORD: ${NACOS_AUTH_PASSWORD}
-    restart: unless-stopped
-    networks:
-      - yunanexus-net
-
-  auth:
-    build:
-      context: ../YunaNexusCore/yunanexus-auth
-      dockerfile: Dockerfile
-    container_name: yunanexus-auth
-    ports:
-      - "8200:8200"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/core_yunanexus_auth?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: ${DB_ROOT_PASSWORD}
-      NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR}
-      NACOS_USERNAME: ${NACOS_AUTH_USERNAME}
-      NACOS_PASSWORD: ${NACOS_AUTH_PASSWORD}
-      REDIS_HOST: redis
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      ROCKETMQ_NAME_SERVER: rocketmq-namesrv:9876
-      JWT_SECRET: ${JWT_SECRET}
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - yunanexus-net
-
-  user:
-    build:
-      context: ../YunaNexusCore/yunanexus-user
-      dockerfile: Dockerfile
-    container_name: yunanexus-user
-    ports:
-      - "8100:8100"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/core_yunanexus_user?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: ${DB_ROOT_PASSWORD}
-      NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR}
-      NACOS_USERNAME: ${NACOS_AUTH_USERNAME}
-      NACOS_PASSWORD: ${NACOS_AUTH_PASSWORD}
-      REDIS_HOST: redis
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      ROCKETMQ_NAME_SERVER: rocketmq-namesrv:9876
-      MAIL_HOST: ${MAIL_HOST}
-      MAIL_PORT: ${MAIL_PORT}
-      MAIL_USERNAME: ${MAIL_USERNAME}
-      MAIL_PASSWORD: ${MAIL_PASSWORD}
-      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
-      MAIL_FROM_NAME: ${MAIL_FROM_NAME}
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - yunanexus-net
-
-  file:
-    build:
-      context: ../YunaNexusCore/yunanexus-file
-      dockerfile: Dockerfile
-    container_name: yunanexus-file
-    ports:
-      - "8300:8300"
-    volumes:
-      - ${FILE_STORAGE_ROOT}:/data/storage/yunanexus-file
-      - ${FILE_TEMP_ROOT}:/data/storage/yunanexus-file-temp
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/core_yunanexus_file?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: ${DB_ROOT_PASSWORD}
-      NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR}
-      NACOS_USERNAME: ${NACOS_AUTH_USERNAME}
-      NACOS_PASSWORD: ${NACOS_AUTH_PASSWORD}
-      REDIS_HOST: redis
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      ROCKETMQ_NAME_SERVER: rocketmq-namesrv:9876
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - yunanexus-net
-
-  # ==================== 前端 ====================
   frontend:
     build:
       context: ../YunaNexusWeb
@@ -245,14 +138,12 @@ services:
       NITRO_HOST: 0.0.0.0
       NITRO_PORT: 3000
       NUXT_PUBLIC_SITE_TITLE: YunaNexus
-      NUXT_PUBLIC_API_BASE: http://gateway:8000
-      NUXT_PUBLIC_AUTH_BASE: http://gateway:8000
-      NUXT_PUBLIC_FILE_BASE: http://gateway:8000
+      NUXT_PUBLIC_API_BASE: /api
+      NUXT_PUBLIC_FILE_BASE: /api
       NUXT_PUBLIC_OAUTH_CLIENT_UUID: ${OAUTH_CLIENT_UUID}
       NUXT_PUBLIC_OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
-    depends_on:
-      gateway:
-        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     networks:
       - yunanexus-net

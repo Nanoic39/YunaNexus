@@ -64,51 +64,16 @@ pipeline {
             steps {
                 sh '''
                     echo "Pre-pulling base images..."
-                    for img in amazoncorretto:22-alpine node:22-alpine; do
-                        for i in 1 2 3; do
-                            docker pull "$img" && break || sleep 10
-                        done
-                    done
+                    docker pull node:22-alpine
+                    docker pull python:3-slim
                 '''
             }
         }
 
-        stage('Build Docker Images (Parallel)') {
-            parallel {
-                stage('Gateway') {
-                    steps {
-                        dir('YunaNexusCore/yunanexus-gateway') {
-                            sh 'docker build -t yunanexus-gateway:${BUILD_TAG} -t yunanexus-gateway:latest .'
-                        }
-                    }
-                }
-                stage('Auth') {
-                    steps {
-                        dir('YunaNexusCore/yunanexus-auth') {
-                            sh 'docker build -t yunanexus-auth:${BUILD_TAG} -t yunanexus-auth:latest .'
-                        }
-                    }
-                }
-                stage('User') {
-                    steps {
-                        dir('YunaNexusCore/yunanexus-user') {
-                            sh 'docker build -t yunanexus-user:${BUILD_TAG} -t yunanexus-user:latest .'
-                        }
-                    }
-                }
-                stage('File') {
-                    steps {
-                        dir('YunaNexusCore/yunanexus-file') {
-                            sh 'docker build -t yunanexus-file:${BUILD_TAG} -t yunanexus-file:latest .'
-                        }
-                    }
-                }
-                stage('Frontend') {
-                    steps {
-                        dir('YunaNexusWeb') {
-                            sh 'docker build -t yunanexus-frontend:${BUILD_TAG} -t yunanexus-frontend:latest .'
-                        }
-                    }
+        stage('Build Frontend Image') {
+            steps {
+                dir('YunaNexusWeb') {
+                    sh 'docker build -t yunanexus-frontend:latest .'
                 }
             }
         }
@@ -118,9 +83,8 @@ pipeline {
                 sh '''
                     WORKSPACE_DIR="$(pwd)"
                     if [ ! -f "${PROJECT_DIR}/docker/.env" ]; then
-                        echo "ERROR: ${PROJECT_DIR}/docker/.env not found."
-                        echo "Create it on the server: cp ${PROJECT_DIR}/docker/.env.example ${PROJECT_DIR}/docker/.env"
-                        exit 1
+                        echo "WARNING: ${PROJECT_DIR}/docker/.env not found."
+                        echo "Copy .env.example and fill in real values: cp ${PROJECT_DIR}/docker/.env.example ${PROJECT_DIR}/docker/.env"
                     fi
                     echo "Workspace: ${WORKSPACE_DIR}"
                     echo "Syncing project to ${PROJECT_DIR}..."
@@ -131,26 +95,24 @@ pipeline {
                     rsync -rltD --no-owner --no-group --delete "${WORKSPACE_DIR}/YunaNexusWeb/" ${PROJECT_DIR}/YunaNexusWeb/ || true
                     rsync -rltD --no-owner --no-group --delete "${WORKSPACE_DIR}/scripts/" ${PROJECT_DIR}/scripts/ || true
                     rsync -rltD --no-owner --no-group --delete "${WORKSPACE_DIR}/sql-schema/" ${PROJECT_DIR}/sql-schema/ || true
-                    if [ ! -f "${PROJECT_DIR}/docker/docker-compose.yml" ]; then
-                        echo "ERROR: docker-compose.yml not synced!"
-                        exit 1
-                    fi
-                    if [ ! -f "${PROJECT_DIR}/scripts/init-db.sh" ]; then
-                        echo "ERROR: init-db.sh not synced!"
-                        exit 1
-                    fi
+                    chmod +x ${PROJECT_DIR}/scripts/*.sh 2>/dev/null || true
+
                     cd ${PROJECT_DIR}/docker
-                    echo "Starting docker compose..."
+                    echo "Starting infrastructure containers..."
                     docker compose down --remove-orphans 2>/dev/null || true
                     docker compose up -d
+
+                    echo "Starting Spring Boot services..."
+                    cd ${PROJECT_DIR}
+                    bash scripts/services.sh restart
                 '''
             }
         }
 
         stage('Wait for Startup') {
             steps {
-                echo 'Waiting 90s for all services to finish cold start...'
-                sleep(90)
+                echo 'Waiting 60s for all services to finish cold start...'
+                sleep(60)
             }
         }
 
