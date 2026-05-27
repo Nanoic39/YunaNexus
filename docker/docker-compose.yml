@@ -136,9 +136,9 @@ services:
       NITRO_HOST: 0.0.0.0
       NITRO_PORT: 3000
       NUXT_PUBLIC_SITE_TITLE: YunaNexus
-      NUXT_PUBLIC_API_BASE: /api
-      NUXT_PUBLIC_AUTH_BASE: /api
-      NUXT_PUBLIC_FILE_BASE: /api
+      NUXT_PUBLIC_API_BASE: http://host.docker.internal:8100
+      NUXT_PUBLIC_AUTH_BASE: http://host.docker.internal:8200
+      NUXT_PUBLIC_FILE_BASE: http://host.docker.internal:8300
       NUXT_PUBLIC_OAUTH_CLIENT_UUID: ${OAUTH_CLIENT_UUID}
       NUXT_PUBLIC_OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
     extra_hosts:

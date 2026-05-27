@@ -30,18 +30,6 @@ spring:
               uri: lb://YunaNexus-AuthService
               predicates:
                 - Path=/oauth/**
-            - id: auth-proxy
-              uri: lb://YunaNexus-AuthService
-              predicates:
-                - Path=/auth/login,/auth/logout,/auth/refresh
-              filters:
-                - RewritePath=/auth/(?<segment>.*), /oauth/$\{segment}
-            - id: auth-permission-proxy
-              uri: lb://YunaNexus-AuthService
-              predicates:
-                - Path=/auth/permissionSnapshot
-              filters:
-                - RewritePath=/auth/permissionSnapshot, /permission/snapshot
             - id: auth-permission
               uri: lb://YunaNexus-AuthService
               predicates:
