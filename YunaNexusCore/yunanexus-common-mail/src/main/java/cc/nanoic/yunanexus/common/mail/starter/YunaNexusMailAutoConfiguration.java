@@ -28,7 +28,16 @@ public class YunaNexusMailAutoConfiguration {
         sender.setUsername(p.getUsername());
         sender.setPassword(p.getPassword());
         sender.setProtocol(p.getProtocol());
-        sender.getJavaMailProperties().putAll(p.getProperties());
+        var props = sender.getJavaMailProperties();
+        props.putIfAbsent("mail.smtp.auth", "true");
+        if (p.getPort() != null && p.getPort() == 587) {
+            props.putIfAbsent("mail.smtp.starttls.enable", "true");
+            props.putIfAbsent("mail.smtp.starttls.required", "true");
+        }
+        if (p.getPort() != null && p.getPort() == 465) {
+            props.putIfAbsent("mail.smtp.ssl.enable", "true");
+        }
+        props.putAll(p.getProperties());
         return sender;
     }
 
