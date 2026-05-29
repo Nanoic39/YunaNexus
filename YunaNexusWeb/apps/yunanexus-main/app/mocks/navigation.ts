@@ -16,45 +16,20 @@ export interface SidebarMenuItem {
 export const sidebarMenus: SidebarMenuItem[] = [
   {
     key: "dashboard",
-    label: "仪表盘",
+    label: "首页",
     icon: "lucide:layout-dashboard",
     to: "/",
   },
   {
-    key: "account",
-    label: "账户",
-    icon: "lucide:book-user",
-    children: [
-      {
-        key: "login",
-        label: "登录",
-        icon: "lucide:log-in",
-        to: "/login",
-      },
-      {
-        key: "register",
-        label: "注册",
-        icon: "lucide:user-plus",
-        to: "/register",
-      },
-      {
-        key: "appeal",
-        label: "申诉",
-        icon: "lucide:file-warning",
-        to: "/appeal",
-      },
-    ],
+    key: "files",
+    label: "文件",
+    icon: "lucide:folder-kanban",
+    to: "/files",
   },
   {
     key: "profile",
-    label: "个人资料",
+    label: "我的",
     icon: "lucide:user-round",
     to: "/profile",
-  },
-  {
-    key: "files",
-    label: "文件管理",
-    icon: "lucide:folder-kanban",
-    to: "/files",
   },
 ];
