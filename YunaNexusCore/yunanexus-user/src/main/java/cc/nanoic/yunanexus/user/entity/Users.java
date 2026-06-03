@@ -8,46 +8,12 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("Users")
+@TableName("users")
 public class Users {
-    /**
-     * 用户主键id(不对外公开,仅用于系统内部操作)
-     */
     @TableId(type = IdType.AUTO)
-    private Long id;
-
-    /**
-     * 用户唯一标识(外显,用于系统内外传递用户信息)
-     */
-    private String uuid;
-
-    /**
-     * 用户名(唯一,用于用户登录)
-     */
-    private String username;
-
-    /**
-     * 密码(存储时使用Argon2/BCrypt加密存储)
-     */
-    private String password;
-
-    /**
-     * 电子邮箱(唯一,可用于登录和接收通知)
-     */
-    private String email;
-
-    /**
-     * 帐号状态(0：注销，1：正常，2：封禁/冻结)
-     */
-    private Integer status;
-
-    /**
-     * 账号创建时间戳
-     */
-    private LocalDateTime createTime;
-
-    /**
-     * 账号更新时间戳
-     */
-    private LocalDateTime updateTime;
+    private Long id; // 用户主键ID, 用于UUID解析后走索引快速查询用户信息
+    private String uuid; // 用户UUID(外显, 用于系统内外传递用户信息)
+    private byte[] globalId; // 全局ID(用于系统内各服务透传操作用户, 全局ID)
+    private Integer routeVersion; // 路由版本(用于路由选择, 默认0)
+    private LocalDateTime createdAt; // 账号创建时间戳
 }
