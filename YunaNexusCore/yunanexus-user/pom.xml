@@ -84,19 +84,7 @@
         <!-- common -->
         <dependency>
             <groupId>cc.nanoic.yunanexus</groupId>
-            <artifactId>yunanexus-common-security</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>cc.nanoic.yunanexus</groupId>
-            <artifactId>yunanexus-common-mail</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>cc.nanoic.yunanexus</groupId>
-            <artifactId>yunanexus-common-redis</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>cc.nanoic.yunanexus</groupId>
-            <artifactId>yunanexus-common-web</artifactId>
+            <artifactId>common-web</artifactId>
         </dependency>
         
 

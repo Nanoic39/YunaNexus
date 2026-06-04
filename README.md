@@ -40,112 +40,22 @@ YunaNexus/
 ```
 
 ## 🔧 .yaml配置文件(开发完毕后该板块会被替换为项目运行指南，届时代码仓库中会提供模板文件)
-> " * " 表示通用，否则会专门给出对应的文件
-### * > application-local.yaml
-位于`YunaNexusCore/yunanexus-{xxx}/src/main/resources/`下
 
-与`application.yaml`同一层级
+## 响应码列表
+| 响应码  | 对应名称           | 响应信息   | 含义                 | 出现场景              |
+|------|----------------|--------|--------------------|-------------------|
+| 200  | SUCCESS        | 操作成功   | 默认成功返回             | action接口          |
+| 500  | FAIL           | 系统内部异常 | 不是已知原因导致的失败(需要查日志) | -                 |
+| 400  | PARAM_ERROR    | 参数错误   | 接口请求参数有误           | 所有接口              |
+| 401  | NOT_LOGIN      | 用户未登录  | 用户没有携带合法Token访问    | 需要登录及以上权限的接口      |
+| 403  | NOT_PERMISSION | 没有所需权限 | 权限不足/没有指定权限        | 越权访问接口(需要记录日志)    |
+| 1000 | LOGIN_ERROR    | 登录失败   | 账号或密码有误            | 登录时               |
+| 1001 | USER_EXIST     | 用户已存在  | 系统已存在该用户名/邮箱/手机号   | 注册时(用户名/邮箱)/绑定手机时 |
 
-```yaml
-spring:
-  datasource:
-    url: jdbc:mysql://{ip:port}/{database_name}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true # 测试时启用useSSL=false和allowPublicKeyRetrieval=true便于测试,生产环境中禁止启用！
-    username: { username }
-    password: { password }
-    driver-class-name: com.mysql.cj.jdbc.Driver
-yunanexus:
-  mail:
-    enabled: true
-    from-address: { from-address } # 必填，显示的发送者邮箱，必须与username一致
-    from-name: { from-name } # 必填，显示的发送者名称
-    subject-prefix: "" # 非必填，邮件主题前缀
-    host: { smtp-host:smtp.qq.com }
-    port: 587
-    username: { username } # 必填，发送者邮箱
-    password: { password } # 必填，授权码
-    protocol: { protocol:smtp }
-    properties: # 必须保持这种神必写法，否则会报530 Login fail.错误
-      "[mail.smtp.auth]": "true"
-      "[mail.smtp.starttls.enable]": "true"
-      "[mail.smtp.starttls.required]": "true"
-    verify:
-      code:
-        expire-time: 600 # 邮箱验证码有效期，默认值为10分钟，单位：秒
-  redis:
-    enabled: { boolean:true }
-    host: { ip }
-    port: { port }
-    database: { database }
-    username: { username }
-    password: { password }
-    ssl: { boolean:false }
-    timeout: 3s # 超时时间
-  rocketmq:
-    enabled: { boolean:true } # 启用RocketMQ?
-    send-timeout-ms: 3000 # 发送超时时间(ms)
-    send-retry-times: 3 # 发送重试次数
-  auth:
-    jwt:
-      secret: { jwtSecurity } # JWT密钥
-      access-exp: 7200 # 默认access过期时间
-      refresh-exp: 604800 # 默认refresh过期时间
-rocketmq:
-  name-server: 127.0.0.1:9876 # RocketMQ默认地址，生产/消费均需要配置
-  producer: # 生产者需要配置，消费者只需要在注解中声明即可
-    group: { group-name }-Producer # -Producer可以不要，这里是为了规范
-```
 
-### core-file > application.yaml
-位于`YunaNexusCore/yunanexus-{xxx}/src/main/resources/`下
-```yaml
-spring:
-  application:
-    name: YunaNexus-FileService
-  profiles:
-    active: @spring.profiles.active@
 
-mybatis-plus:
-  mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: cc.nanoic.yunanexus.file.entity
-  configuration:
-    map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-  global-config:
-    db-config:
-      id-type: auto
 
-server:
-  port: { port } # 服务端口
-
-spring:
-  servlet:
-    multipart:
-      max-file-size: ${YUNANEXUS_FILE_MAX_UPLOAD_SIZE:800MB} # 最大文件大小
-      max-request-size: ${YUNANEXUS_FILE_MAX_REQUEST_SIZE:800MB} # 最大请求大小
-
-custom:
-  time:
-    time-zone: Asia/Shanghai
-
-yunanexus:
-  file:
-    upload: # 上传限制
-      direct-upload-threshold-bytes: ${YUNANEXUS_FILE_DIRECT_UPLOAD_THRESHOLD_BYTES:524288000} # 分片大小 500MB
-      normal-user-max-file-size-bytes: ${YUNANEXUS_FILE_NORMAL_USER_MAX_FILE_SIZE_BYTES:2147483648} # 普通用户最大文件大小 2GB
-      normal-user-max-space-bytes: ${YUNANEXUS_FILE_NORMAL_USER_MAX_SPACE_BYTES:53687091200} # 普通用户默认最大上传空间 50GB
-      chunk-size-bytes: ${YUNANEXUS_FILE_CHUNK_SIZE_BYTES:16777216}
-      temp-root-path: ${YUNANEXUS_FILE_TEMP_ROOT_PATH:./storage/yunanexus-file-temp}
-    storage:
-      local:
-        root-path: ${YUNANEXUS_FILE_STORAGE_ROOT:./storage/yunanexus-file}
-    avatar:
-      max-size-bytes: ${YUNANEXUS_FILE_AVATAR_MAX_SIZE_BYTES:5242880}
-      allowed-content-types: ${YUNANEXUS_FILE_AVATAR_ALLOWED_CONTENT_TYPES:image/jpeg,image/png,image/webp}
-      allowed-extensions: ${YUNANEXUS_FILE_AVATAR_ALLOWED_EXTENSIONS:jpg,jpeg,png,webp}
-
-```
-
-***
+---
 
 # 📕 系列项目目录
 

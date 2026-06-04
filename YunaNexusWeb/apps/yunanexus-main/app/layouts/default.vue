@@ -7,7 +7,7 @@ import AppGlobalLoader from "../components/feedback/AppGlobalLoader.vue";
 const runtimeConfig = useRuntimeConfig();
 const route = useRoute();
 const siteTitle = runtimeConfig.public.siteTitle || "YunaNexus";
-const defaultOpenKeys = ["account", "user"];
+const defaultOpenKeys: string[] = [];
 const sidebarCollapsedCookie = useCookie<string>("yn-sidebar-collapsed", {
   default: () => "0",
   sameSite: "lax",
@@ -582,10 +582,12 @@ const handleThemeMenu = (origin: HTMLElement | null, event: MouseEvent) => {
   grid-template-columns: 96px minmax(0, 1fr);
 }
 .app-sidebar {
-  position: relative;
+  position: sticky;
+  top: 0;
   display: flex;
   flex-direction: column;
-  overflow: visible;
+  max-height: 100vh;
+  overflow-y: auto;
   border-right: 1px solid var(--yn-color-border-subtle);
   background: var(--yn-color-surface);
   padding: 20px 12px;

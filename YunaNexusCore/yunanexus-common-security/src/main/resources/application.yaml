@@ -1,8 +1,0 @@
-yunanexus:
-  security:
-    rsa:
-      secret-dir: ./.rsa/ # 默认密钥目录
-      public-key-file: rsa.pub # 公钥文件名
-      private-key-file: rsa # 私钥文件名
-      key-size: 2048 # 密钥位数
-      auto-generate: true # 是否允许自动生成

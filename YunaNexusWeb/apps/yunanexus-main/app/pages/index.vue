@@ -159,8 +159,8 @@ onMounted(async () => {
         <p class="page-desc">
           {{
             isLoggedIn
-              ? "聚合当前账户的会话、空间、根目录与权限快照，所有数字都来自实时接口而非占位数据。"
-              : "当前未登录，页面展示真实可访问入口与会话状态；登录后自动切换为个人控制台。"
+              ? "文件空间、账户状态、权限信息一览。"
+              : "登录后可查看个人控制台。"
           }}
         </p>
       </div>
@@ -212,18 +212,18 @@ onMounted(async () => {
       </article>
 
       <article class="panel-card">
-        <h2>文件态势</h2>
+        <h2>文件概览</h2>
         <template v-if="isLoggedIn">
           <ul>
-            <li>根目录文件夹：{{ rootFolders.length }}</li>
-            <li>根目录文件：{{ rootFiles.length }}</li>
-            <li>回收站文件：{{ recycleFiles.length }}</li>
+            <li>文件夹：{{ rootFolders.length }} 个</li>
+            <li>文件：{{ rootFiles.length }} 个</li>
+            <li>回收站：{{ recycleFiles.length }} 个</li>
             <li v-if="rootFiles[0]">
-              最近根目录文件：{{ rootFiles[0].originName || rootFiles[0].fileName }}
+              最近更新：{{ rootFiles[0].originName || rootFiles[0].fileName }}
             </li>
           </ul>
         </template>
-        <p v-else class="panel-tip">未登录状态下不拉取个人文件数据。</p>
+        <p v-else class="panel-tip">登录后查看文件信息。</p>
       </article>
 
       <article class="panel-card">
@@ -245,24 +245,32 @@ onMounted(async () => {
       <article class="panel-card">
         <h2>快捷入口</h2>
         <div class="link-list">
-          <NuxtLink v-if="isLoggedIn" to="/files">文件系统</NuxtLink>
+          <NuxtLink v-if="isLoggedIn" to="/files">文件管理</NuxtLink>
           <NuxtLink v-if="isLoggedIn" to="/profile">个人资料</NuxtLink>
           <NuxtLink v-if="!isLoggedIn" to="/login">登录</NuxtLink>
           <NuxtLink v-if="!isLoggedIn" to="/register">注册</NuxtLink>
-          <NuxtLink to="/appeal">账户申诉</NuxtLink>
         </div>
       </article>
 
       <article class="panel-card">
-        <h2>系统反馈</h2>
-        <p v-if="loading" class="panel-tip">正在刷新仪表盘数据…</p>
+        <h2>近期动态</h2>
+        <p v-if="loading" class="panel-tip">加载中…</p>
         <p v-else-if="dashboardError" class="panel-error">{{ dashboardError }}</p>
-        <ul v-else>
-          <li>网关入口：`/` 页面当前可正常读取会话态。</li>
-          <li>文件系统：已接入空间、根目录、回收站真实接口。</li>
-          <li>权限系统：已接入当前用户权限快照。</li>
-          <li>分享浏览：新增独立 `/share/:shareCode` 页面链路。</li>
+        <ul v-else-if="isLoggedIn">
+          <li v-if="rootFiles.length > 0">
+            最近文件：{{ rootFiles[0].originName || rootFiles[0].fileName }}
+          </li>
+          <li v-if="rootFolders.length > 0">
+            共有 {{ rootFolders.length }} 个文件夹
+          </li>
+          <li v-if="recycleFiles.length > 0">
+            回收站有 {{ recycleFiles.length }} 个待处理文件
+          </li>
+          <li v-if="rootFiles.length === 0 && rootFolders.length === 0">
+            暂未上传任何文件
+          </li>
         </ul>
+        <p v-else class="panel-tip">登录后显示文件动态。</p>
       </article>
     </section>
   </div>

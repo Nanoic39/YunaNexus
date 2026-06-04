@@ -15,14 +15,7 @@
 
     <modules>
         <module>yunanexus-user</module>
-        <module>yunanexus-common-security</module>
-        <module>yunanexus-common-mail</module>
-        <module>yunanexus-common-redis</module>
-        <module>yunanexus-common-rocketmq</module>
-        <module>yunanexus-auth</module>
-        <module>yunanexus-gateway</module>
-        <module>yunanexus-common-web</module>
-        <module>yunanexus-file</module>
+        <module>common-web</module>
     </modules>
 
     <!-- 版本管理 -->
@@ -156,33 +149,9 @@
             </dependency>
 
             <!-- common -->
-
             <dependency>
                 <groupId>cc.nanoic.yunanexus</groupId>
-                <artifactId>yunanexus-common-security</artifactId>
-                <version>${yunanexus.common.security.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>cc.nanoic.yunanexus</groupId>
-                <artifactId>yunanexus-common-mail</artifactId>
-                <version>${yunanexus.common.mail.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>cc.nanoic.yunanexus</groupId>
-                <artifactId>yunanexus-common-redis</artifactId>
-                <version>${yunanexus.common.redis.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>cc.nanoic.yunanexus</groupId>
-                <artifactId>yunanexus-common-rocketmq</artifactId>
-                <version>${yunanexus.common.rocketmq.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>cc.nanoic.yunanexus</groupId>
-                <artifactId>yunanexus-common-web</artifactId>
+                <artifactId>common-web</artifactId>
                 <version>${yunanexus.common.web.version}</version>
             </dependency>
 

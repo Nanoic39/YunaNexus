@@ -28,7 +28,7 @@ CREATE TABLE `user_profile` (
     `gender` VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户性别(未知 / 男 / 女 / {用户输入})',
     `birthday` DATE COMMENT '用户出生日期(不外显)',
     `bio` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '用户个人简介',
-    `showcase_badge` JSON DEFAULT NULL COMMENT '展示徽章ID列表([{badge_id:uuid, sort:0}], 最多5个)',
+    `showcase_badges` JSON DEFAULT NULL COMMENT '展示徽章ID列表([{badge_id:uuid, sort:0}], 最多5个)',
     `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '账号创建时间戳',
     `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '账号更新时间戳', 
     PRIMARY KEY (`global_id`) USING BTREE

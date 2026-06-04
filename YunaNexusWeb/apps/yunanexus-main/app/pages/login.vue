@@ -88,11 +88,7 @@ const submitLogin = async () => {
         </AppFormField>
 
         <div class="auth-row">
-          <AppCheckbox v-model="form.remember">记住当前设备</AppCheckbox>
-
-          <NuxtLink class="auth-text-link" to="/appeal">
-            账号封禁申诉
-          </NuxtLink>
+          <AppCheckbox v-model="form.remember">记住登录</AppCheckbox>
         </div>
 
         <p v-if="submitError" class="auth-message auth-message-error">
