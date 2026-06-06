@@ -16,6 +16,7 @@
     <modules>
         <module>yunanexus-user</module>
         <module>common-web</module>
+        <module>yunanexus-auth</module>
     </modules>
 
     <!-- 版本管理 -->
