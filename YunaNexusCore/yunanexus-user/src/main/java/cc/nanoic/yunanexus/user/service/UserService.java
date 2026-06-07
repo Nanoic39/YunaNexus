@@ -1,0 +1,86 @@
+package cc.nanoic.yunanexus.user.service;
+
+import cc.nanoic.yunanexus.common.web.common.BusinessException;
+import cc.nanoic.yunanexus.common.web.common.R;
+import cc.nanoic.yunanexus.user.entity.UserEconomy;
+import cc.nanoic.yunanexus.user.entity.UserProfile;
+import cc.nanoic.yunanexus.user.entity.Users;
+import cc.nanoic.yunanexus.user.entity.VO.UserProfileVO;
+import cc.nanoic.yunanexus.user.mapper.UserEconomyMapper;
+import cc.nanoic.yunanexus.user.mapper.UserProfileMapper;
+import cc.nanoic.yunanexus.user.mapper.UsersMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import jakarta.annotation.Resource;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class UserService {
+
+    @Resource
+    private UsersMapper usersMapper;
+
+    @Resource
+    private UserProfileMapper userProfileMapper;
+
+    @Resource
+    private UserEconomyMapper userEconomyMapper;
+
+    // 根据userId获取UserProfile
+    // 使用includeBirthday参数是否包含生日信息（可以被uuid查询和me查询分别调用）
+    public UserProfileVO getUserProfile(Long userId, boolean includeBirthday) {
+        Users user = findUserById(userId);
+        UserProfile userProfile = findUserProfileByGid(user.getGlobalId());
+        UserEconomy userEconomy = findUserEconomyByGid(user.getGlobalId());
+        UserProfileVO vo = new UserProfileVO();
+        BeanUtils.copyProperties(userProfile, vo);
+        BeanUtils.copyProperties(userEconomy, vo);
+        if (includeBirthday == true) {
+            return vo;
+        }
+        vo.setBirthday(null); // 根据userId查询时不应该获取生日这种敏感信息
+        return vo;
+        
+    }
+
+    // 通过uuid查询User信息
+    private Users findUserByUuid(String uuid) {
+        Users user = usersMapper.selectOne(
+                new LambdaQueryWrapper<Users>()
+                        .eq(Users::getUuid, uuid)
+                        .last("LIMIT 1")
+        );
+        if (user == null) {
+            throw new BusinessException(R.USER_NOTFOUND, "用户不存在");
+        }
+        return user;
+    }
+
+    // 通过id查询User信息
+    private Users findUserById(Long id) {
+        Users user = usersMapper.selectById(id);
+        if (user == null) {
+            throw new BusinessException(R.USER_NOTFOUND, "用户不存在");
+        }
+        return user;
+    }
+
+    // 根据gid查询UserProfile
+    private UserProfile findUserProfileByGid(byte[] gid) {
+        UserProfile userProfile = userProfileMapper.selectById(gid);
+        if (userProfile == null) {
+            throw new BusinessException(R.USER_NOTFOUND, "用户不存在");
+        }
+        return userProfile;
+    }
+
+    // 根据gid查询UserEconomy
+    private UserEconomy findUserEconomyByGid(byte[] gid) {
+        UserEconomy userEconomy = userEconomyMapper.selectById(gid);
+        if (userEconomy == null) {
+            throw new BusinessException(R.USER_NOTFOUND, "用户不存在");
+        }
+        return userEconomy;
+    }
+}
