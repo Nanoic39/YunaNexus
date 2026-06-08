@@ -14,7 +14,7 @@ CREATE TABLE `user_identity` (
     `username` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户名/账号',
     `password` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '密码',
     `email` VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '邮箱',
-    `phone` VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '手机号',
+    `phone` VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '手机号',
     `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `status` TINYINT NOT NULL DEFAULT 0 COMMENT '帐号状态(0：注销，1：正常，2：永久封禁/暂时封禁，3：用户本人冻结{需要输入账户绑定手机/邮箱收到的验证码}解冻)',
     PRIMARY KEY (`global_id`) USING BTREE,
