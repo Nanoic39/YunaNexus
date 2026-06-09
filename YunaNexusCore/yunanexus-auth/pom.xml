@@ -74,6 +74,16 @@
             <groupId>cc.nanoic.yunanexus</groupId>
             <artifactId>common-web</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>common-redis</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>common-mail</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

@@ -9,8 +9,10 @@ import cc.nanoic.yunanexus.auth.mapper.AdminInitKeyMapper;
 import cc.nanoic.yunanexus.auth.mapper.OAuthClientMapper;
 import cc.nanoic.yunanexus.auth.mapper.RolesMapper;
 import cc.nanoic.yunanexus.auth.mapper.UserRolesMapper;
+import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.crypto.asymmetric.RSA;
 import cn.hutool.crypto.digest.BCrypt;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -19,10 +21,8 @@ import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.PostMapping;
 
-import java.lang.reflect.Array;
-import java.util.List;
+import java.io.File;
 
 @Component
 public class AuthInitializer {
@@ -47,8 +47,10 @@ public class AuthInitializer {
     @PostConstruct
     public void init() {
         initDefaultRoles();
-        initBuiltinClients();
-        initAdminKey();
+        initBuiltinClients(); //
+        initAdminKey(); // Admin密钥初始化
+        initRsaKeyPair(); // Rsa密钥初始化
+        initAesKey(); // Aes密钥初始化
     }
 
     // 初始化默认角色
@@ -75,21 +77,21 @@ public class AuthInitializer {
 
     // 初始化客户端
     private void initBuiltinClients() {
-        if (authProperties.getBuiltinClientList() == null) {
+        if (authProperties.getBuiltinClients() == null) {
             logger.info("没有需要创建的默认客户端（跳过）");
             return;
         }
         // 循环插入数据
-        for (AuthProperties.BuiltinClient builtinClient : authProperties.getBuiltinClientList()) {
+        for (AuthProperties.BuiltinClients builtinClients : authProperties.getBuiltinClients()) {
             // 查询数据是否存在
             OAuthClient oAuthClient = oAuthClientMapper.selectOne(
                     new LambdaQueryWrapper<OAuthClient>()
-                            .eq(OAuthClient::getClientName, builtinClient.getClientName())
+                            .eq(OAuthClient::getClientName, builtinClients.getClientName())
                             .last("LIMIT 1")
             );
             // 如果已经存在
             if (oAuthClient != null) {
-                logger.info("OAuth客户端已存在：{}", builtinClient.getClientName());
+                logger.info("OAuth客户端已存在：{}", builtinClients.getClientName());
                 continue;
             }
 
@@ -99,14 +101,15 @@ public class AuthInitializer {
             String rawSecret = RandomUtil.randomString(32);
             String encodedSecret = BCrypt.hashpw(rawSecret);
 
-            OAuthClient client = createInitOAuthClient(builtinClient, uuid, encodedSecret);
+            OAuthClient client = createInitOAuthClient(builtinClients, uuid, encodedSecret);
 
             oAuthClientMapper.insert(client);
 
-            logger.info("OAuth客户端注册成功：{} | UUID={} | RAW_SECRET={}", builtinClient.getClientName(), uuid, rawSecret);
+            logger.info("OAuth客户端注册成功：{} | UUID={} | RAW_SECRET={}", builtinClients.getClientName(), uuid, rawSecret);
         }
     }
 
+    // 初始化超管认证密钥
     private void initAdminKey() {
         Roles role = rolesMapper.selectOne(
                 new LambdaQueryWrapper<Roles>()
@@ -143,16 +146,33 @@ public class AuthInitializer {
         logger.info("管理员初始化密钥已生成: {}", initKey);
     }
 
+    // 不涉及数据库内的加解密，仅用于传输链路中安全性
+    // 所以可以反复调用创建新文件，只要保证一次请求中不变化即可
+    private void initRsaKeyPair() {
+        String keyPath = authProperties.getRsa().getKeyPath();
+        File privateKeyFile = new File(keyPath, "id_rsa");
+        File publicKeyFile = new File(keyPath, "id_rsa.pub");
+        // 公私钥成对存在时才跳过，否则创建新的
+        if (privateKeyFile.exists() && publicKeyFile.exists()) {
+            return;
+        }
+        RSA rsa = new RSA();
+        FileUtil.mkdir(keyPath);
+        FileUtil.writeUtf8String(rsa.getPrivateKeyBase64(), privateKeyFile);
+        FileUtil.writeUtf8String(rsa.getPublicKeyBase64(), publicKeyFile);
+        logger.info("RSA密钥对已生成，路径: {}", keyPath);
+    }
+
     // 创建初始化客户端数据
-    private static OAuthClient createInitOAuthClient(AuthProperties.BuiltinClient builtinClient, String uuid, String encodedSecret) {
+    private static OAuthClient createInitOAuthClient(AuthProperties.BuiltinClients builtinClients, String uuid, String encodedSecret) {
         OAuthClient client = new OAuthClient();
         client.setUuid(uuid);
-        client.setClientName(builtinClient.getClientName());
+        client.setClientName(builtinClients.getClientName());
         client.setClientSecret(encodedSecret);
         client.setClientType(1); // 客户端类型，官方时=1
-        client.setGrantTypes(builtinClient.getGrantTypes());
-        client.setScope(builtinClient.getScope());
-        client.setRedirectUri(builtinClient.getRedirectUri());
+        client.setGrantTypes(builtinClients.getGrantTypes());
+        client.setScope(builtinClients.getScope());
+        client.setRedirectUri(builtinClients.getRedirectUri());
         client.setDescription("内置客户端无需申请描述"); //
         client.setAuditStatus(1); // 审核状态（0：待审核，1：通过，2：拒绝）
         client.setApplicantGlobalId(null); // 官方客户端无需申请人
@@ -161,4 +181,18 @@ public class AuthInitializer {
         client.setStatus(1); // 默认启用
         return client;
     }
+
+    // 初始化Aes
+    private void initAesKey() {
+        String keyPath = authProperties.getAes().getKeyPath();
+        File aesKeyFile = new File(keyPath, "aes.key");
+        if (aesKeyFile.exists()) {
+            return;
+        }
+        FileUtil.mkdir(keyPath);
+        byte[] key = RandomUtil.randomBytes(16);
+        FileUtil.writeBytes(key, aesKeyFile);
+        logger.info("AES密钥已生成，路径: {}", aesKeyFile.getAbsolutePath());
+    }
+
 }

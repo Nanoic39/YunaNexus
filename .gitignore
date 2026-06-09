@@ -67,6 +67,7 @@ postman/
 **/.env
 **/.env.*
 !**/.env.example
+!**/application-example.yaml
 **/.DS_Store
 **/coverage
 **/*.log

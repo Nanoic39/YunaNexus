@@ -11,11 +11,13 @@ import java.util.List;
 @ConfigurationProperties(prefix = "yunanexus.auth")
 public class AuthProperties {
 
-    private List<BuiltinClient> builtinClientList;
+    private List<BuiltinClients> builtinClients;
     private Jwt jwt;
+    private Rsa rsa;
+    private Aes aes;
 
     @Data
-    public static class BuiltinClient {
+    public static class BuiltinClients {
         private String clientName;
         private Integer clientType;
         private String scope;
@@ -28,5 +30,15 @@ public class AuthProperties {
         private String secret;
         private Long accessExp;
         private Long refreshExp;
+    }
+
+    @Data
+    public static class Rsa {
+        private String keyPath = "./SecretKey";
+    }
+
+    @Data
+    public static class Aes {
+        private String keyPath = "./SecretKey";
     }
 }

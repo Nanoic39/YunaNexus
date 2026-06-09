@@ -21,4 +21,9 @@ server:
 custom:
   time:
     time-zone: Asia/Shanghai
+
+yunanexus:
+  user:
+    route: # 后续需要从Nacos动态获取/更新
+      version: 0
     

@@ -1,9 +1,14 @@
 spring:
   application:
     name: YunaNexus-AuthService
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
   profiles:
     active: @spring.profiles.active@
 
+# MyBatisPlus
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
   type-aliases-package: cc.nanoic.yunanexus.auth.entity
@@ -14,9 +19,11 @@ mybatis-plus:
     db-config:
       id-type: auto
 
+# 服务默认端口
 server:
   port: 8200
 
+#
 yunanexus:
   auth:
     builtin-clients: # 初始化构建参数
@@ -29,3 +36,7 @@ yunanexus:
       secret: ${YUNANEXUS_AUTH_JWT_SECRET}
       access-exp: 7200 # AccessToken 2小时
       refresh-exp: 604800 # RefreshToken 7天
+    rsa:
+      key-path: ./SecretKey
+    aes:
+      key-path: ./SecretKek

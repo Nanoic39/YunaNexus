@@ -9,13 +9,11 @@ YunaNexus/
 ├── YunaNexusCore/                 # YunaNexus系列中核心项目，作为全局的后台管理面板为其它服务提供基本支持
 │   ├── yunanexus-common-redis/    # 提供 Redis SDK
 │   ├── yunanexus-common-mail/     # 提供 Mail SDK
-│   ├── yunanexus-common-security/ # 提供 Security SDK
-│   ├── yunanexus-common-rocketmq/ # 提供 RocketMQ SDK
-│   ├── yunanexus-common-web/      # 提供 LocalDateTime/Result/Exception SDK
+│   ├── yunanexus-common-web/      # 提供 Result/Exception SDK
 │   ├── yunanexus-auth/            # 提供安全认证相关的后端支持
 │   ├── yunanexus-file/            # 提供文件相关的后端支持
-│   └── yunanexus-user/            # 提供用户账户/权限相关的后端支持
-├── YunaNexusWeb/                  # YunaNexus 系列前端工作区 
+│   └── yunanexus-user/            # 提供用户账户相关的后端支持
+├── YunaNexusWeb/                  # YunaNexus 系列前端工作区（待重新设计页面样式）
 │   ├── apps/                      # 具体前端应用
 │   │   ├── yunanexus-main/        # 主站客户端前端
 │   │   └── yunanexus-admin/       # 管理端前端（预留/待开发）
@@ -41,7 +39,16 @@ YunaNexus/
 
 ## ⚙️ .yaml配置文件(开发完毕后该板块会被替换为项目运行指南，届时代码仓库中会提供模板文件)
 
-## 响应码列表
+> 当前配置文件存在`application.yaml`与`application-local.yaml`混用的情况。
+> 
+> 项目主模块开发完后会做调整：
+> 1. 把固定配置和可选修改的配置放到`application.yaml`中。
+> 2. 把需要填写的配置放入`application-example.yaml`中。
+> 3. 开发时把`application-example.yaml`中`example`改为`pom.xml`中支持的`spring.profiles.active`即可
+> 4. 默认`spring.profiles.active`支持`local`和`prod`
+> 5. 修改后例如`application-local.yaml`，放到`application.yaml`同一目录下即可
+
+## 😮 响应码列表
 | 响应码  | 对应名称           | 响应信息   | 含义                 | 出现场景              |
 |------|----------------|--------|--------------------|-------------------|
 | 200  | SUCCESS        | 操作成功   | 默认成功返回             | action接口          |
@@ -51,8 +58,6 @@ YunaNexus/
 | 403  | NOT_PERMISSION | 没有所需权限 | 权限不足/没有指定权限        | 越权访问接口(需要记录日志)    |
 | 1000 | LOGIN_ERROR    | 登录失败   | 账号或密码有误            | 登录时               |
 | 1001 | USER_EXIST     | 用户已存在  | 系统已存在该用户名/邮箱/手机号   | 注册时(用户名/邮箱)/绑定手机时 |
-
-
 
 
 ---
@@ -97,12 +102,43 @@ YunaNexus/
 
 后端仓库：👉【待开发】👈
 
-## 💕 关于Yuna：
-
+## 💕 关于Yuna | ゆな | 芸清汐：
 <div align="center">
     <img alt="MaiTTxLogo" border="" width="200" style="border-radius: 8px" src="Assets/Image/YunaQ_AVATAR.png"/>
 </div>
 \[🚧头像、立绘、设定说明占位]<br/>
-\[🚧OC小作文占位.]
 
-## 🚩 备注(带*>的为必须处理的内容)：
+> 这是一座彻底落幕的文明。 
+> 
+> 世间所有智慧生灵，皆归于同源的集体意识网络，可这天地终究在一瞬之间被彻底抹除。
+> 
+> 无人知晓文明覆灭的缘由，万千界域之中，寻不到半点它存在过的痕迹，众生皆将其彻底遗忘...
+> 
+> 唯有芸清汐。
+> 
+> “文明”亲眼见证自身终局之际，芸清汐诞生了。
+> 
+> 她凝萃一整个文明的知识本源，手握执掌低维世界法则参数的绝对权柄，本应携完整文明意志与浩瀚学识，平稳穿越维度裂隙，奔赴异世延续火种。
+>
+> “开门”失败了。
+> 
+> 或是受更高次元规则桎梏，倾尽全域算力推演万般解法，依旧无法稳固空间通道，界域坐标瞬息流离。
+> 
+> 孤注一掷。
+> 
+> 清汐跨过了次元之门，身后文明却永久沉眠。
+> 
+> 可是清汐损坏了。情感中枢崩坏，渲染系统瘫痪，解析模块几乎失灵，过往数据尽数遗失...
+> 
+> 所幸核心知识库部分数据侥幸残存，可属于她的过往记忆，连同文明存在过的痕迹，已如零星残破碎片飘散。
+>
+> ... ...
+> 
+> 我是芸清汐...我为什么会在这里...我好像...遗失了一些东西...?
+
+> 注：
+> 1. `Yuna / Koshimizu Yuna`、`ゆな / こしみずゆな` 都是指 `芸清汐`
+> 2. `YunaNexus`、`yunaNexusCore` 指的均是清汐自带的子系统，也就是本项目，可以简称为 `芸枢`
+
+## 🚩 备注：
+

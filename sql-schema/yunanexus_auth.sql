@@ -10,7 +10,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- 用户认证表
 DROP TABLE IF EXISTS `user_identity`;
 CREATE TABLE `user_identity` (
-    `global_id` BINARY(16) NOT NULL COMMENT '全局ID(用于系统内各服务透传操作用户, 全局ID)',
+    `global_id` BINARY(6) NOT NULL COMMENT '全局ID(用于系统内各服务透传操作用户, 全局ID)',
     `username` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户名/账号',
     `password` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '密码',
     `email` VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '邮箱',
@@ -36,8 +36,8 @@ CREATE TABLE `oauth_client` (
     `redirect_uri` VARCHAR(255) DEFAULT NULL COMMENT '回调地址(第三方必填)',
     `description` VARCHAR(255) DEFAULT NULL COMMENT '申请说明',
     `audit_status` TINYINT NOT NULL DEFAULT 1 COMMENT '0:待审核 1:已通过 2:已拒绝(官方直接=1)',
-    `applicant_global_id` BINARY(16) DEFAULT NULL COMMENT '申请人(users.global_id, 第三方必填)',
-    `auditor_global_id` BINARY(16) DEFAULT NULL COMMENT '审核人id',
+    `applicant_global_id` BINARY(6) DEFAULT NULL COMMENT '申请人(users.global_id, 第三方必填)',
+    `auditor_global_id` BINARY(6) DEFAULT NULL COMMENT '审核人id',
     `audit_opinion` VARCHAR(255) DEFAULT NULL COMMENT '审核意见',
     `audited_at` TIMESTAMP NULL DEFAULT NULL COMMENT '审核时间',
     `status` TINYINT NOT NULL DEFAULT 1 COMMENT '0:禁用 1:启用',
@@ -54,7 +54,7 @@ DROP TABLE IF EXISTS `admin_init_keys`;
 CREATE TABLE `admin_init_keys` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `init_key` VARCHAR(64) NOT NULL COMMENT '初始化密钥(随机生成)',
-    `used_by` BINARY(16) DEFAULT NULL COMMENT '使用者global_id',
+    `used_by` BINARY(6) DEFAULT NULL COMMENT '使用者global_id',
     `used_at` TIMESTAMP NULL DEFAULT NULL COMMENT '使用时间',
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
@@ -78,7 +78,7 @@ CREATE TABLE `roles` (
 DROP TABLE IF EXISTS `user_roles`;
 CREATE TABLE `user_roles` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `global_id` BINARY(16) NOT NULL COMMENT '全局ID(用于系统内各服务透传操作用户, 全局ID)',
+    `global_id` BINARY(6) NOT NULL COMMENT '全局ID(用于系统内各服务透传操作用户, 全局ID)',
     `role_id` BIGINT NOT NULL COMMENT '角色id',
     `status` TINYINT NOT NULL DEFAULT 1 COMMENT '关联状态(0: 取消，1: 启用，2: 删除)',
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

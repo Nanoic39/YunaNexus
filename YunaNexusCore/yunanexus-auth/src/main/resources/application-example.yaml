@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: # 数据库连接URL
+    username: # 数据库账号
+    password: # 密码
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  cloud:
+    nacos:
+      discovery:
+        server-addr: Nacos地址
+
+yunanexus:
+  mail:
+    host:
+    port:
+    username:
+    password:
+    from:
+    from-name:
