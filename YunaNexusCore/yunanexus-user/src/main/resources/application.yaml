@@ -26,4 +26,7 @@ yunanexus:
   user:
     route: # 后续需要从Nacos动态获取/更新
       version: 0
+  web:
+    jwt:
+      secret: ${YUNANEXUS_AUTH_JWT_SECRET}
     

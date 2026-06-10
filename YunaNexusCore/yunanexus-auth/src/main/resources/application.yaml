@@ -40,3 +40,6 @@ yunanexus:
       key-path: ./SecretKey
     aes:
       key-path: ./SecretKek
+  web:
+    jwt:
+      secret: ${YUNANEXUS_AUTH_JWT_SECRET}

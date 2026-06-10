@@ -1,0 +1,2 @@
+cc.nanoic.yunanexus.common.web.trace.TraceAutoConfiguration
+cc.nanoic.yunanexus.common.web.auth.PermissionAutoConfiguration
