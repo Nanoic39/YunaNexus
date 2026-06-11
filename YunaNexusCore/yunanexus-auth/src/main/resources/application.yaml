@@ -5,8 +5,6 @@ spring:
     redis:
       host: 127.0.0.1
       port: 6379
-  profiles:
-    active: @spring.profiles.active@
 
 # MyBatisPlus
 mybatis-plus:
@@ -39,7 +37,7 @@ yunanexus:
     rsa:
       key-path: ./SecretKey
     aes:
-      key-path: ./SecretKek
+      key-path: ./SecretKey
   web:
     jwt:
       secret: ${YUNANEXUS_AUTH_JWT_SECRET}

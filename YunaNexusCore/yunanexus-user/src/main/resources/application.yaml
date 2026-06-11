@@ -1,9 +1,6 @@
 spring:
   application:
-    name: YunaNexus-UserService # 服务名称
-  # 环境激活（Maven自动注入）
-  profiles:
-    active: @spring.profiles.active@
+    name: YunaNexus-UserService
 
 # MyBatisPlus配置
 mybatis-plus:
