@@ -2,6 +2,7 @@ package cc.nanoic.yunanexus.common.web.auth;
 
 import org.redisson.api.RedissonClient;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -14,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 public class PermissionAutoConfiguration {
 
     @Bean
+    @ConditionalOnBean(RedissonClient.class)
     public FilterRegistrationBean<PermissionFilter> permissionFilterRegistration(
             WebProperties webProperties, RedissonClient redissonClient) {
         byte[] jwtSecret = webProperties.getJwt().getSecret() != null

@@ -15,4 +15,7 @@ public interface UserInternalClient {
 
     @DeleteMapping("/internal/user/cancel")
     Result<?> cancelUser(@RequestBody byte[] globalId);
+
+    @PostMapping("/internal/user/uuid")
+    Result<String> getUuid(@RequestBody byte[] globalId);
 }

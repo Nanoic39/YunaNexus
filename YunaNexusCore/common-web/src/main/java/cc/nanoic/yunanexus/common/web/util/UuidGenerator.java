@@ -76,6 +76,18 @@ public class UuidGenerator {
         return (int) ((high >>> 6) & 0xFFF);
     }
 
+    public static String internalToExternal(String internalUuid, byte[] aesKey) {
+        if (internalUuid == null || internalUuid.isEmpty()) {
+            throw new IllegalArgumentException("internalUuid is null or empty");
+        }
+        if (internalUuid.length() != 32) {
+            throw new IllegalArgumentException("internalUuid length must be 32, got " + internalUuid.length() + ": " + internalUuid.substring(0, Math.min(32, internalUuid.length())));
+        }
+        byte[] plaintext = HexUtil.decodeHex(internalUuid);
+        byte[] ciphertext = aesEncrypt(plaintext, aesKey);
+        return HexUtil.encodeHexStr(ciphertext);
+    }
+
     private static byte[] toBytes6(long localId) {
         byte[] gid = new byte[6];
         gid[0] = (byte) (localId >>> 40);
@@ -101,7 +113,9 @@ public class UuidGenerator {
             cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(aesKey, "AES"));
             return cipher.doFinal(plaintext);
         } catch (Exception e) {
-            throw new RuntimeException("AES加密失败", e);
+            throw new RuntimeException("AES加密失败: " + e.getMessage()
+                    + " (keyLen=" + (aesKey != null ? aesKey.length : 0)
+                    + ", dataLen=" + (plaintext != null ? plaintext.length : 0) + ")", e);
         }
     }
 

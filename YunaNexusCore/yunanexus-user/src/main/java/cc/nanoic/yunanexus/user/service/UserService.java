@@ -64,8 +64,11 @@ public class UserService {
     }
 
     // 通过id查询User信息
-    private Users findUserByGlobalId(byte[] globalId) {
-        Users user = usersMapper.selectById(globalId);
+    public Users findUserByGlobalId(byte[] globalId) {
+        Users user = usersMapper.selectOne(
+                new LambdaQueryWrapper<Users>()
+                        .eq(Users::getGlobalId, globalId)
+                        .last("LIMIT 1"));
         if (user == null) {
             throw new BusinessException(R.USER_NOTFOUND, "用户不存在");
         }

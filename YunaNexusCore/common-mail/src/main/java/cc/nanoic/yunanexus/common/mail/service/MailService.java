@@ -36,6 +36,14 @@ public class MailService {
         sender.setUsername(mailProperties.getUsername());
         sender.setPassword(mailProperties.getPassword());
 
+        Properties props = sender.getJavaMailProperties();
+        props.put("mail.smtp.auth", String.valueOf(mailProperties.isAuth()));
+        props.put("mail.smtp.starttls.enable", String.valueOf(mailProperties.isStarttls()));
+        if (mailProperties.isSsl()) {
+            props.put("mail.smtp.ssl.enable", "true");
+            props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
+        }
+
         this.mailSender = sender;
         logger.info("邮件服务已初始化: {}:{}", mailProperties.getHost(), mailProperties.getPort());
     }

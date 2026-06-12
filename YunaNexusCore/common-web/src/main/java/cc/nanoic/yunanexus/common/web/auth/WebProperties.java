@@ -14,6 +14,7 @@ public class WebProperties {
 
     public WebProperties() {
         excludePaths.add("/register/**");
+        excludePaths.add("/login/**");
         excludePaths.add("/key/**");
         excludePaths.add("/internal/**");
         excludePaths.add("/actuator/**");

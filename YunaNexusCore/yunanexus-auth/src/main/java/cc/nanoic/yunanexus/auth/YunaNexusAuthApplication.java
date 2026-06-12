@@ -7,7 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.annotation.Import;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = "cc.nanoic.yunanexus")
 @MapperScan("cc.nanoic.yunanexus.auth.mapper")
 @EnableFeignClients(basePackages = "cc.nanoic.yunanexus.auth.client")
 @Import(GlobalExceptionHandler.class)

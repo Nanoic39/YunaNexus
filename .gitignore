@@ -52,7 +52,7 @@ build/
 **/application-*
 **/application-prod.*
 # 密钥文件(由YunaNexusCommonSecurity自动生成)
-.rsa/
+**/SecretKey/
 # Postman文件
 postman/
 .postman/
@@ -74,3 +74,6 @@ postman/
 
 ### 文件存储 ###
 /storage
+
+### 本地调试脚本 ###
+ScriptsDebug/

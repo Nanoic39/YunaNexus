@@ -3,6 +3,8 @@ package cc.nanoic.yunanexus.auth.service;
 import cc.nanoic.yunanexus.auth.client.UserInternalClient;
 import cc.nanoic.yunanexus.auth.config.AuthProperties;
 import cc.nanoic.yunanexus.auth.entity.AdminInitKey;
+import cc.nanoic.yunanexus.auth.entity.DTO.LoginRequest;
+import cc.nanoic.yunanexus.auth.entity.DTO.LoginResponse;
 import cc.nanoic.yunanexus.auth.entity.DTO.RegisterRequest;
 import cc.nanoic.yunanexus.auth.entity.DTO.RegisterResponse;
 import cc.nanoic.yunanexus.auth.entity.Roles;
@@ -14,6 +16,7 @@ import cc.nanoic.yunanexus.auth.mapper.UserIdentityMapper;
 import cc.nanoic.yunanexus.auth.mapper.UserRolesMapper;
 import cc.nanoic.yunanexus.common.mail.service.MailService;
 import cc.nanoic.yunanexus.common.mail.template.MailTemplateType;
+import cc.nanoic.yunanexus.common.web.auth.JwtUtil;
 import cc.nanoic.yunanexus.common.web.common.BusinessException;
 import cc.nanoic.yunanexus.common.web.common.R;
 import cc.nanoic.yunanexus.common.web.common.Result;
@@ -27,6 +30,8 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.crypto.asymmetric.KeyType;
 import cn.hutool.crypto.asymmetric.RSA;
 import cn.hutool.crypto.digest.BCrypt;
+
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
 import org.redisson.api.RBucket;
@@ -35,10 +40,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.Year;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class AuthService {
@@ -82,9 +92,10 @@ public class AuthService {
         // 创建验证码并发送邮件
         String code = RandomUtil.randomNumbers(6);
         redissonClient.getBucket("email:code:" + email).set(code, Duration.ofMinutes(5));
-        redissonClient.getBucket("email:cd:" + email).set("1", Duration.ofSeconds(60));
 
         mailService.send(MailTemplateType.VERIFY_CODE, email, "YunaNexus 邮箱验证码", Map.of("code", code, "year", String.valueOf(Year.now().getValue())));
+
+        redissonClient.getBucket("email:cd:" + email).set("1", Duration.ofSeconds(60));
     }
 
     // 注册
@@ -197,6 +208,69 @@ public class AuthService {
         userRole.setRoleId(role.getId());
         userRole.setStatus(1);
         userRolesMapper.insert(userRole);
+    }
+
+    public LoginResponse login(LoginRequest req) {
+        UserIdentity identity = userIdentityMapper.selectOne(
+                new LambdaQueryWrapper<UserIdentity>()
+                        .eq(UserIdentity::getUsername, req.getUsername())
+                        .last("LIMIT 1"));
+        if (identity == null) {
+            throw new BusinessException(R.NOT_LOGIN, "账号不存在");
+        }
+        if (identity.getStatus() != 1) {
+            throw new BusinessException(R.NOT_LOGIN, "账号已被禁用或注销");
+        }
+
+        String password = decryptPassword(req.getPassword());
+        if (!BCrypt.checkpw(password, identity.getPassword())) {
+            throw new BusinessException(R.NOT_LOGIN, "密码错误");
+        }
+
+        byte[] globalId = identity.getGlobalId();
+        Result<String> uuidResult = userInternalClient.getUuid(globalId);
+        if (uuidResult == null || uuidResult.getCode() != R.SUCCESS.getCode() || uuidResult.getData() == null) {
+            String detail = uuidResult == null ? "result is null"
+                    : "code=" + uuidResult.getCode() + ", msg=" + uuidResult.getMsg();
+            throw new BusinessException(R.SERVER_ERROR, "获取用户UUID失败: " + detail);
+        }
+        String internalUuid = uuidResult.getData();
+
+        byte[] aesKey = loadAesKey();
+        String externalUuid = UuidGenerator.internalToExternal(internalUuid, aesKey);
+
+        Set<String> roles = new HashSet<>();
+        Set<String> permissions = new HashSet<>();
+        assemblePermissions(globalId, roles, permissions);
+
+        AuthProperties.Jwt jwtConfig = authProperties.getJwt();
+        byte[] jwtSecret = jwtConfig.getSecret().getBytes(StandardCharsets.UTF_8);
+        long expireMs = jwtConfig.getAccessExp() * 1000;
+        String token = JwtUtil.createToken(externalUuid, globalId, roles, permissions, jwtSecret, expireMs);
+
+        LoginResponse resp = new LoginResponse();
+        resp.setAccessToken(token);
+        resp.setUuid(externalUuid);
+        return resp;
+    }
+
+    private void assemblePermissions(byte[] globalId, Set<String> roles, Set<String> permissions) {
+        List<UserRoles> userRoles = userRolesMapper.selectList(
+                new LambdaQueryWrapper<UserRoles>()
+                        .eq(UserRoles::getGlobalId, globalId)
+                        .eq(UserRoles::getStatus, 1));
+        if (userRoles.isEmpty()) {
+            roles.add("USER");
+            return;
+        }
+        List<Long> roleIds = userRoles.stream().map(UserRoles::getRoleId).collect(Collectors.toList());
+        List<Roles> roleList = rolesMapper.selectBatchIds(roleIds);
+        for (Roles r : roleList) {
+            roles.add(r.getName());
+            if (r.getPermissions() != null && !r.getPermissions().isEmpty()) {
+                permissions.addAll(JSON.parseArray(r.getPermissions(), String.class));
+            }
+        }
     }
 
 }

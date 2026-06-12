@@ -160,7 +160,7 @@ public class AuthInitializer {
         FileUtil.mkdir(keyPath);
         FileUtil.writeUtf8String(rsa.getPrivateKeyBase64(), privateKeyFile);
         FileUtil.writeUtf8String(rsa.getPublicKeyBase64(), publicKeyFile);
-        logger.info("RSA密钥对已生成，路径: {}", keyPath);
+        logger.info("RSA密钥对已生成, 路径: {}, 公钥指纹: {}", keyPath, rsa.getPublicKeyBase64().substring(0, 20));
     }
 
     // 创建初始化客户端数据

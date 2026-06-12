@@ -23,4 +23,10 @@ public class UserInternalController {
         userService.cancelRegister(globalId);
         return Result.success(null);
     }
+
+    @PostMapping("/uuid")
+    public Result<String> getUuid(@RequestBody byte[] globalId) {
+        String uuid = userService.findUserByGlobalId(globalId).getUuid();
+        return Result.success(uuid);
+    }
 }

@@ -16,4 +16,5 @@ public class MailProperties {
     private String fromName; // 外显来源名称
     private boolean auth = true;
     private boolean starttls = true;
+    private boolean ssl = false;
 }

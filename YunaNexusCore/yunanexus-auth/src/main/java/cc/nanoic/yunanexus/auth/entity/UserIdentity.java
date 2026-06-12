@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.auth.entity;
 
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
@@ -8,6 +9,7 @@ import java.time.LocalDateTime;
 @Data
 @TableName("user_identity")
 public class UserIdentity {
+    @TableId
     private byte[] globalId; // 全局用户id
     private String username; // 用户名（登录用）
     private String password; // 密码
