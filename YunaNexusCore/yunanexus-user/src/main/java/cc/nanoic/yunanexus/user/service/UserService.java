@@ -77,16 +77,21 @@ public class UserService {
 
     // 根据gid查询UserProfile
     private UserProfile findUserProfileByGid(byte[] gid) {
-        UserProfile userProfile = userProfileMapper.selectById(gid);
+        UserProfile userProfile = userProfileMapper.selectOne(
+                new LambdaQueryWrapper<UserProfile>()
+                        .eq(UserProfile::getGlobalId, gid)
+                        .last("LIMIT 1"));
         if (userProfile == null) {
             throw new BusinessException(R.USER_NOTFOUND, "用户不存在");
         }
         return userProfile;
     }
 
-    // 根据gid查询UserEconomy
     private UserEconomy findUserEconomyByGid(byte[] gid) {
-        UserEconomy userEconomy = userEconomyMapper.selectById(gid);
+        UserEconomy userEconomy = userEconomyMapper.selectOne(
+                new LambdaQueryWrapper<UserEconomy>()
+                        .eq(UserEconomy::getGlobalId, gid)
+                        .last("LIMIT 1"));
         if (userEconomy == null) {
             throw new BusinessException(R.USER_NOTFOUND, "用户不存在");
         }
@@ -112,8 +117,8 @@ public class UserService {
 
         UserProfile userProfile = new UserProfile();
         userProfile.setGlobalId(globalId);
-        userProfile.setNickname(userCreateDTO.getNickname() == null ? "YUNA❀清汐" : userCreateDTO.getNickname());
-        userProfile.setGender(userCreateDTO.getGender() == null ? "未知" : userCreateDTO.getGender());
+        userProfile.setNickname(userCreateDTO.getNickname() == null || userCreateDTO.getNickname().isEmpty() ? "YUNA❀清汐" : userCreateDTO.getNickname());
+        userProfile.setGender(userCreateDTO.getGender() == null || userCreateDTO.getGender().isEmpty() ? "未知" : userCreateDTO.getGender());
         userProfileMapper.insert(userProfile);
 
         UserEconomy economy = new UserEconomy();

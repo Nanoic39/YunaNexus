@@ -1,6 +1,10 @@
 spring:
   application:
     name: YunaNexus-UserService
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
 
 # MyBatisPlus配置
 mybatis-plus:

@@ -8,12 +8,15 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.redisson.api.RedissonClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.*;
 
 public class PermissionFilter extends OncePerRequestFilter {
+    private static final Logger log = LoggerFactory.getLogger(PermissionFilter.class);
     private final byte[] jwtSecret;
     private final RedissonClient redisson;
     private final List<String> excludePaths;
@@ -34,6 +37,11 @@ public class PermissionFilter extends OncePerRequestFilter {
         }
 
         try {
+            String auth = request.getHeader("Authorization");
+            log.info("PermissionFilter invoked, path: {}, auth header: {}",
+                    request.getRequestURI(),
+                    auth != null ? (auth.length() > 60 ? auth.substring(0, 60) + "..." : auth) : "null");
+
             String userUuid = request.getHeader("X-User-Uuid");
             if (userUuid != null && !userUuid.isEmpty()) {
                 loadFromHeaders(request);
@@ -83,7 +91,11 @@ public class PermissionFilter extends OncePerRequestFilter {
         String token = auth.substring(7);
 
         JwtUtil.JwtPayload payload = JwtUtil.parseToken(token, jwtSecret);
-        if (payload == null) return;
+        if (payload == null) {
+            log.warn("JWT verification failed, token prefix: {}, secretLen: {}",
+                    token.length() > 20 ? token.substring(0, 20) + "..." : token, jwtSecret.length);
+            return;
+        }
 
         Set<String> effectiveRoles = applyRedisOverlay(payload.uuid, payload.roles, "jwt:revoked:");
         effectiveRoles = applyRedisGrant(payload.uuid, effectiveRoles, "jwt:granted:");

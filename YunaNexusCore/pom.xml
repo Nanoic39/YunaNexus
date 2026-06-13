@@ -17,10 +17,13 @@
         <!-- module -->
         <module>yunanexus-user</module>
         <module>yunanexus-auth</module>
+        <module>yunanexus-gateway</module>
+
         <!-- common -->
         <module>common-web</module>
         <module>common-redis</module>
         <module>common-mail</module>
+
     </modules>
 
     <!-- 版本管理 -->
@@ -33,6 +36,7 @@
         <spring.cloud.alibaba.version>2025.1.0.0</spring.cloud.alibaba.version>
         <spring.cloud.alibaba.nacos.version>2025.1.0.0</spring.cloud.alibaba.nacos.version>
         <sentinel.gateway.adapter.version>1.8.9</sentinel.gateway.adapter.version>
+        <spring.cloud.starter.gateway>4.1.2</spring.cloud.starter.gateway>
 
         <spring.boot.starter.aop.version>3.4.7</spring.boot.starter.aop.version>
         <spring.boot.starter.validation.version>4.0.5</spring.boot.starter.validation.version>
@@ -155,6 +159,12 @@
                 <groupId>org.apache.rocketmq</groupId>
                 <artifactId>rocketmq-spring-boot-starter</artifactId>
                 <version>${spring.boot.starter.rocketmq}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-starter-gateway</artifactId>
+                <version>${spring.cloud.starter.gateway}</version>
             </dependency>
 
             <!-- common -->

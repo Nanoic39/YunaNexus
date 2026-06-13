@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.user.entity;
 
 import cn.hutool.core.date.DateTime;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
@@ -9,6 +10,7 @@ import java.time.LocalDateTime;
 @Data
 @TableName("user_profile")
 public class UserProfile {
+    @TableId
     private byte[] globalId; // 全局ID
     private String nickname; // 用户昵称
     private String avatarUuid; // 头像文件uuid

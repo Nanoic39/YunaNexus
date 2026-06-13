@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: YunaNexus-Gateway
+  cloud:
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+      routes:
+        - id: auth-service
+          uri: lb://YunaNexus-AuthService
+          predicates:
+            - Path=/auth/**,/login/**,/register/**,/key/**,/oauth/**
+        - id: user-service
+          uri: lb://YunaNexus-UserService
+          predicates:
+            - Path=/user/**,/me

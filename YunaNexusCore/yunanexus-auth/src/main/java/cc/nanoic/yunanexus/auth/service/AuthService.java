@@ -5,6 +5,7 @@ import cc.nanoic.yunanexus.auth.config.AuthProperties;
 import cc.nanoic.yunanexus.auth.entity.AdminInitKey;
 import cc.nanoic.yunanexus.auth.entity.DTO.LoginRequest;
 import cc.nanoic.yunanexus.auth.entity.DTO.LoginResponse;
+import cc.nanoic.yunanexus.auth.entity.DTO.RefreshRequest;
 import cc.nanoic.yunanexus.auth.entity.DTO.RegisterRequest;
 import cc.nanoic.yunanexus.auth.entity.DTO.RegisterResponse;
 import cc.nanoic.yunanexus.auth.entity.Roles;
@@ -32,6 +33,7 @@ import cn.hutool.crypto.asymmetric.RSA;
 import cn.hutool.crypto.digest.BCrypt;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
 import org.redisson.api.RBucket;
@@ -175,6 +177,7 @@ public class AuthService {
         return resp;
     }
 
+    // 解密密码
     private String decryptPassword(String encryptedPassword) {
         String keyPath = authProperties.getRsa().getKeyPath();
         File privateFile = new File(keyPath, "id_rsa");
@@ -186,6 +189,7 @@ public class AuthService {
         return rsa.decryptStr(encryptedPassword, KeyType.PrivateKey);
     }
 
+    // 加载AESKey
     private byte[] loadAesKey() {
         String keyPath = authProperties.getAes().getKeyPath();
         File keyFile = new File(keyPath, "aes.key");
@@ -195,6 +199,7 @@ public class AuthService {
         return FileUtil.readBytes(keyFile);
     }
 
+    // 绑定角色
     private void bindRole(byte[] globalId, String roleName) {
         Roles role = rolesMapper.selectOne(
                 new LambdaQueryWrapper<Roles>()
@@ -210,6 +215,7 @@ public class AuthService {
         userRolesMapper.insert(userRole);
     }
 
+    // 登录
     public LoginResponse login(LoginRequest req) {
         UserIdentity identity = userIdentityMapper.selectOne(
                 new LambdaQueryWrapper<UserIdentity>()
@@ -245,12 +251,28 @@ public class AuthService {
 
         AuthProperties.Jwt jwtConfig = authProperties.getJwt();
         byte[] jwtSecret = jwtConfig.getSecret().getBytes(StandardCharsets.UTF_8);
-        long expireMs = jwtConfig.getAccessExp() * 1000;
-        String token = JwtUtil.createToken(externalUuid, globalId, roles, permissions, jwtSecret, expireMs);
+        return buildTokenResponse(externalUuid, globalId, roles, permissions, jwtConfig, jwtSecret);
+    }
 
-        LoginResponse resp = new LoginResponse();
-        resp.setAccessToken(token);
-        resp.setUuid(externalUuid);
+    public LoginResponse refresh(RefreshRequest req) {
+        RBucket<String> bucket = redissonClient.getBucket("refresh:" + req.getRefreshToken());
+        String data = bucket.get();
+        if (data == null) {
+            throw new BusinessException(R.NOT_LOGIN, "refresh token 无效或已过期");
+        }
+        bucket.delete();
+
+        JSONObject obj = JSON.parseObject(data);
+        String externalUuid = obj.getString("uuid");
+        byte[] globalId = HexUtil.decodeHex(obj.getString("globalId"));
+
+        Set<String> roles = new HashSet<>();
+        Set<String> permissions = new HashSet<>();
+        assemblePermissions(globalId, roles, permissions);
+
+        AuthProperties.Jwt jwtConfig = authProperties.getJwt();
+        byte[] jwtSecret = jwtConfig.getSecret().getBytes(StandardCharsets.UTF_8);
+        LoginResponse resp = buildTokenResponse(externalUuid, globalId, roles, permissions, jwtConfig, jwtSecret);
         return resp;
     }
 
@@ -271,6 +293,46 @@ public class AuthService {
                 permissions.addAll(JSON.parseArray(r.getPermissions(), String.class));
             }
         }
+    }
+
+    public String getExternalUuid(byte[] globalId) {
+        Result<String> uuidResult = userInternalClient.getUuid(globalId);
+        if (uuidResult == null || uuidResult.getCode() != R.SUCCESS.getCode() || uuidResult.getData() == null) {
+            String detail = uuidResult == null ? "result is null" : "code=" + uuidResult.getCode();
+            throw new BusinessException(R.SERVER_ERROR, "获取用户UUID失败: " + detail);
+        }
+        String internalUuid = uuidResult.getData();
+        byte[] aesKey = loadAesKey();
+        return UuidGenerator.internalToExternal(internalUuid, aesKey);
+    }
+
+    public LoginResponse issueTokens(byte[] globalId) {
+        String externalUuid = getExternalUuid(globalId);
+        Set<String> roles = new HashSet<>();
+        Set<String> permissions = new HashSet<>();
+        assemblePermissions(globalId, roles, permissions);
+        AuthProperties.Jwt jwtConfig = authProperties.getJwt();
+        byte[] jwtSecret = jwtConfig.getSecret().getBytes(StandardCharsets.UTF_8);
+        return buildTokenResponse(externalUuid, globalId, roles, permissions, jwtConfig, jwtSecret);
+    }
+
+    private LoginResponse buildTokenResponse(String externalUuid, byte[] globalId,
+                                              Set<String> roles, Set<String> permissions,
+                                              AuthProperties.Jwt jwtConfig, byte[] jwtSecret) {
+        long expireMs = jwtConfig.getAccessExp() * 1000;
+        String token = JwtUtil.createToken(externalUuid, globalId, roles, permissions, jwtSecret, expireMs);
+        String refreshToken = RandomUtil.randomString(32);
+        JSONObject refreshData = new JSONObject();
+        refreshData.put("uuid", externalUuid);
+        refreshData.put("globalId", HexUtil.encodeHexStr(globalId));
+        redissonClient.getBucket("refresh:" + refreshToken)
+                .set(refreshData.toJSONString(), Duration.ofSeconds(jwtConfig.getRefreshExp()));
+        LoginResponse resp = new LoginResponse();
+        resp.setAccessToken(token);
+        resp.setRefreshToken(refreshToken);
+        resp.setExpiresIn(jwtConfig.getAccessExp());
+        resp.setUuid(externalUuid);
+        return resp;
     }
 
 }

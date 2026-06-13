@@ -8,7 +8,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = "cc.nanoic.yunanexus")
 @EnableFeignClients(basePackages = "cc.nanoic.yunanexus.user.client")
 @MapperScan("cc.nanoic.yunanexus.user.mapper")
 @EnableScheduling
