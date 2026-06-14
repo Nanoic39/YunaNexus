@@ -1,5 +1,7 @@
 # ✨YunaNexus基本信息
 
+![YunaNexus](https://socialify.git.ci/Nanoic39/YunaNexus/image?font=JetBrains+Mono&forks=1&issues=1&logo=https%3A%2F%2Fgithub.com%2FNanoic39%2FYunaNexus%2Fraw%2Fmain%2FAssets%2FImage%2FYunaQ_AVATAR.png&name=1&owner=1&pattern=Circuit+Board&stargazers=1&theme=Light)
+
 > 这篇Markdown文件是我自己手搓的，无任何AI生成内容 `: )`
 
 ## 📕 当前仓库项目结构
@@ -108,6 +110,7 @@ YunaNexus/
 <div align="center">
     <img alt="MaiTTxLogo" border="" width="200" style="border-radius: 8px" src="Assets/Image/YunaQ_AVATAR.png"/>
 </div>
+
 \[🚧头像、立绘、设定说明占位]<br/>
 
 > 这是一座彻底落幕的文明。 
