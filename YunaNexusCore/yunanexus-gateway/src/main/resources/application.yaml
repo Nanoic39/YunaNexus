@@ -9,20 +9,15 @@ spring:
       discovery:
         enabled: true
         register-enabled: false
-
-yunanexus:
-  gateway:
-    routes:
-      auth:
-        paths:
-          - /auth/**
-          - /login/**
-          - /register/**
-          - /key/**
-          - /oauth/**
-        service: YunaNexus-AuthService
-      user:
-        paths:
-          - /user/**
-          - /me
-        service: YunaNexus-UserService
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: auth-service
+              uri: lb://YunaNexus-AuthService
+              predicates:
+                - Path=/auth/**,/login/**,/register/**,/key/**,/oauth/**
+            - id: user-service
+              uri: lb://YunaNexus-UserService
+              predicates:
+                - Path=/user/**,/me/**

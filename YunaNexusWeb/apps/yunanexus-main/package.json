@@ -10,15 +10,12 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
-    "@nuxt/icon": "^2.2.2",
     "jsencrypt": "^3.5.4",
     "nuxt": "^4.4.5",
     "vue": "^3.5.34",
     "vue-router": "^5.0.6"
   },
   "devDependencies": {
-    "@iconify-json/lucide": "^1.2.66",
-    "@types/node": "^25.8.0",
-    "sass": "^1.99.0"
+    "@types/node": "^25.8.0"
   }
 }
