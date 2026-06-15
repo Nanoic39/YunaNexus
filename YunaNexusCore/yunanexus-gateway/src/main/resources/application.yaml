@@ -21,3 +21,7 @@ spring:
               uri: lb://YunaNexus-UserService
               predicates:
                 - Path=/user/**,/me/**
+            - id: file-service
+              uri: lb://YunaNexus-FileService
+              predicates:
+                - Path=/file/**

@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: YunaNexus-FileService
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+mybatis-plus:
+  type-aliases-package: cc.nanoic.yunanexus.file.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+
+server:
+  port: 8200
+
+yunanexus:
+  web:
+    jwt:
+      secret: ${YUNANEXUS_AUTH_JWT_SECRET}
+  file:
+    storage-path: ./storage
+    avatar-max-size: 52428800 # 50MB
