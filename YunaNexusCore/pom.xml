@@ -18,6 +18,7 @@
         <module>yunanexus-user</module>
         <module>yunanexus-auth</module>
         <module>yunanexus-gateway</module>
+        <module>yunanexus-file</module>
 
         <!-- common -->
         <module>common-web</module>
