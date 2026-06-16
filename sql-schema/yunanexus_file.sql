@@ -193,4 +193,25 @@ CREATE TABLE `file_share` (
     INDEX `idx_status_expire` (`status`, `expire_at`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件分享表' ROW_FORMAT=Dynamic;
 
+-- 文件存储配额表
+DROP TABLE IF EXISTS `file_storage_quota`;
+CREATE TABLE `file_storage_quota` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `role_name` VARCHAR(32) NOT NULL COMMENT '角色名',
+    `max_single_file_size` BIGINT NOT NULL DEFAULT 0 COMMENT '单文件最大字节(0=不限)',
+    `max_total_storage` BIGINT NOT NULL DEFAULT 0 COMMENT '总空间最大字节(0=不限)',
+    `priority` INT NOT NULL DEFAULT 0 COMMENT '优先级(越大越优先)',
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '0:禁用, 1:启用',
+    `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE INDEX `ui_role_name` (`role_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件存储配额表';
+
+INSERT INTO `file_storage_quota` (`role_name`, `max_single_file_size`, `max_total_storage`, `priority`) VALUES
+('SUPER_ADMIN', 0, 0, 99),
+('ADMIN', 0, 0, 60),
+( ' VIP ' , 107374182400 , 429496729600, 10), -- 1TB单文件, 4TB总空间
+( ' USER ' , 53687091200 , 214748364800, 1); -- 50GB单文件, 2TB总空间
+
 SET FOREIGN_KEY_CHECKS = 1;
