@@ -4,8 +4,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class YunaNexusGatewayApplication {
+public class YunaGatewayApplication {
     public static void main(String[] args) {
-        SpringApplication.run(YunaNexusGatewayApplication.class, args);
+        SpringApplication.run(YunaGatewayApplication.class, args);
     }
 }
