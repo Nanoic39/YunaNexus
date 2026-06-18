@@ -7,7 +7,6 @@ spring:
       port: 6379
   servlet:
     multipart:
-      max-file-size: 100MB
       max-request-size: 100MB
 
 mybatis-plus:
@@ -28,4 +27,3 @@ yunanexus:
       secret: ${YUNANEXUS_AUTH_JWT_SECRET}
   file:
     storage-path: ./storage
-    avatar-max-size: 52428800 # 50MB

@@ -211,7 +211,7 @@ CREATE TABLE `file_storage_quota` (
 INSERT INTO `file_storage_quota` (`role_name`, `max_single_file_size`, `max_total_storage`, `priority`) VALUES
 ('SUPER_ADMIN', 0, 0, 99),
 ('ADMIN', 0, 0, 60),
-( ' VIP ' , 107374182400 , 429496729600, 10), -- 1TB单文件, 4TB总空间
-( ' USER ' , 53687091200 , 214748364800, 1); -- 50GB单文件, 2TB总空间
+('VIP', 107374182400, 429496729600, 10), -- 1TB单文件, 4TB总空间
+('USER', 53687091200, 214748364800, 1); -- 50GB单文件, 2TB总空间
 
 SET FOREIGN_KEY_CHECKS = 1;

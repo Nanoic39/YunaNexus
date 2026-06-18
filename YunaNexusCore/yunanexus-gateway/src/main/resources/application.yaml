@@ -8,7 +8,7 @@ spring:
     nacos:
       discovery:
         enabled: true
-        register-enabled: false
+        register-enabled: true
     gateway:
       server:
         webmvc:
@@ -17,11 +17,29 @@ spring:
               uri: lb://YunaNexus-AuthService
               predicates:
                 - Path=/auth/**,/login/**,/register/**,/key/**,/oauth/**
-            - id: user-service
-              uri: lb://YunaNexus-UserService
+            - id: file-avatar
+              uri: lb://YunaNexus-FileService
               predicates:
-                - Path=/user/**,/me/**
+                - Path=/file/avatar/**
             - id: file-service
               uri: lb://YunaNexus-FileService
               predicates:
                 - Path=/file/**
+
+yunanexus:
+  web:
+    jwt:
+      secret: ${YUNANEXUS_AUTH_JWT_SECRET}
+  gateway:
+    shard:
+      routes:
+        - base-name: YunaNexus-UserService
+          paths:
+            - /user
+            - /me
+            - /internal/user
+        - base-name: YunaNexus-FileService
+          paths:
+            - /file
+          exclude-paths:
+            - /file/avatar
