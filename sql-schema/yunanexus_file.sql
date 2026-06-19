@@ -170,7 +170,7 @@ DROP TABLE IF EXISTS `file_share`;
 CREATE TABLE `file_share` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `share_uuid` VARCHAR(36) NOT NULL COMMENT '分享UUID',
-    `share_code` VARCHAR(32) NOT NULL COMMENT '分享码(对外短码)',
+    `share_code` VARCHAR(36) NOT NULL COMMENT '分享码(UUID格式)',
     `global_id` BINARY(6) NOT NULL COMMENT '发起分享的用户global_id',
     `file_uuid` VARCHAR(36) NOT NULL COMMENT '被分享的文件uuid',
     `extract_code` VARCHAR(10) NULL COMMENT '提取码',
