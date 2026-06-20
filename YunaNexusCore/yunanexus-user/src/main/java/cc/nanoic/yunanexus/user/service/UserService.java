@@ -47,7 +47,7 @@ public class UserService {
         }
         vo.setBirthday(null); // 根据userId查询时不应该获取生日这种敏感信息
         return vo;
-        
+
     }
 
     // 通过uuid查询User信息
@@ -55,8 +55,7 @@ public class UserService {
         Users user = usersMapper.selectOne(
                 new LambdaQueryWrapper<Users>()
                         .eq(Users::getUuid, uuid)
-                        .last("LIMIT 1")
-        );
+                        .last("LIMIT 1"));
         if (user == null) {
             throw new BusinessException(R.USER_NOTFOUND, "用户不存在");
         }
@@ -98,6 +97,13 @@ public class UserService {
         return userEconomy;
     }
 
+    @Transactional
+    public void updateAvatar(byte[] globalId, String avatarUuid) {
+        UserProfile profile = findUserProfileByGid(globalId);
+        profile.setAvatarUuid(avatarUuid);
+        userProfileMapper.updateById(profile);
+    }
+
     // 取消注册
     public void cancelRegister(byte[] gid) {
         Users user = findUserByGlobalId(gid);
@@ -117,8 +123,10 @@ public class UserService {
 
         UserProfile userProfile = new UserProfile();
         userProfile.setGlobalId(globalId);
-        userProfile.setNickname(userCreateDTO.getNickname() == null || userCreateDTO.getNickname().isEmpty() ? "YUNA❀清汐" : userCreateDTO.getNickname());
-        userProfile.setGender(userCreateDTO.getGender() == null || userCreateDTO.getGender().isEmpty() ? "未知" : userCreateDTO.getGender());
+        userProfile.setNickname(userCreateDTO.getNickname() == null || userCreateDTO.getNickname().isEmpty() ? "YUNA❀清汐"
+                : userCreateDTO.getNickname());
+        userProfile.setGender(userCreateDTO.getGender() == null || userCreateDTO.getGender().isEmpty() ? "未知"
+                : userCreateDTO.getGender());
         userProfileMapper.insert(userProfile);
 
         UserEconomy economy = new UserEconomy();
@@ -128,5 +136,4 @@ public class UserService {
         userEconomyMapper.insert(economy);
     }
 
-    
 }

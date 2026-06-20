@@ -172,14 +172,14 @@ CREATE TABLE `file_share` (
     `share_uuid` VARCHAR(36) NOT NULL COMMENT '分享UUID',
     `share_code` VARCHAR(36) NOT NULL COMMENT '分享码(UUID格式)',
     `global_id` BINARY(6) NOT NULL COMMENT '发起分享的用户global_id',
-    `file_uuid` VARCHAR(36) NOT NULL COMMENT '被分享的文件uuid',
-    `extract_code` VARCHAR(10) NULL COMMENT '提取码',
-    `view_auth_mode` TINYINT NOT NULL DEFAULT 1 COMMENT '0:免登录, 1:需登录',
-    `download_auth_mode` TINYINT NOT NULL DEFAULT 1 COMMENT '0:免登录, 1:需登录',
-    `max_download_count` BIGINT NOT NULL DEFAULT 0 COMMENT '最大下载次数(0=不限)',
-    `download_count` BIGINT NOT NULL DEFAULT 0,
+    `extract_code` VARCHAR(10) NULL COMMENT '提取码(NULL=无密码)',
+    `need_login` TINYINT NOT NULL DEFAULT 1 COMMENT '0:免登录, 1:需登录',
+    `allow_preview` TINYINT NOT NULL DEFAULT 0 COMMENT '0:禁止, 1:允许预览',
+    `max_view_count` BIGINT NOT NULL DEFAULT 0 COMMENT '最大访问次数(0=不限,到达后自动取消)',
+    `max_download_count` BIGINT NOT NULL DEFAULT 0 COMMENT '最大下载次数(0=不限,到达后自动取消)',
     `view_count` BIGINT NOT NULL DEFAULT 0,
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '0:已取消, 1:有效, 2:已过期',
+    `download_count` BIGINT NOT NULL DEFAULT 0,
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '0:已取消, 1:有效, 2:已过期(自动)',
     `expire_at` DATETIME NULL COMMENT '过期时间(NULL=永久)',
     `last_viewed_at` DATETIME NULL,
     `last_downloaded_at` DATETIME NULL,
@@ -189,9 +189,22 @@ CREATE TABLE `file_share` (
     UNIQUE INDEX `ui_share_uuid` (`share_uuid`) USING BTREE,
     UNIQUE INDEX `ui_share_code` (`share_code`) USING BTREE,
     INDEX `idx_global_id` (`global_id`) USING BTREE,
-    INDEX `idx_file_uuid` (`file_uuid`) USING BTREE,
     INDEX `idx_status_expire` (`status`, `expire_at`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件分享表' ROW_FORMAT=Dynamic;
+
+-- 分享目标表（支持多文件/多目录）
+DROP TABLE IF EXISTS `file_share_target`;
+CREATE TABLE `file_share_target` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `share_id` BIGINT NOT NULL COMMENT '关联file_share.id',
+    `target_type` TINYINT NOT NULL COMMENT '0:文件, 1:目录',
+    `target_uuid` VARCHAR(36) NOT NULL COMMENT '文件/目录UUID',
+    `sort_no` INT NOT NULL DEFAULT 0 COMMENT '排序值',
+    `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    INDEX `idx_share_id` (`share_id`),
+    INDEX `idx_target_uuid` (`target_uuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分享目标表';
 
 -- 文件存储配额表
 DROP TABLE IF EXISTS `file_storage_quota`;

@@ -1,6 +1,5 @@
 package cc.nanoic.yunanexus.auth.service;
 
-import cc.nanoic.yunanexus.auth.client.UserInternalClient;
 import cc.nanoic.yunanexus.auth.config.AuthProperties;
 import cc.nanoic.yunanexus.auth.entity.AdminInitKey;
 import cc.nanoic.yunanexus.auth.entity.DTO.LoginRequest;
@@ -38,6 +37,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -67,9 +67,6 @@ public class AuthService {
     private UserRolesMapper userRolesMapper;
 
     @Resource
-    private UserInternalClient userInternalClient;
-
-    @Resource
     private RedissonClient redissonClient;
 
     @Resource
@@ -77,6 +74,9 @@ public class AuthService {
 
     @Resource
     private MailService mailService;
+
+    @Resource
+    private UserRemoteService userRemoteService;
 
     // 发送邮箱验证码
     public void sendEmailVerifyCode(String email) {
@@ -95,7 +95,8 @@ public class AuthService {
         String code = RandomUtil.randomNumbers(6);
         redissonClient.getBucket("email:code:" + email).set(code, Duration.ofMinutes(5));
 
-        mailService.send(MailTemplateType.VERIFY_CODE, email, "YunaNexus 邮箱验证码", Map.of("code", code, "year", String.valueOf(Year.now().getValue())));
+        mailService.send(MailTemplateType.VERIFY_CODE, email, "YunaNexus 邮箱验证码",
+                Map.of("code", code, "year", String.valueOf(Year.now().getValue())));
 
         redissonClient.getBucket("email:cd:" + email).set("1", Duration.ofSeconds(60));
     }
@@ -126,7 +127,6 @@ public class AuthService {
 
         String password = decryptPassword(registerRequest.getPassword());
 
-
         byte[] aesKey = loadAesKey();
         UuidResult uuidResult = UuidGenerator.generate(redissonClient, aesKey);
         byte[] globalId = uuidResult.getGlobalId();
@@ -139,7 +139,7 @@ public class AuthService {
         dto.setNickname(registerRequest.getNickname());
         dto.setGender(registerRequest.getGender());
 
-        userInternalClient.createUser(dto);
+        userRemoteService.createUser(dto);
 
         try {
             UserIdentity identity = new UserIdentity();
@@ -168,7 +168,7 @@ public class AuthService {
                 }
             }
         } catch (Exception e) {
-            userInternalClient.cancelUser(globalId);
+            userRemoteService.cancelUser(globalId);
             throw new BusinessException(R.SERVER_ERROR, "注册失败！");
         }
 
@@ -234,7 +234,7 @@ public class AuthService {
         }
 
         byte[] globalId = identity.getGlobalId();
-        Result<String> uuidResult = userInternalClient.getUuid(globalId);
+        Result<String> uuidResult = userRemoteService.getUuid(globalId);
         if (uuidResult == null || uuidResult.getCode() != R.SUCCESS.getCode() || uuidResult.getData() == null) {
             String detail = uuidResult == null ? "result is null"
                     : "code=" + uuidResult.getCode() + ", msg=" + uuidResult.getMsg();
@@ -296,7 +296,7 @@ public class AuthService {
     }
 
     public String getExternalUuid(byte[] globalId) {
-        Result<String> uuidResult = userInternalClient.getUuid(globalId);
+        Result<String> uuidResult = userRemoteService.getUuid(globalId);
         if (uuidResult == null || uuidResult.getCode() != R.SUCCESS.getCode() || uuidResult.getData() == null) {
             String detail = uuidResult == null ? "result is null" : "code=" + uuidResult.getCode();
             throw new BusinessException(R.SERVER_ERROR, "获取用户UUID失败: " + detail);
@@ -317,8 +317,8 @@ public class AuthService {
     }
 
     private LoginResponse buildTokenResponse(String externalUuid, byte[] globalId,
-                                              Set<String> roles, Set<String> permissions,
-                                              AuthProperties.Jwt jwtConfig, byte[] jwtSecret) {
+            Set<String> roles, Set<String> permissions,
+            AuthProperties.Jwt jwtConfig, byte[] jwtSecret) {
         long expireMs = jwtConfig.getAccessExp() * 1000;
         String token = JwtUtil.createToken(externalUuid, globalId, roles, permissions, jwtSecret, expireMs);
         String refreshToken = RandomUtil.randomString(32);
