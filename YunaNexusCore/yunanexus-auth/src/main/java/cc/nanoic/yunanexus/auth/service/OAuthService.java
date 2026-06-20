@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.auth.service;
 
+import cc.nanoic.yunanexus.auth.entity.DTO.RegisterClientRequest;
 import cc.nanoic.yunanexus.auth.entity.DTO.AuthorizeRequest;
 import cc.nanoic.yunanexus.auth.entity.DTO.LoginResponse;
 import cc.nanoic.yunanexus.auth.entity.DTO.TokenRequest;
@@ -24,6 +25,7 @@ import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
@@ -147,7 +149,8 @@ public class OAuthService {
             vo.setDescription(c.getDescription());
             vo.setAuditStatus(c.getAuditStatus());
             vo.setApplicantGlobalId(c.getApplicantGlobalId() != null
-                    ? HexUtil.encodeHexStr(c.getApplicantGlobalId()) : null);
+                    ? HexUtil.encodeHexStr(c.getApplicantGlobalId())
+                    : null);
             vo.setStatus(c.getStatus());
             vo.setCreatedAt(c.getCreatedAt());
             return vo;
@@ -164,5 +167,142 @@ public class OAuthService {
             throw new BusinessException(R.PARAM_ERROR, "客户端不存在或已禁用");
         }
         return client;
+    }
+
+    private OAuthClient findClientByUuid(String uuid) {
+        OAuthClient client = oAuthClientMapper.selectOne(
+                new LambdaQueryWrapper<OAuthClient>()
+                        .eq(OAuthClient::getUuid, uuid)
+                        .last("LIMIT 1"));
+        if (client == null) {
+            throw new BusinessException(R.NOT_FOUND, "客户端不存在");
+        }
+        return client;
+    }
+
+    public Map<String, Object> registerClient(RegisterClientRequest req) {
+        PermissionUtil.checkLogin();
+        byte[] globalId = PermissionContext.getGlobalId();
+
+        String cdKey = "oauth:register:cd:" + HexUtil.encodeHexStr(globalId);
+        RBucket<String> cdBucket = redissonClient.getBucket(cdKey);
+        if (cdBucket.isExists()) {
+            throw new BusinessException(R.PARAM_ERROR, "提交过于频繁，请1小时后再试");
+        }
+
+        long pendingCount = oAuthClientMapper.selectCount(
+                new LambdaQueryWrapper<OAuthClient>()
+                        .eq(OAuthClient::getApplicantGlobalId, globalId)
+                        .eq(OAuthClient::getAuditStatus, 0));
+        if (pendingCount >= 3) {
+            throw new BusinessException(R.PARAM_ERROR, "待审核申请已达上限(3个)，请等待审核结果");
+        }
+
+        redissonClient.getBucket(cdKey).set("1", Duration.ofHours(1));
+
+        OAuthClient client = new OAuthClient();
+        client.setUuid(cn.hutool.core.util.IdUtil.fastSimpleUUID());
+        client.setClientName(req.getClientName());
+        client.setClientSecret(BCrypt.hashpw(RandomUtil.randomString(32)));
+        client.setClientType(PermissionUtil.hasRole("ADMIN") || PermissionUtil.hasRole("SUPER_ADMIN") ? 1 : 2);
+        client.setGrantTypes(req.getGrantTypes() != null ? req.getGrantTypes() : "authorization_code");
+        client.setScope(req.getScope() != null ? req.getScope() : "read");
+        client.setRedirectUri(req.getRedirectUri());
+        client.setDescription(req.getDescription());
+        client.setAuditStatus(client.getClientType() == 1 ? 1 : 0);
+        client.setApplicantGlobalId(globalId);
+        client.setStatus(client.getClientType() == 1 ? 1 : 0);
+        client.setCreatedAt(java.time.LocalDateTime.now());
+        client.setUpdatedAt(java.time.LocalDateTime.now());
+        oAuthClientMapper.insert(client);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("uuid", client.getUuid());
+        result.put("clientName", client.getClientName());
+        result.put("clientType", client.getClientType());
+        result.put("auditStatus", client.getAuditStatus());
+        return result;
+    }
+
+    public OAuthClientVO getClientDetail(String uuid) {
+        PermissionUtil.checkLogin();
+        byte[] globalId = PermissionContext.getGlobalId();
+        OAuthClient client = findClientByUuid(uuid);
+
+        boolean isOwner = client.getApplicantGlobalId() != null
+                && java.util.Arrays.equals(client.getApplicantGlobalId(), globalId);
+        boolean isAdmin = PermissionUtil.hasPermission("core:oauth:audit");
+        if (!isOwner && !isAdmin) {
+            throw new BusinessException(R.NOT_PERMISSION, "无权查看此应用详情");
+        }
+
+        OAuthClientVO vo = new OAuthClientVO();
+        vo.setId(client.getId());
+        vo.setUuid(client.getUuid());
+        vo.setClientName(client.getClientName());
+        vo.setClientType(client.getClientType());
+        vo.setGrantTypes(client.getGrantTypes());
+        vo.setScope(client.getScope());
+        vo.setRedirectUri(client.getRedirectUri());
+        vo.setDescription(client.getDescription());
+        vo.setAuditStatus(client.getAuditStatus());
+        vo.setApplicantGlobalId(client.getApplicantGlobalId() != null
+                ? HexUtil.encodeHexStr(client.getApplicantGlobalId())
+                : null);
+        vo.setStatus(client.getStatus());
+        vo.setCreatedAt(client.getCreatedAt());
+        return vo;
+    }
+
+    public void updateClient(String uuid, RegisterClientRequest req) {
+        PermissionUtil.checkLogin();
+        byte[] globalId = PermissionContext.getGlobalId();
+        OAuthClient client = findClientByUuid(uuid);
+
+        if (client.getApplicantGlobalId() == null
+                || !java.util.Arrays.equals(client.getApplicantGlobalId(), globalId)) {
+            throw new BusinessException(R.NOT_PERMISSION, "只能编辑自己的应用");
+        }
+        if (client.getAuditStatus() == 1 && !PermissionUtil.hasPermission("core:oauth:audit")) {
+            throw new BusinessException(R.PARAM_ERROR, "已审核通过的应用不可编辑，请联系管理员");
+        }
+
+        if (req.getClientName() != null)
+            client.setClientName(req.getClientName());
+        if (req.getGrantTypes() != null)
+            client.setGrantTypes(req.getGrantTypes());
+        if (req.getScope() != null)
+            client.setScope(req.getScope());
+        if (req.getRedirectUri() != null)
+            client.setRedirectUri(req.getRedirectUri());
+        if (req.getDescription() != null)
+            client.setDescription(req.getDescription());
+        client.setUpdatedAt(java.time.LocalDateTime.now());
+        oAuthClientMapper.updateById(client);
+    }
+
+    public void auditClient(String uuid, Integer auditStatus, String auditOpinion) {
+        PermissionUtil.checkPermission("core:oauth:audit");
+        byte[] globalId = PermissionContext.getGlobalId();
+        OAuthClient client = findClientByUuid(uuid);
+
+        if (client.getAuditStatus() != 0) {
+            throw new BusinessException(R.PARAM_ERROR, "该应用已被审核过");
+        }
+        client.setAuditStatus(auditStatus);
+        client.setAuditOpinion(auditOpinion);
+        client.setAuditorGlobalId(globalId);
+        client.setAuditedAt(java.time.LocalDateTime.now());
+        client.setStatus(auditStatus == 1 ? 1 : 0);
+        client.setUpdatedAt(java.time.LocalDateTime.now());
+        oAuthClientMapper.updateById(client);
+    }
+
+    public void toggleClient(String uuid) {
+        PermissionUtil.checkPermission("core:oauth:audit");
+        OAuthClient client = findClientByUuid(uuid);
+        client.setStatus(client.getStatus() == 1 ? 0 : 1);
+        client.setUpdatedAt(java.time.LocalDateTime.now());
+        oAuthClientMapper.updateById(client);
     }
 }
