@@ -8,35 +8,21 @@
 
 ```text
 YunaNexus/
-├── YunaNexusCore/                 # YunaNexus系列中核心项目，作为全局的后台管理面板为其它服务提供基本支持
-│   ├── yunanexus-common-redis/    # 提供 Redis SDK
-│   ├── yunanexus-common-mail/     # 提供 Mail SDK
-│   ├── yunanexus-common-web/      # 提供 Result/Exception SDK
-│   ├── yunanexus-auth/            # 提供安全认证相关的后端支持
-│   ├── yunanexus-file/            # 提供文件相关的后端支持
-│   └── yunanexus-user/            # 提供用户账户相关的后端支持
-├── YunaNexusWeb/                  # YunaNexus 系列前端工作区（待重新设计页面样式）
-│   ├── apps/                      # 具体前端应用
-│   │   ├── yunanexus-main/        # 主站客户端前端
-│   │   └── yunanexus-admin/       # 管理端前端（预留/待开发）
-│   ├── packages/                  # 共享模块
-│   │   ├── config/                # ESLint/Prettier/TypeScript/公共开发 配置
-│   │   ├── ui/                    # 通用 UI 组件库
-│   │   ├── theme/                 # CSS变量、Tailwind、Nuxt UI主题
-│   │   ├── sdk/                   # API、types、contracts、request
-│   │   ├── stores/                # 跨应用共享 Pinia Store
-│   │   ├── composable/            # 跨应用共享 composable
-│   │   └── utils/                 # 纯工具函数
-│   ├── docs/                      # 前端约定、组件规范、开发文档
-│   ├── package.json               # workspace 前端工作区根配置
-│   ├── pnpm-workspace.yaml        # workspace 工作区声明文件
-│   ├── tsconfig.base.json         # 共享 TypeScript 基础配置
-│   ├── .env.example               # .env 模板
-│   └── .editorconfig              # 编辑器统一格式配置
-├── sql-schema/                    # YunaNexusCore用到的SQL数据结构
-└── Assets/                        # 用于本项目仓库的素材文件(不影响具体项目内容)
-    ├── Image/                     # 用于本仓库的图片类型文件
-    └── 开发笔记/                    # 对开发过程中遇到的问题/思考的记录
+├── YunaNexusCore/                 # 后端服务
+│   ├── common-redis/              # 【公共】: Redis 自动配置
+│   ├── common-mail/               # 【公共】: 邮件发送 SDK
+│   ├── common-web/                # 【公共】: Result / 异常 / JWT / 权限校验
+│   ├── yunanexus-gateway/         # 【网关】: SCG-MVC + 分片路由
+│   ├── yunanexus-auth/            # 【认证】: 登录 / 注册 / OAuth 授权
+│   ├── yunanexus-user/            # 【用户】: 账户信息
+│   └── yunanexus-file/            # 【文件】: 上传 / 预览 / 分享
+├── YunaNexusWeb/                  # 前端 
+│   ├── apps/yunanexus-main/       # 主站 ( 🚧 开发中 🚧 )
+│   ├── apps/yunanexus-bot/        # bot管理面板 ( 🖊️ 规划中 🖊️ )
+|   ├── apps/yunanexus-game/       # 游戏服务器管理面板 ( 🖊️ 规划中 🖊️ )
+│   ├── packages/ui/               # 【公共】: UI 组件
+│   └── packages/api/              # 【公共】: API 请求封装
+└── sql-schema/                    # 数据库建表脚本 (MySQL)
 ```
 
 ## ⚙️ .yaml配置文件(开发完毕后该板块会被替换为项目运行指南，届时代码仓库中会提供模板文件)
