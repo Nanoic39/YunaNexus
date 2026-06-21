@@ -1,5 +1,5 @@
 <template>
   <div>
-    YunaNexus
+    YunaNexus Main
   </div>
 </template>
