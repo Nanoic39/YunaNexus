@@ -77,7 +77,6 @@ public class PermissionFilter extends OncePerRequestFilter {
         PermissionContext.setPermissions(parseJsonSet(request.getHeader("X-User-Permissions")));
     }
 
-    @SuppressWarnings("unchecked")
     private Set<String> parseJsonSet(String json) {
         if (json == null || json.isEmpty()) return Collections.emptySet();
         return new HashSet<>(JSON.parseArray(json, String.class));

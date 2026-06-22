@@ -37,10 +37,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -77,6 +74,9 @@ public class AuthService {
 
     @Resource
     private UserRemoteService userRemoteService;
+
+    @Resource
+    private ResourceService resourceService;
 
     // 发送邮箱验证码
     public void sendEmailVerifyCode(String email) {
@@ -286,7 +286,9 @@ public class AuthService {
             return;
         }
         List<Long> roleIds = userRoles.stream().map(UserRoles::getRoleId).collect(Collectors.toList());
-        List<Roles> roleList = rolesMapper.selectBatchIds(roleIds);
+        List<Roles> roleList = rolesMapper.selectList(
+                new LambdaQueryWrapper<Roles>()
+                        .in(Roles::getId, roleIds));
         for (Roles r : roleList) {
             roles.add(r.getName());
             if (r.getPermissions() != null && !r.getPermissions().isEmpty()) {
@@ -332,6 +334,8 @@ public class AuthService {
         resp.setRefreshToken(refreshToken);
         resp.setExpiresIn(jwtConfig.getAccessExp());
         resp.setUuid(externalUuid);
+        resp.setMenus(resourceService.buildMenuTree(permissions));
+        resp.setButtons(resourceService.getUserButtonCodes(permissions));
         return resp;
     }
 

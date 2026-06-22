@@ -93,4 +93,44 @@ INSERT INTO `roles` (`name`, `level`, `permissions`, `status`) VALUES
     ('ADMIN', 60, '["core:*:*:manage"]', 1),
     ('USER', 1, '["core:user:profile:read"]', 1);
 
+-- 前端资源表（目录/菜单/页面内按钮）
+DROP TABLE IF EXISTS `resources`;
+CREATE TABLE `resources` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `parent_id` BIGINT DEFAULT 0 COMMENT '父资源ID，0=顶级',
+    `name` VARCHAR(64) NOT NULL COMMENT '资源名称',
+    `code` VARCHAR(64) DEFAULT NULL COMMENT '权限码，如 core:file:upload:write（目录可为NULL）',
+    `type` TINYINT NOT NULL COMMENT '0目录 1菜单 2页面资源(按钮/表格列等)',
+    `icon` VARCHAR(32) DEFAULT NULL COMMENT '图标(Lucide)，仅目录/菜单使用',
+    `path` VARCHAR(128) DEFAULT NULL COMMENT '路由路径，仅菜单使用',
+    `redirect` VARCHAR(128) DEFAULT NULL COMMENT '重定向路径，目录type=0被直接访问时兜底',
+    `component` VARCHAR(128) DEFAULT NULL COMMENT '组件路径，仅菜单使用',
+    `sort_no` INT DEFAULT 0 COMMENT '排序',
+    `visible` TINYINT DEFAULT 1 COMMENT '0隐藏 1显示',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE INDEX `uk_code` (`code`),
+    INDEX `idx_parent_sort` (`parent_id`, `sort_no`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 接口端点表（各服务启动时上报，Auth 统一管理，支持动态配置）
+DROP TABLE IF EXISTS `api_endpoints`;
+CREATE TABLE `api_endpoints` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `service_name` VARCHAR(32) NOT NULL COMMENT '服务名，如 yunanexus-file',
+    `http_method` VARCHAR(8) NOT NULL COMMENT 'GET/POST/PUT/DELETE',
+    `path_pattern` VARCHAR(128) NOT NULL COMMENT '路径模式，如 /file/upload',
+    `required_code` VARCHAR(64) NOT NULL COMMENT '所需权限码，如 core:file:upload:api',
+    `description` VARCHAR(128) DEFAULT NULL COMMENT '接口说明',
+    `source` TINYINT DEFAULT 0 COMMENT '0自动上报(来自注解) 1管理端手动配置',
+    `status` TINYINT DEFAULT 1 COMMENT '0停用(不校验) 1启用',
+    `reported_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '最近上报时间',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE INDEX `uk_service_method_path` (`service_name`, `http_method`, `path_pattern`),
+    INDEX `idx_service` (`service_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

@@ -11,8 +11,6 @@ import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,13 +19,9 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 public class FileService {
-
-    private static final Logger log = LoggerFactory.getLogger(FileService.class);
-    private static final int MAX_RETRY = 3;
 
     private final UserFileMapper userFileMapper;
     private final FileObjectMapper fileObjectMapper;
@@ -130,12 +124,6 @@ public class FileService {
         String baseName = originName;
         String ext = extractExt(originName);
         String nameWithoutExt = ext.isEmpty() ? baseName : baseName.substring(0, baseName.lastIndexOf('.'));
-
-        LambdaQueryWrapper<UserFile> wrapper = new LambdaQueryWrapper<UserFile>()
-                .eq(UserFile::getGlobalId, globalId)
-                .eq(UserFile::getFolderId, folderId)
-                .eq(UserFile::getDeleteStage, 0)
-                .eq(UserFile::getServiceName, "main-site");
 
         boolean exists = userFileMapper.exists(
                 new LambdaQueryWrapper<UserFile>()

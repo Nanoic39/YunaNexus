@@ -222,9 +222,9 @@ CREATE TABLE `file_storage_quota` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件存储配额表';
 
 INSERT INTO `file_storage_quota` (`role_name`, `max_single_file_size`, `max_total_storage`, `priority`) VALUES
-('SUPER_ADMIN', 0, 0, 99),
-('ADMIN', 0, 0, 60),
-('VIP', 107374182400, 429496729600, 10), -- 1TB单文件, 4TB总空间
-('USER', 53687091200, 214748364800, 1); -- 50GB单文件, 2TB总空间
+('SUPER_ADMIN', 0, 0, 99),          /* 无限 */
+('ADMIN', 0, 0, 60),                /* 无限 */
+('VIP', 107374182400, 429496729600, 10),  /* 单文件100GB, 总量400GB */
+('USER', 53687091200, 214748364800, 1);   /* 单文件50GB, 总量200GB */
 
 SET FOREIGN_KEY_CHECKS = 1;

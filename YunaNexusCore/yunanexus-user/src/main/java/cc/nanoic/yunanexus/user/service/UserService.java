@@ -50,18 +50,6 @@ public class UserService {
 
     }
 
-    // 通过uuid查询User信息
-    private Users findUserByUuid(String uuid) {
-        Users user = usersMapper.selectOne(
-                new LambdaQueryWrapper<Users>()
-                        .eq(Users::getUuid, uuid)
-                        .last("LIMIT 1"));
-        if (user == null) {
-            throw new BusinessException(R.USER_NOTFOUND, "用户不存在");
-        }
-        return user;
-    }
-
     // 通过id查询User信息
     public Users findUserByGlobalId(byte[] globalId) {
         Users user = usersMapper.selectOne(
