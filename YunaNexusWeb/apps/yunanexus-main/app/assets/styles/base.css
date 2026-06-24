@@ -46,6 +46,35 @@ body {
   width: 56px;
 }
 
+/* 持久化折叠：渲染前由 inline script 设置 body 属性，仅桌面端生效 */
+@media (min-width: 769px) {
+  body[data-sidebar-collapsed="true"] .app-sidebar {
+    width: 56px;
+  }
+
+  body[data-sidebar-collapsed="true"] .app-sidebar .sidebar-brand-text,
+  body[data-sidebar-collapsed="true"] .app-sidebar .sidebar-nav-item > span:last-child,
+  body[data-sidebar-collapsed="true"] .app-sidebar .sidebar-footer-item > span:last-child {
+    display: none !important;
+  }
+
+  body[data-sidebar-collapsed="true"] .app-sidebar .sidebar-nav-item,
+  body[data-sidebar-collapsed="true"] .app-sidebar .sidebar-footer-item {
+    justify-content: center;
+    padding: 0 !important;
+    width: 100%;
+    min-width: 0;
+  }
+
+  body[data-sidebar-collapsed="true"] .app-sidebar .sidebar-nav {
+    overflow: hidden !important;
+  }
+
+  body[data-sidebar-collapsed="true"] .app-sidebar .sidebar-brand {
+    justify-content: center;
+  }
+}
+
 .app-sidebar.sidebar-collapsed .sidebar-brand-text,
 .app-sidebar.sidebar-collapsed .sidebar-nav-item > span:last-child,
 .app-sidebar.sidebar-collapsed .sidebar-footer-item > span:last-child {

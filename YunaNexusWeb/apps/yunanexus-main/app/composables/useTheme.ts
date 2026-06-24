@@ -1,5 +1,6 @@
 export interface ThemeSettings {
   dark: boolean;
+  sidebarCollapsed: boolean;
   [key: string]: unknown;
 }
 
@@ -9,6 +10,7 @@ const STORAGE_KEY = "user-theme-info";
 function getDefaultSettings(): Record<string, unknown> {
   return {
     dark: false,
+    sidebarCollapsed: false,
   };
 }
 
@@ -38,6 +40,19 @@ export function useTheme() {
     () => loadOrInit() as ThemeSettings,
   );
 
+  // 客户端 hydration 后：从 body 属性和 localStorage 同步真实状态
+  onMounted(async () => {
+    const persisted = loadOrInit();
+    Object.assign(theme.value, persisted);
+
+    // body 属性由 inline script 在渲染前设置，Vue hydration 后接管
+    // nextTick 确保 Vue 先把 .sidebar-collapsed class 加上再移除 body 属性，避免闪烁
+    if (document.body.hasAttribute("data-sidebar-collapsed")) {
+      await nextTick();
+      document.body.removeAttribute("data-sidebar-collapsed");
+    }
+  });
+
   function toggle(pos?: { x: number; y: number }) {
     if (pos) {
       document.documentElement.style.setProperty("--theme-x", pos.x + "px");
@@ -55,5 +70,13 @@ export function useTheme() {
     });
   }
 
-  return { theme, toggle };
+  const sidebarCollapsed = computed({
+    get: () => theme.value.sidebarCollapsed,
+    set: (val: boolean) => {
+      theme.value.sidebarCollapsed = val;
+      saveSettings({ sidebarCollapsed: val });
+    },
+  });
+
+  return { theme, toggle, sidebarCollapsed };
 }

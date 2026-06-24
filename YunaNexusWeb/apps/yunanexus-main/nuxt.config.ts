@@ -16,7 +16,7 @@ export default defineNuxtConfig({
     head: {
       script: [
         {
-          innerHTML: `try{var d=localStorage.getItem('user-theme-info');if(!d){d='{"dark":false}';localStorage.setItem('user-theme-info',d)}d=JSON.parse(d);if(d.dark)document.body.setAttribute('data-theme','dark')}catch(e){}`,
+          innerHTML: `try{var d=localStorage.getItem('user-theme-info');if(!d){d='{"dark":false,"sidebarCollapsed":false}';localStorage.setItem('user-theme-info',d)}d=JSON.parse(d);if(d.dark)document.body.setAttribute('data-theme','dark');if(d.sidebarCollapsed)document.body.setAttribute('data-sidebar-collapsed','true')}catch(e){}`,
           tagPosition: "bodyOpen",
         },
       ],

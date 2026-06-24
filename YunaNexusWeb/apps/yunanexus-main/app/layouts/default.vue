@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const { menuItems } = useMenu();
+const { toggle: toggleTheme, sidebarCollapsed } = useTheme();
 
-const collapsed = ref(false);
 const mobileOpen = ref(false);
 const currentTitle = ref("首页");
 
@@ -29,17 +29,15 @@ watch(
   },
   { immediate: true },
 );
-
-const { toggle: toggleTheme } = useTheme();
 </script>
 
 <template>
   <div class="app-shell">
     <Sidebar
       :menu-items="menuItems"
-      :collapsed="collapsed"
+      :collapsed="sidebarCollapsed"
       :mobile-open="mobileOpen"
-      @update:collapsed="collapsed = $event"
+      @update:collapsed="sidebarCollapsed = $event"
       @update:mobile-open="mobileOpen = $event"
     />
     <div class="app-main">
