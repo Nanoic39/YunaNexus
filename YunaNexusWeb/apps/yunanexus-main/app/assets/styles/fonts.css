@@ -1,0 +1,27 @@
+@font-face {
+  font-family: "CJK HandWriting";
+  src: url("../font/cjkfonts_handingwriting4.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "JetBrains Mono NF";
+  src: url("../font/JetBrainsMonoNerdFontMono-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "LXGW WenKai";
+  src: url("../font/LXGWWenKai-Regular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Lolifont";
+  src: url("../font/lolifont.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}

@@ -1,0 +1,63 @@
+:root {
+  /* 品牌色 */
+  --color-emphasis: #16a34a;
+  --color-emphasis-hover: #15803d;
+  --color-emphasis-soft: rgba(22, 163, 74, 0.08);
+  --color-emphasis-ghost: rgba(22, 163, 74, 0.15);
+
+  /* 系统色 */
+  --color-info: #A0D8EF;
+  --color-info-soft: rgba(160, 216, 239, 0.15);
+  --color-info-text: #2563eb;
+
+  /* 背景 */
+  --color-primary-background: #f7f7f5;
+  --color-card: #fff;
+
+  /* 字体颜色 */
+  --color-font: #1a1a1a;
+  --color-font-secondary: #6b6b6b;
+  --color-font-assist: #a0a0a0;
+
+  /* 边框 */
+  --color-border: rgba(0, 0, 0, 0.06);
+  --color-border-heavy: rgba(0, 0, 0, 0.1);
+
+  /* 阴影 */
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.06), 0 2px 10px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover:
+    0 4px 16px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-overlay:
+    0 8px 28px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  /* 字体 */
+  --font-family: "LXGW WenKai", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-family-jp: "CJK HandWriting", "PingFang SC", sans-serif;
+  --font-family-mono: "JetBrains Mono NF", "Fira Code", Consolas, monospace;
+  --font-family-style: "Lolifont", cursive;
+
+  /* 圆角 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+}
+
+body[data-theme="dark"] {
+  --color-emphasis-soft: rgba(22, 163, 74, 0.18);
+
+  --color-primary-background: #111;
+  --color-card: #1a1a1a;
+
+  --color-font: #e0e0e0;
+  --color-font-secondary: #8a8a8a;
+  --color-font-assist: #5a5a5a;
+
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-heavy: rgba(255, 255, 255, 0.12);
+
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.25), 0 2px 10px rgba(0, 0, 0, 0.2);
+  --shadow-card-hover:
+    0 4px 16px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow-overlay: 0 8px 28px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+}

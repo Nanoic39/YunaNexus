@@ -1,0 +1,195 @@
+/* ========== 关于页 ========== */
+.about-wrapper {
+  max-width: 660px;
+  margin: 0 auto;
+  display: grid;
+  gap: 20px;
+}
+
+.about-card {
+  background: var(--color-card);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border);
+}
+
+.about-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-font-assist);
+  margin-bottom: 16px;
+}
+
+.about-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.about-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.about-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.about-meta {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--color-font-secondary);
+}
+
+.about-meta strong {
+  color: var(--color-font);
+  font-weight: 500;
+}
+
+.about-timeline {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.about-timeline-item {
+  display: grid;
+  gap: 2px;
+  padding-left: 16px;
+  border-left: 2px solid var(--color-border);
+  font-size: 13px;
+}
+
+.about-timeline-item .date {
+  font-size: 11px;
+  color: var(--color-font-assist);
+  font-family: var(--font-family-mono);
+}
+
+.about-timeline-item .title {
+  font-weight: 500;
+}
+
+.about-timeline-item .desc {
+  color: var(--color-font-secondary);
+}
+
+.lolifont {
+  font-family: var(--font-family-style);
+}
+
+/* 名字轮播 */
+.name-rotator {
+  overflow: hidden;
+  display: grid;
+  grid-template: 1fr / 1fr;
+  min-height: 1.4em;
+}
+
+.name-rotator > * {
+  grid-area: 1 / 1;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.name-slide-enter-active {
+  transition: all 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.name-slide-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.name-slide-enter-from {
+  opacity: 0;
+  transform: translateY(-120%);
+}
+
+.name-slide-leave-to {
+  opacity: 0;
+  transform: translateY(120%);
+}
+
+/* 技能列表 */
+.about-skill-list {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-font-secondary);
+}
+
+.about-skill-list strong {
+  color: var(--color-font);
+  font-weight: 500;
+  margin-right: 8px;
+}
+
+/* 项目经历卡片 */
+.about-project-card {
+  background: var(--color-primary-background);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  border-left: 3px solid var(--color-emphasis);
+  position: relative;
+}
+
+.about-project-card + .about-project-card {
+  margin-top: 14px;
+}
+
+.about-project-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.about-project-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.about-project-period {
+  font-size: 11px;
+  color: var(--color-font-assist);
+  font-family: var(--font-family-mono);
+}
+
+.about-project-role {
+  font-size: 12px;
+  color: var(--color-emphasis);
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.about-project-desc {
+  font-size: 13px;
+  color: var(--color-font-secondary);
+  line-height: 1.8;
+  margin: 0 0 12px;
+}
+
+.about-project-placeholder {
+  border-left-color: var(--color-border);
+  opacity: 0.7;
+}
+
+.about-project-placeholder .about-project-role {
+  color: var(--color-font-assist);
+}
+
+.about-project-pending {
+  color: var(--color-font-assist) !important;
+  font-style: italic;
+}
