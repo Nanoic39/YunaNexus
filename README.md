@@ -36,6 +36,55 @@ YunaNexus/
 > 4. 默认`spring.profiles.active`支持`local`和`prod`
 > 5. 修改后例如`application-local.yaml`，放到`application.yaml`同一目录下即可
 
+## ⚙️ 安装/部署教程
+
+### Ubuntu24
+1. JDK环境配置
+```bash
+# 安装JDK
+wget https://corretto.aws/downloads/resources/22.0.2.9.1/amazon-corretto-22.0.2.9.1-linux-x64.tar.gz
+
+# 配置JDK为默认Java环节
+tar -xzf amazon-corretto-22.0.2.9.1-linux-x64.tar.gz
+
+mv amazon-corretto-22.0.2.9.1-linux-x64 jdk22 # 改名为jdk22便于后续操作(非必须,但是后续所有"jdk22"需要自己处理文件夹名称)
+
+export JAVA_HOME=/从根目录开始/你安装corretto的目录/绝对路径/jdk22 
+export PATH=$JAVA_HOME/bin:$PATH
+export CLASSPATH=.:$JAVA_HOME/lib
+
+# 如果需要永久生效
+echo "export JAVA_HOME=/从根目录开始/你安装corretto的目录/绝对路径/jdk22" >> ~/.bashrc
+echo "export PATH=\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
+source ~/.bashrc
+
+java -version # 校验版本是否正确
+```
+
+2. Maven环境配置
+```bash
+# 安装Maven
+wget https://mirrors.aliyun.com/apache/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz
+
+# 配置Maven
+tar -xzf apache-maven-3.9.16-bin.tar.gz
+
+mv apache-maven-3.9.16 maven # 改名为maven便于后续操作(非必须,但是后续所有"maven"需要自己处理文件夹名称)
+
+echo "export MAVEN_HOME=/从根目录开始/你安装maven的目录/绝对路径/maven" >> ~/.bashrc
+echo "export PATH=\$MAVEN_HOME/bin:\$PATH" >> ~/.bashrc
+source ~/.bashrc
+
+mvn -version # 校验版本是否正确
+```
+
+3. Nacos环境配置
+```bash
+# TODO: 歇逼、、、明天再写
+```
+
+
+
 ## 😮 响应码列表
 | 响应码  | 对应名称           | 响应信息   | 含义                 | 出现场景              |
 |------|----------------|--------|--------------------|-------------------|
