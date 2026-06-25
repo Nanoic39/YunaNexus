@@ -1,33 +1,18 @@
 spring:
   application:
     name: YunaNexus-UserService
-  data:
-    redis:
-      host: 127.0.0.1
-      port: 6379
 
-# MyBatisPlus配置
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
   type-aliases-package: cc.nanoic.yunanexus.user.entity
   configuration:
-    map-underscore-to-camel-case: true # 下划线转驼峰：开启
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 日志实现类
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
     db-config:
       id-type: auto
 
-server:
-  port: 8100 # 端口
-custom:
-  time:
-    time-zone: Asia/Shanghai
-
 yunanexus:
   user:
-    route: # 后续需要从Nacos动态获取/更新
+    route:
       version: 0
-  web:
-    jwt:
-      secret: ${YUNANEXUS_AUTH_JWT_SECRET}
-    

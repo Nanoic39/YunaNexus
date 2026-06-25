@@ -1,19 +1,41 @@
+server:
+  port: 8200
+
 spring:
   datasource:
-    url: # 数据库连接URL
-    username: # 数据库账号
-    password: # 密码
+    url: jdbc:mysql://127.0.0.1:3306/yunanexus_auth?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Shanghai
+    username: <数据库账号>
+    password: <数据库密码>
     driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
   cloud:
     nacos:
       discovery:
-        server-addr: Nacos地址
+        server-addr: 127.0.0.1:8848
 
 yunanexus:
+  web:
+    jwt:
+      secret: ${YUNANEXUS_AUTH_JWT_SECRET}
+  auth:
+    jwt:
+      secret: ${YUNANEXUS_AUTH_JWT_SECRET}
+    builtin-clients:
+      - client-name: YunaNexusWeb
+        client-type: 1
+        scope: core:*:*:*
+        grant-types: password,refresh_token
+        redirect-uri: ${YUNANEXUS_WEB_URL:http://<前端服务器ip地址>:3000}
   mail:
-    host:
-    port:
-    username:
-    password:
-    from:
-    from-name:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    from: ${MAIL_FROM:}
+    from-name: ${MAIL_FROM_NAME:YunaNexus}
+    ssl: ${MAIL_SSL:false}
+    auth: ${MAIL_AUTH:true}
+    starttls: ${MAIL_STARTTLS:true}

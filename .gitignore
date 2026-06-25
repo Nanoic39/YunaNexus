@@ -3,6 +3,9 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+### 本地部署配置（含敏感信息，勿提交）###
+**/application-local.yaml
+
 ### IntelliJ IDEA ###
 .idea/
 .idea/modules.xml

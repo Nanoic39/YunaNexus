@@ -1,10 +1,6 @@
 spring:
   application:
     name: YunaNexus-FileService
-  data:
-    redis:
-      host: 127.0.0.1
-      port: 6379
   servlet:
     multipart:
       max-request-size: 100MB
@@ -17,13 +13,3 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
-
-server:
-  port: 8200
-
-yunanexus:
-  web:
-    jwt:
-      secret: ${YUNANEXUS_AUTH_JWT_SECRET}
-  file:
-    storage-path: ./storage

@@ -1,0 +1,13 @@
+server:
+  port: 8000
+
+spring:
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+
+yunanexus:
+  web:
+    jwt:
+      secret: ${YUNANEXUS_AUTH_JWT_SECRET}

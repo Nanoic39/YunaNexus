@@ -1,6 +1,3 @@
-server:
-  port: 8000
-
 spring:
   application:
     name: YunaNexus-Gateway
@@ -27,9 +24,6 @@ spring:
                 - Path=/file/**
 
 yunanexus:
-  web:
-    jwt:
-      secret: ${YUNANEXUS_AUTH_JWT_SECRET}
   gateway:
     shard:
       routes:
