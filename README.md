@@ -102,7 +102,18 @@ tail -f /从根目录开始/你安装nacos232的目录/绝对路径/nacos232/log
 # 启动后进入 <nacos服务器地址>:8080/next 初始化（注意开放防火墙端口）
 ```
 
-【4】拉取并配置后端项目
+【4】配置Redis
+```bash
+# 安装 Redis
+sudo apt install -y redis-server
+
+# 确认运行状态
+systemctl status redis
+
+# 默认监听 127.0.0.1:6379，本地访问无需额外配置
+```
+
+【5】拉取并配置后端项目
 
 ```bash
 # 克隆本仓库
@@ -140,20 +151,25 @@ nohup java -jar yunanexus-file/target/yunanexus-file-1.0.0.jar    --spring.profi
 nohup java -jar yunanexus-gateway/target/yunanexus-gateway-1.0.0.jar --spring.profiles.active=local > logs/gateway.log 2>&1 &
 ```
 
-【5】拉取并配置前端项目
+【6】拉取并配置前端项目
 ```bash
-# 安装 Node.js 与 pnpm（如已安装跳过）
-sudo apt install -y nodejs npm
+# 安装 Node.js 与 pnpm
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
 npm install -g pnpm
 
 cd ../YunaNexusWeb
-pnpm install && pnpm build
+pnpm install
+
+# 若网关非本机部署，修改 nuxt.config.ts 中 routeRules 的代理目标地址
+#   "/api/**": { proxy: "http://你的网关IP:8000/**" }
+pnpm build
 
 # 启动
 cd apps/yunanexus-main
 node .output/server/index.mjs
 ```
-> 前端默认监听 :3000（Nuxt nitro server 代理 /api → :8000 Gateway），确保防火墙已放行该端口。
+> 前端默认监听 :3000，Nitro server 代理 /api → Gateway（默认 127.0.0.1:8000），确保防火墙已放行 3000 端口。
 
 ## 😮 响应码列表
 

@@ -7,9 +7,9 @@ import cc.nanoic.yunanexus.common.web.common.Result;
 import cc.nanoic.yunanexus.user.entity.VO.UserProfileVO;
 import cc.nanoic.yunanexus.user.service.UserService;
 import jakarta.annotation.Resource;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/user")
@@ -25,5 +25,19 @@ public class UserController {
             throw new BusinessException(R.NOT_LOGIN, "请先登录");
         }
         return Result.success(userService.getUserProfile(globalId, true));
+    }
+
+    @PutMapping("/profile")
+    public Result<?> updateProfile(@RequestBody Map<String, String> body) {
+        byte[] globalId = PermissionContext.getGlobalId();
+        if (globalId == null) {
+            throw new BusinessException(R.NOT_LOGIN, "请先登录");
+        }
+        userService.updateProfile(globalId,
+                body.get("nickname"),
+                body.get("gender"),
+                body.get("birthday"),
+                body.get("bio"));
+        return Result.success(null);
     }
 }

@@ -139,9 +139,12 @@ public class AuthService {
         dto.setNickname(registerRequest.getNickname());
         dto.setGender(registerRequest.getGender());
 
-        userRemoteService.createUser(dto);
-
         try {
+            Result<?> createResult = userRemoteService.createUser(dto);
+            if (createResult.getCode() != R.SUCCESS.getCode()) {
+                throw new BusinessException(R.SERVER_ERROR, "创建用户失败: " + createResult.getMsg());
+            }
+
             UserIdentity identity = new UserIdentity();
             identity.setGlobalId(globalId);
             identity.setUsername(registerRequest.getUsername());
@@ -165,6 +168,8 @@ public class AuthService {
                     key.setUsedAt(LocalDateTime.now());
                     adminInitKeyMapper.updateById(key);
                     bindRole(globalId, "SUPER_ADMIN");
+                } else {
+                    throw new BusinessException(R.PARAM_ERROR, "管理员初始化密钥无效或已被使用");
                 }
             }
         } catch (Exception e) {

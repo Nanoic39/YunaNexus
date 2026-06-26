@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import mascot from "~/assets/mascot/YunaImageMascotQQ.jpg";
+import { useMyProfile } from "~/composables/useMyProfile";
+
 defineProps<{
   currentTitle: string;
 }>();
@@ -9,6 +12,7 @@ const emit = defineEmits<{
 }>();
 
 const { isLoggedIn } = useAuth();
+const { profile } = useMyProfile();
 
 const themeButtonRef = ref<HTMLElement>();
 
@@ -22,6 +26,13 @@ function onThemeClick() {
     : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   emit("toggle-theme", pos);
 }
+
+function avatarSrc(): string {
+  if (profile.value?.avatarUuid) {
+    return `/api/file/avatar/${profile.value.avatarUuid}`;
+  }
+  return mascot;
+}
 </script>
 
 <template>
@@ -34,43 +45,37 @@ function onThemeClick() {
     </div>
 
     <!-- 已登录：主题切换 + 用户信息 -->
-    <div v-if="isLoggedIn" class="topbar-right">
-      <button
-        ref="themeButtonRef"
-        class="topbar-action-button"
-        @click="onThemeClick"
-      >
-        <Icon name="lucide:sun" size="16" />
-      </button>
-      <div class="user-profile">
-        <div class="user-avatar">清</div>
-        <div>
-          <div class="user-name">清汐</div>
-          <div class="user-role">管理员</div>
-        </div>
+    <ClientOnly>
+      <div v-if="isLoggedIn" class="topbar-right">
+        <button
+          ref="themeButtonRef"
+          class="topbar-action-button"
+          @click="onThemeClick"
+        >
+          <Icon name="lucide:sun" size="16" />
+        </button>
+        <NuxtLink to="/profile" class="user-profile">
+          <img :src="avatarSrc()" class="user-avatar" />
+          <div class="user-profile-main">
+            <div class="user-name">{{ profile?.nickname || "用户" }}</div>
+          </div>
+        </NuxtLink>
       </div>
-    </div>
-
-    <!-- 未登录：主题切换 + 开源地址 + 登录 -->
-    <div v-else class="topbar-right">
-      <button
-        ref="themeButtonRef"
-        class="topbar-action-button"
-        @click="onThemeClick"
-      >
-        <Icon name="lucide:sun" size="16" />
-      </button>
-      <a
-        class="topbar-action-button"
-        href="https://github.com/Nanoic39/YunaNexus"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <Icon name="lucide:github" size="16" />
-      </a>
-      <NuxtLink to="/login" class="button button-primary button-small">
-        登录
-      </NuxtLink>
-    </div>
+      <div v-else class="topbar-right">
+        <button
+          ref="themeButtonRef"
+          class="topbar-action-button"
+          @click="onThemeClick"
+        >
+          <Icon name="lucide:sun" size="16" />
+        </button>
+        <NuxtLink to="/login" class="button button-primary button-small">
+          登录
+        </NuxtLink>
+      </div>
+      <template #fallback>
+        <div class="topbar-right" />
+      </template>
+    </ClientOnly>
   </header>
 </template>

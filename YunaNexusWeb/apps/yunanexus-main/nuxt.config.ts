@@ -1,3 +1,15 @@
+const API_TARGET = process.env.NUXT_API_PROXY_TARGET || "http://127.0.0.1:8000";
+
+const API_PATHS = [
+  "/api/login",
+  "/api/register",
+  "/api/auth",
+  "/api/key",
+  "/api/oauth",
+  "/api/file",
+  "/api/user",
+];
+
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: true },
@@ -10,6 +22,7 @@ export default defineNuxtConfig({
     "~/assets/styles/pages/hero.css",
     "~/assets/styles/pages/about.css",
     "~/assets/styles/pages/login.css",
+    "~/assets/styles/pages/profile.css",
   ],
   components: [{ path: "~/components", pathPrefix: false }],
   app: {
@@ -23,6 +36,13 @@ export default defineNuxtConfig({
     },
   },
   routeRules: {
-    "/api/**": { proxy: "http://localhost:8000/**" },
+    ...Object.fromEntries(
+      API_PATHS.map((p) => [
+        p + "/**",
+        { proxy: API_TARGET + p.replace("/api", "") + "/**" },
+      ]),
+    ),
+    "/_nuxt_icon/**": { proxy: undefined },
+    "/.well-known/**": { proxy: undefined },
   },
 });

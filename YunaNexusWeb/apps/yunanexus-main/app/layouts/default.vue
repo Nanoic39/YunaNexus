@@ -1,5 +1,7 @@
 <script setup lang="ts">
-const { menuItems } = useMenu();
+import { useMyProfile } from "~/composables/useMyProfile";
+
+const { menuItems, allowedPaths: menuAllowedPaths } = useMenu();
 const { toggle: toggleTheme, sidebarCollapsed } = useTheme();
 
 const mobileOpen = ref(false);
@@ -10,13 +12,16 @@ const route = useRoute();
 // 同步菜单路径给权限中间件
 const allowedPaths = useState<string[]>("menu-allowed-paths", () => []);
 
-watch(
-  menuItems,
-  (items) => {
-    allowedPaths.value = items.map((i) => i.path);
-  },
-  { immediate: true },
-);
+// 仅在客户端同步路径，避免 SSR 下用访客 fallback 误拦已登录页面
+if (import.meta.client) {
+  watch(
+    menuAllowedPaths,
+    (paths) => {
+      allowedPaths.value = paths;
+    },
+    { immediate: true },
+  );
+}
 
 // 同步当前页面标题
 watch(
@@ -29,6 +34,12 @@ watch(
   },
   { immediate: true },
 );
+
+const { fetch: fetchProfile } = useMyProfile();
+
+onMounted(() => {
+  fetchProfile();
+});
 </script>
 
 <template>

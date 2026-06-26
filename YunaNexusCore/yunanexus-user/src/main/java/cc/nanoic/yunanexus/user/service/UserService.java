@@ -11,6 +11,7 @@ import cc.nanoic.yunanexus.user.entity.VO.UserProfileVO;
 import cc.nanoic.yunanexus.user.mapper.UserEconomyMapper;
 import cc.nanoic.yunanexus.user.mapper.UserProfileMapper;
 import cc.nanoic.yunanexus.user.mapper.UsersMapper;
+import cn.hutool.core.date.DateTime;
 import cn.hutool.core.util.HexUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
@@ -89,6 +90,20 @@ public class UserService {
     public void updateAvatar(byte[] globalId, String avatarUuid) {
         UserProfile profile = findUserProfileByGid(globalId);
         profile.setAvatarUuid(avatarUuid);
+        userProfileMapper.updateById(profile);
+    }
+
+    @Transactional
+    public void updateProfile(byte[] globalId, String nickname, String gender, String birthday, String bio) {
+        UserProfile profile = findUserProfileByGid(globalId);
+        if (nickname != null)
+            profile.setNickname(nickname);
+        if (gender != null)
+            profile.setGender(gender);
+        if (birthday != null && !birthday.isEmpty())
+            profile.setBirthday(DateTime.of(birthday + " 00:00:00", "yyyy-MM-dd HH:mm:ss"));
+        if (bio != null)
+            profile.setBio(bio);
         userProfileMapper.updateById(profile);
     }
 

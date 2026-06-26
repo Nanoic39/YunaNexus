@@ -1,6 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ layout: "default" });
 
+const { encryptPassword } = useAuth();
+
 const username = ref("");
 const password = ref("");
 const confirmPassword = ref("");
@@ -25,10 +27,17 @@ async function sendVerifyCode() {
   errorMsg.value = "";
   sendingCode.value = true;
   try {
-    await $fetch("/api/register/send-code", {
-      method: "POST",
-      body: { email: email.value },
-    });
+    const res = await $fetch<{ code: number; msg: string }>(
+      "/api/register/send-code",
+      {
+        method: "POST",
+        body: { email: email.value },
+      },
+    );
+    if (res.code !== 200) {
+      errorMsg.value = res.msg || "验证码发送失败";
+      return;
+    }
     codeSent.value = true;
     countdown.value = 60;
     countdownTimer = setInterval(() => {
@@ -39,7 +48,7 @@ async function sendVerifyCode() {
       }
     }, 1000);
   } catch {
-    errorMsg.value = "验证码发送失败，请稍后重试";
+    errorMsg.value = "网络错误，请稍后重试";
   } finally {
     sendingCode.value = false;
   }
@@ -69,11 +78,12 @@ async function handleRegister() {
   }
   loading.value = true;
   try {
-    await $fetch("/api/register", {
+    const encrypted = await encryptPassword(password.value);
+    const res = await $fetch<{ code: number; msg: string }>("/api/register", {
       method: "POST",
       body: {
         username: username.value,
-        password: password.value,
+        password: encrypted,
         email: email.value,
         verifyCode: verifyCode.value,
         nickname: nickname.value,
@@ -81,9 +91,13 @@ async function handleRegister() {
         adminInitKey: adminInitKey.value || undefined,
       },
     });
+    if (res.code !== 200) {
+      errorMsg.value = res.msg || "注册失败";
+      return;
+    }
     navigateTo("/login");
   } catch {
-    errorMsg.value = "注册失败，请稍后重试";
+    errorMsg.value = "网络错误，请稍后重试";
   } finally {
     loading.value = false;
   }

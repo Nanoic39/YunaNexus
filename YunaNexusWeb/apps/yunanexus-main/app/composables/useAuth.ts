@@ -5,9 +5,14 @@ export interface AuthTokens {
   uuid: string;
 }
 
+interface AuthStorageData extends AuthTokens {
+  menus?: any[];
+  buttons?: string[];
+}
+
 const AUTH_STORAGE_KEY = "user-auth-info";
 
-function loadFromStorage(): AuthTokens | null {
+function loadFromStorage(): AuthStorageData | null {
   if (import.meta.server) return null;
   try {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY);
@@ -18,12 +23,27 @@ function loadFromStorage(): AuthTokens | null {
   }
 }
 
-function saveToStorage(tokens: AuthTokens) {
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(tokens));
+function saveToStorage(data: AuthStorageData) {
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data));
 }
 
 function clearStorage() {
   localStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+async function encryptPassword(plain: string): Promise<string> {
+  const { JSEncrypt } = await import("jsencrypt");
+  const keyRes = await $fetch<{ code: number; data: { publicKey: string } }>(
+    "/api/key/public",
+  );
+  if (keyRes.code !== 200 || !keyRes.data?.publicKey) {
+    throw new Error("获取加密密钥失败");
+  }
+  const encrypt = new JSEncrypt();
+  encrypt.setPublicKey(keyRes.data.publicKey);
+  const encrypted = encrypt.encrypt(plain);
+  if (!encrypted) throw new Error("密码加密失败");
+  return encrypted;
 }
 
 export function useAuth() {
@@ -31,17 +51,29 @@ export function useAuth() {
   const menus = useState<any[]>("auth-menus", () => []);
   const buttons = useState<string[]>("auth-buttons", () => []);
 
-  // 客户端初始化：从 localStorage 恢复
   if (import.meta.client && !tokens.value) {
-    tokens.value = loadFromStorage();
+    const stored = loadFromStorage();
+    if (stored) {
+      tokens.value = {
+        accessToken: stored.accessToken,
+        refreshToken: stored.refreshToken,
+        expiresIn: stored.expiresIn,
+        uuid: stored.uuid,
+      };
+      menus.value = stored.menus ?? [];
+      buttons.value = stored.buttons ?? [];
+    }
   }
 
   const isLoggedIn = computed(() => !!tokens.value?.accessToken);
   const currentUuid = computed(() => tokens.value?.uuid ?? "");
 
   async function login(username: string, password: string) {
+    const encrypted = await encryptPassword(password);
     const res = await $fetch<{
       code: number;
+      msg: string;
+      tip: string;
       data: {
         accessToken: string;
         refreshToken: string;
@@ -52,9 +84,11 @@ export function useAuth() {
       };
     }>("/api/login", {
       method: "POST",
-      body: { username, password },
+      body: { username, password: encrypted },
     });
-    if (res.code !== 200) throw new Error("登录失败");
+    if (res.code !== 200) {
+      throw new Error(res.tip || res.msg || "登录失败");
+    }
     tokens.value = {
       accessToken: res.data.accessToken,
       refreshToken: res.data.refreshToken,
@@ -63,7 +97,11 @@ export function useAuth() {
     };
     menus.value = res.data.menus ?? [];
     buttons.value = res.data.buttons ?? [];
-    saveToStorage(tokens.value);
+    saveToStorage({
+      ...tokens.value,
+      menus: menus.value,
+      buttons: buttons.value,
+    });
   }
 
   function logout() {
@@ -74,10 +112,8 @@ export function useAuth() {
     navigateTo("/login");
   }
 
-  /** 获取当前 accessToken，过期时自动刷新 */
   async function getAccessToken(): Promise<string | null> {
     if (!tokens.value) return null;
-    // TODO: 检查过期并 refresh
     return tokens.value.accessToken;
   }
 
@@ -90,5 +126,6 @@ export function useAuth() {
     login,
     logout,
     getAccessToken,
+    encryptPassword,
   };
 }

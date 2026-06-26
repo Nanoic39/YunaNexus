@@ -45,7 +45,7 @@ const sidebarClasses = computed(() => ({
   open: props.mobileOpen,
 }));
 
-const iconMap: Record<MenuItem["icon"], string> = {
+const iconMap: Record<string, string> = {
   dashboard: "lucide:layout-dashboard",
   folder: "lucide:folder",
   user: "lucide:circle-user",
@@ -53,6 +53,10 @@ const iconMap: Record<MenuItem["icon"], string> = {
   monitor: "lucide:activity",
   about: "lucide:info",
 };
+
+function getIconName(key: string): string {
+  return iconMap[key] || "lucide:circle";
+}
 </script>
 
 <template>
@@ -83,7 +87,7 @@ const iconMap: Record<MenuItem["icon"], string> = {
         @click="onNavClick"
       >
         <span class="nav-icon"
-          ><Icon :name="iconMap[item.icon]" size="16"
+          ><Icon :name="getIconName(item.icon)" size="16"
         /></span>
         <span>{{ item.label }}</span>
       </NuxtLink>

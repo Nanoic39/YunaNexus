@@ -18,8 +18,8 @@ async function handleLogin() {
   try {
     await login(account.value, password.value);
     navigateTo("/");
-  } catch {
-    errorMsg.value = "登录失败，请检查用户名或密码";
+  } catch (e: any) {
+    errorMsg.value = e.message || "登录失败，请检查用户名或密码";
   } finally {
     loading.value = false;
   }

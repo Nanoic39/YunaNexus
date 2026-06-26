@@ -11,5 +11,8 @@
   },
   "keywords": [],
   "author": "YunaNexus|nanoic",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "@iconify-json/lucide": "^1.2.114"
+  }
 }
