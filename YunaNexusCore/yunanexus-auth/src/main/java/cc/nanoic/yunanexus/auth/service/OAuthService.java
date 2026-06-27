@@ -147,11 +147,13 @@ public class OAuthService {
             vo.setRedirectUri(c.getRedirectUri());
             vo.setDescription(c.getDescription());
             vo.setAuditStatus(c.getAuditStatus());
+            vo.setAuditOpinion(c.getAuditOpinion());
             vo.setApplicantGlobalId(c.getApplicantGlobalId() != null
                     ? HexUtil.encodeHexStr(c.getApplicantGlobalId())
                     : null);
             vo.setStatus(c.getStatus());
-            vo.setCreatedAt(c.getCreatedAt());
+            vo.setCreatedAt(c.getCreatedAt() != null ? c.getCreatedAt().toString() : null);
+            vo.setUpdatedAt(c.getUpdatedAt() != null ? c.getUpdatedAt().toString() : null);
             return vo;
         }).collect(Collectors.toList());
     }
@@ -245,11 +247,17 @@ public class OAuthService {
         vo.setRedirectUri(client.getRedirectUri());
         vo.setDescription(client.getDescription());
         vo.setAuditStatus(client.getAuditStatus());
+        vo.setAuditOpinion(client.getAuditOpinion());
         vo.setApplicantGlobalId(client.getApplicantGlobalId() != null
                 ? HexUtil.encodeHexStr(client.getApplicantGlobalId())
                 : null);
+        vo.setAuditorGlobalId(client.getAuditorGlobalId() != null
+                ? HexUtil.encodeHexStr(client.getAuditorGlobalId())
+                : null);
+        vo.setAuditedAt(client.getAuditedAt() != null ? client.getAuditedAt().toString() : null);
         vo.setStatus(client.getStatus());
-        vo.setCreatedAt(client.getCreatedAt());
+        vo.setCreatedAt(client.getCreatedAt() != null ? client.getCreatedAt().toString() : null);
+        vo.setUpdatedAt(client.getUpdatedAt() != null ? client.getUpdatedAt().toString() : null);
         return vo;
     }
 

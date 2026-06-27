@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -22,6 +23,11 @@ public class OAuthClientController {
 
     @Resource
     private OAuthService oAuthService;
+
+    @GetMapping("/list")
+    public Result<List<OAuthClientVO>> list() {
+        return Result.success(oAuthService.listClients());
+    }
 
     @PostMapping("/register")
     public Result<Map<String, Object>> register(@RequestBody RegisterClientRequest req) {
@@ -41,8 +47,8 @@ public class OAuthClientController {
 
     @PostMapping("/{uuid}/audit")
     public Result<?> audit(@PathVariable String uuid,
-                           @RequestParam Integer auditStatus,
-                           @RequestParam(required = false) String auditOpinion) {
+            @RequestParam Integer auditStatus,
+            @RequestParam(required = false) String auditOpinion) {
         oAuthService.auditClient(uuid, auditStatus, auditOpinion);
         return Result.success(null);
     }

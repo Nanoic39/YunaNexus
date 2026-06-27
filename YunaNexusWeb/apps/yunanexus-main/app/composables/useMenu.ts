@@ -35,6 +35,7 @@ function mapResources(list: ResourceVO[]): MenuItem[] {
 const FALLBACK_MENU_AUTH: MenuItem[] = [
   { path: "/", label: "仪表盘", icon: "dashboard" },
   { path: "/files", label: "文件", icon: "folder" },
+  { path: "/apps", label: "应用", icon: "box" },
   { path: "/profile", label: "我的", icon: "user" },
   { path: "/settings", label: "设置", icon: "settings" },
 ];

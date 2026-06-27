@@ -14,7 +14,11 @@ public class OAuthClientVO {
     private String redirectUri;
     private String description;
     private Integer auditStatus;
+    private String auditOpinion;
     private String applicantGlobalId;
+    private String auditorGlobalId;
+    private String auditedAt;
     private Integer status;
-    private LocalDateTime createdAt;
+    private String createdAt;
+    private String updatedAt;
 }

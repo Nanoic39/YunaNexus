@@ -41,18 +41,6 @@
   gap: 18px;
 }
 
-.auth-field {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.auth-field span {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-font);
-}
-
 .auth-required::before {
   content: "* ";
   color: var(--color-error, #dc2626);
@@ -78,28 +66,10 @@
   align-items: baseline;
 }
 
-.auth-field input {
-  width: 100%;
+/* 登录/注册页表单字段微调 */
+.auth-card .auth-field input {
   height: 40px;
   padding: 0 12px;
-  font-size: 13px;
-  font-family: inherit;
-  color: var(--color-font);
-  background: var(--color-primary-background);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  outline: none;
-  box-sizing: border-box;
-  transition: border-color 0.15s;
-}
-
-.auth-field input:focus {
-  border-color: var(--color-emphasis);
-}
-
-.auth-field input::placeholder {
-  color: var(--color-font-assist);
-  opacity: 0.6;
 }
 
 .auth-error {

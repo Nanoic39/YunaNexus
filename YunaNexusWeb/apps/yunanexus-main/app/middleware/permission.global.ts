@@ -2,7 +2,8 @@ export default defineNuxtRouteMiddleware((to) => {
   if (
     to.path === "/forbidden" ||
     to.path.startsWith("/login") ||
-    to.path.startsWith("/register")
+    to.path.startsWith("/register") ||
+    to.path.startsWith("/admin/")
   )
     return;
 

@@ -23,6 +23,7 @@ export default defineNuxtConfig({
     "~/assets/styles/pages/about.css",
     "~/assets/styles/pages/login.css",
     "~/assets/styles/pages/profile.css",
+    "~/assets/styles/pages/apps.css",
   ],
   components: [{ path: "~/components", pathPrefix: false }],
   app: {

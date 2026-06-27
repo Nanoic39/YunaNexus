@@ -1,0 +1,166 @@
+.apps-page {
+  display: grid;
+  gap: 20px;
+}
+
+.apps-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.apps-list {
+  display: grid;
+  gap: 12px;
+}
+
+.app-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.15s;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+
+.app-card:hover {
+  border-color: var(--color-emphasis);
+}
+
+.app-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-emphasis);
+}
+
+.app-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.app-card-desc {
+  font-size: 12px;
+  color: var(--color-font-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--color-font-assist);
+}
+
+.app-status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.app-status-tag.pending {
+  background: rgba(250, 173, 20, 0.1);
+  color: #d48806;
+}
+
+.app-status-tag.approved {
+  background: rgba(82, 196, 26, 0.1);
+  color: #389e0d;
+}
+
+.app-status-tag.rejected {
+  background: rgba(216, 57, 49, 0.08);
+  color: #b31f1f;
+}
+
+.apps-empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--color-font-assist);
+}
+
+.apps-empty p {
+  margin-bottom: 16px;
+}
+
+/* apply page */
+.apply-form {
+  max-width: 560px;
+}
+
+.apply-hint {
+  font-size: 12px;
+  color: var(--color-font-assist);
+  margin-top: 2px;
+}
+
+/* admin audit */
+.admin-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-font-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filter-chip.active {
+  border-color: var(--color-emphasis);
+  background: rgba(0, 102, 255, 0.06);
+  color: var(--color-emphasis);
+}
+
+.audit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.audit-modal {
+  max-width: 420px;
+  width: 100%;
+}
+
+.audit-modal textarea {
+  width: 100%;
+  min-height: 80px;
+}
+
+@media (max-width: 640px) {
+  .app-card-meta {
+    display: none;
+  }
+}
