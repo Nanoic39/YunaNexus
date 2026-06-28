@@ -35,26 +35,26 @@ public class OAuthClientController {
     }
 
     @GetMapping("/{uuid}")
-    public Result<OAuthClientVO> detail(@PathVariable String uuid) {
+    public Result<OAuthClientVO> detail(@PathVariable("uuid") String uuid) {
         return Result.success(oAuthService.getClientDetail(uuid));
     }
 
     @PutMapping("/{uuid}")
-    public Result<?> update(@PathVariable String uuid, @RequestBody RegisterClientRequest req) {
+    public Result<?> update(@PathVariable("uuid") String uuid, @RequestBody RegisterClientRequest req) {
         oAuthService.updateClient(uuid, req);
         return Result.success(null);
     }
 
     @PostMapping("/{uuid}/audit")
-    public Result<?> audit(@PathVariable String uuid,
-            @RequestParam Integer auditStatus,
-            @RequestParam(required = false) String auditOpinion) {
+    public Result<?> audit(@PathVariable("uuid") String uuid,
+            @RequestParam("auditStatus") Integer auditStatus,
+            @RequestParam(value = "auditOpinion", required = false) String auditOpinion) {
         oAuthService.auditClient(uuid, auditStatus, auditOpinion);
         return Result.success(null);
     }
 
     @PostMapping("/{uuid}/toggle")
-    public Result<?> toggle(@PathVariable String uuid) {
+    public Result<?> toggle(@PathVariable("uuid") String uuid) {
         oAuthService.toggleClient(uuid);
         return Result.success(null);
     }

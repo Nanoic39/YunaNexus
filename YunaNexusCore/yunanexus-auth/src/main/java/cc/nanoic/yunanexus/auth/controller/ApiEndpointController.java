@@ -29,7 +29,7 @@ public class ApiEndpointController {
      * 获取指定服务的全量接口配置（内部调用 / 服务拉取更新）
      */
     @GetMapping("/{serviceName}")
-    public Result<List<EndpointConfigItem>> getServiceConfig(@PathVariable String serviceName) {
+    public Result<List<EndpointConfigItem>> getServiceConfig(@PathVariable("serviceName") String serviceName) {
         List<EndpointConfigItem> config = apiEndpointService.getServiceConfig(serviceName);
         return Result.success(config);
     }
@@ -38,7 +38,7 @@ public class ApiEndpointController {
      * 管理端修改接口配置后触发推送通知（由管理端控制器调用）
      */
     @PostMapping("/publish/{serviceName}")
-    public Result<Void> publishUpdate(@PathVariable String serviceName) {
+    public Result<Void> publishUpdate(@PathVariable("serviceName") String serviceName) {
         apiEndpointService.notifyServiceUpdate(serviceName);
         return Result.success(null);
     }
