@@ -95,6 +95,7 @@ public class AuthInitializer {
         long filesId = upsertResource(null, "文件管理", "core:file", 0, "folder", "/files", null, sort += 10);
         // 应用管理 (目录)
         long appsId = upsertResource(null, "应用管理", "core:apps", 0, "box", "/apps", null, sort += 10);
+        upsertResource(appsId, "我的应用", "core:apps:list", 1, "layout", "/apps", null, sort += 10);
         upsertResource(appsId, "创建应用", "core:apps:create", 1, "plus", "/apps/apply", null, sort += 10);
 
         // 管理中心 (目录 - 仅管理员可见)

@@ -6,6 +6,7 @@ const API_PATHS = [
   "/api/auth",
   "/api/key",
   "/api/oauth",
+  "/api/admin",
   "/api/file",
   "/api/user",
 ];

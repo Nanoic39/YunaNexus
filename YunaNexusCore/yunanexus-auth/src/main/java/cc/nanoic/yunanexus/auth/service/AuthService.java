@@ -44,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.Year;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -340,6 +341,7 @@ public class AuthService {
         resp.setRefreshToken(refreshToken);
         resp.setExpiresIn(jwtConfig.getAccessExp());
         resp.setUuid(externalUuid);
+        resp.setRoles(new ArrayList<>(roles));
         resp.setMenus(resourceService.buildMenuTree(permissions));
         resp.setButtons(resourceService.getUserButtonCodes(permissions));
         return resp;

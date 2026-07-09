@@ -14,7 +14,8 @@ public class OAuthClient {
     private Long id;
     private String uuid; // 客户端UUID
     private String clientName; // 客户端名称
-    private String clientSecret; // 客户端密钥
+    private String clientSecret; // 客户端密钥(BCrypt哈希)
+    private String clientSecretEncrypted; // 客户端密钥(AES加密原文，允许用户反复查看)
     private Integer clientType; // 客户端类型 1:官方 2:第三方
     private String grantTypes; // 认证方式 账号密码：password,Token刷新：refresh_token,OAuth：authorization_code
     private String scope; // 授权范围

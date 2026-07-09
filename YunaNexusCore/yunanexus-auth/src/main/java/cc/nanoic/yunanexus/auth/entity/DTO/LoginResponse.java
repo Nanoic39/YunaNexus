@@ -11,6 +11,7 @@ public class LoginResponse {
     private String refreshToken;
     private long expiresIn;
     private String uuid;
+    private List<String> roles;
     private List<ResourceVO> menus;
     private List<String> buttons;
 }

@@ -40,6 +40,7 @@ CREATE TABLE `oauth_client` (
     `auditor_global_id` BINARY(6) DEFAULT NULL COMMENT '审核人id',
     `audit_opinion` VARCHAR(255) DEFAULT NULL COMMENT '审核意见',
     `audited_at` TIMESTAMP NULL DEFAULT NULL COMMENT '审核时间',
+    `client_secret_encrypted` TEXT COMMENT '客户端密钥(AES加密原文，允许用户反复查看)',
     `status` TINYINT NOT NULL DEFAULT 1 COMMENT '0:禁用 1:启用',
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

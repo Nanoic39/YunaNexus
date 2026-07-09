@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.auth.service;
 
+import cc.nanoic.yunanexus.auth.config.AuthProperties;
 import cc.nanoic.yunanexus.auth.entity.DTO.RegisterClientRequest;
 import cc.nanoic.yunanexus.auth.entity.DTO.AuthorizeRequest;
 import cc.nanoic.yunanexus.auth.entity.DTO.LoginResponse;
@@ -12,10 +13,12 @@ import cc.nanoic.yunanexus.common.web.auth.PermissionContext;
 import cc.nanoic.yunanexus.common.web.auth.PermissionUtil;
 import cc.nanoic.yunanexus.common.web.common.BusinessException;
 import cc.nanoic.yunanexus.common.web.common.R;
+import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.HexUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import cn.hutool.crypto.digest.DigestUtil;
+import cn.hutool.crypto.symmetric.AES;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -24,6 +27,7 @@ import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.HashMap;
@@ -42,6 +46,9 @@ public class OAuthService {
 
     @Resource
     private AuthService authService;
+
+    @Resource
+    private AuthProperties authProperties;
 
     public Map<String, String> authorize(AuthorizeRequest req) {
         OAuthClient client = findActiveClient(req.getClientId());
@@ -204,8 +211,11 @@ public class OAuthService {
         OAuthClient client = new OAuthClient();
         client.setUuid(cn.hutool.core.util.IdUtil.fastSimpleUUID());
         client.setClientName(req.getClientName());
-        client.setClientSecret(BCrypt.hashpw(RandomUtil.randomString(32)));
-        client.setClientType(PermissionUtil.hasRole("ADMIN") || PermissionUtil.hasRole("SUPER_ADMIN") ? 1 : 2);
+        String rawSecret = RandomUtil.randomString(32);
+        client.setClientSecret(BCrypt.hashpw(rawSecret));
+        AES aes = new AES(loadAesKey());
+        client.setClientSecretEncrypted(aes.encryptBase64(rawSecret));
+        client.setClientType(PermissionUtil.hasRole("SUPER_ADMIN") ? 1 : 2);
         client.setGrantTypes(req.getGrantTypes() != null ? req.getGrantTypes() : "authorization_code");
         client.setScope(req.getScope() != null ? req.getScope() : "read");
         client.setRedirectUri(req.getRedirectUri());
@@ -220,6 +230,7 @@ public class OAuthService {
         Map<String, Object> result = new HashMap<>();
         result.put("uuid", client.getUuid());
         result.put("clientName", client.getClientName());
+        result.put("clientSecret", rawSecret);
         result.put("clientType", client.getClientType());
         result.put("auditStatus", client.getAuditStatus());
         return result;
@@ -317,5 +328,29 @@ public class OAuthService {
         PermissionUtil.checkPermission("core:oauth:audit");
         OAuthClient client = findClientByUuid(uuid);
         oAuthClientMapper.deleteById(client.getId());
+    }
+
+    public String getClientSecret(String uuid) {
+        byte[] globalId = PermissionContext.getGlobalId();
+        OAuthClient client = findClientByUuid(uuid);
+        // 只有申请人或管理员可以查看密钥
+        boolean isOwner = java.util.Arrays.equals(globalId, client.getApplicantGlobalId());
+        if (!isOwner && !PermissionUtil.hasRole("SUPER_ADMIN") && !PermissionUtil.hasRole("ADMIN")) {
+            throw new BusinessException(R.NOT_PERMISSION, "只有申请人和管理员可以查看密钥");
+        }
+        if (client.getClientSecretEncrypted() == null || client.getClientSecretEncrypted().isEmpty()) {
+            throw new BusinessException(R.NOT_FOUND, "该应用创建时间较早，不支持查看密钥，请重新创建应用");
+        }
+        AES aes = new AES(loadAesKey());
+        return aes.decryptStr(client.getClientSecretEncrypted());
+    }
+
+    private byte[] loadAesKey() {
+        String keyPath = authProperties.getAes().getKeyPath();
+        File keyFile = new File(keyPath, "aes.key");
+        if (!keyFile.exists()) {
+            throw new BusinessException(R.SERVER_ERROR, "AES密钥未初始化");
+        }
+        return FileUtil.readBytes(keyFile);
     }
 }

@@ -3,7 +3,8 @@ spring:
     name: YunaNexus-FileService
   servlet:
     multipart:
-      max-request-size: 100MB
+      max-file-size: 500MB
+      max-request-size: 500MB
 
 mybatis-plus:
   type-aliases-package: cc.nanoic.yunanexus.file.entity

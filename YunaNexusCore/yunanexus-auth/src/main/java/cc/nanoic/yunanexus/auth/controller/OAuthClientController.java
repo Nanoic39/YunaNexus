@@ -36,6 +36,12 @@ public class OAuthClientController {
         return Result.success(oAuthService.getClientDetail(uuid));
     }
 
+    @GetMapping("/{uuid}/secret")
+    @RequirePermission
+    public Result<String> secret(@PathVariable("uuid") String uuid) {
+        return Result.success(oAuthService.getClientSecret(uuid));
+    }
+
     @PutMapping("/{uuid}")
     @RequirePermission
     public Result<?> update(@PathVariable("uuid") String uuid, @RequestBody RegisterClientRequest req) {
