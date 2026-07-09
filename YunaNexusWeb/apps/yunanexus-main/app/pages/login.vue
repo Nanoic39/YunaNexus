@@ -15,8 +15,8 @@ const fieldErrors = ref<Record<string, string>>({});
 function validateField(field: string) {
   const errs = { ...fieldErrors.value };
   if (field === "account") {
-    if (!account.value.includes("@") || !account.value.includes(".")) {
-      errs.account = "请输入有效的邮箱地址";
+    if (account.value.trim().length < 3) {
+      errs.account = "用户名至少需要 3 个字符";
     } else {
       delete errs.account;
     }
@@ -34,8 +34,8 @@ function validate(): boolean {
   const errs: Record<string, string> = {};
   if (!account.value) {
     errs.account = "请输入用户名";
-  } else if (!account.value.includes("@") || !account.value.includes(".")) {
-    errs.account = "请输入有效的邮箱地址";
+  } else if (account.value.trim().length < 3) {
+    errs.account = "用户名至少需要 3 个字符";
   }
   if (!password.value) {
     errs.password = "请输入密码";

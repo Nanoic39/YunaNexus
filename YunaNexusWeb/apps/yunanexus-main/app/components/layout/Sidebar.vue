@@ -130,6 +130,7 @@ const iconMap: Record<string, string> = {
   "shield-check": "lucide:shield-check",
   plus: "lucide:plus",
   "clipboard-check": "lucide:clipboard-check",
+  users: "lucide:users-round",
   "users-round": "lucide:users-round",
   list: "lucide:list",
   database: "lucide:database",

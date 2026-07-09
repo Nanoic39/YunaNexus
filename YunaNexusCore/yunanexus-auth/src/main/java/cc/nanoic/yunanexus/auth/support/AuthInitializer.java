@@ -59,22 +59,26 @@ public class AuthInitializer {
         initAesKey();
     }
 
-    // 初始化默认角色
+    // 初始化默认角色（幂等：已有角色跳过，只添加缺失的）
     private void initDefaultRoles() {
-        if (rolesMapper.selectCount(new LambdaQueryWrapper<>()) > 0) {
-            logger.info("已存在默认角色（跳过）");
-            return;
-        }
-        insertRole("SUPER_ADMIN", 99, "*:*:*:*"); // 所有权限
-        insertRole("ADMIN", 60, "core:*:*:manage"); // 全局管理
-        insertRole("MODERATOR", 30, "admin:users:read", "admin:users:write", "admin:apps:read", "admin:apps:write", "core:admin:moderate:*");
-        insertRole("USER", 1, "core:*:self:read", "core:*:self:edit");
-        insertRole("VIP", 10, "core:file:vip:upload", "core:file:vip:download", "core:identity:vip:badge");
+        upsertRole("SUPER_ADMIN", 99, "*:*:*:*"); // 所有权限
+        upsertRole("ADMIN", 60, "core:*:*:manage"); // 全局管理
+        upsertRole("MODERATOR", 30, "admin:users:read", "admin:users:write", "admin:apps:read", "admin:apps:write",
+                "core:admin:moderate:*");
+        upsertRole("USER", 1, "core:*:self:read", "core:*:self:edit");
+        upsertRole("VIP", 10, "core:file:vip:upload", "core:file:vip:download", "core:identity:vip:badge");
         logger.info("默认角色初始化完成");
     }
 
-    // 插入角色
-    private void insertRole(String name, Integer level, String... permissions) {
+    // 幂等插入角色：按 name 检测，已存在则跳过
+    private void upsertRole(String name, Integer level, String... permissions) {
+        Roles existing = rolesMapper.selectOne(
+                new LambdaQueryWrapper<Roles>()
+                        .eq(Roles::getName, name)
+                        .last("LIMIT 1"));
+        if (existing != null) {
+            return;
+        }
         Roles role = new Roles();
         role.setName(name);
         role.setLevel(level);
@@ -84,49 +88,64 @@ public class AuthInitializer {
     }
 
     private void initDefaultResources() {
-        if (resourceMapper.selectCount(new LambdaQueryWrapper<ResourceEntity>()) > 0) {
-            logger.info("已存在资源数据（跳过）");
-            return;
-        }
-
         int sort = 0;
         // 仪表盘 (目录)
-        long dashboardId = insertResource(null, "仪表盘", "core:dashboard", 0, "dashboard", "/", null, sort += 10);
+        long dashboardId = upsertResource(null, "仪表盘", "core:dashboard", 0, "dashboard", "/", null, sort += 10);
         // 文件管理 (目录)
-        long filesId = insertResource(null, "文件管理", "core:file", 0, "folder", "/files", null, sort += 10);
+        long filesId = upsertResource(null, "文件管理", "core:file", 0, "folder", "/files", null, sort += 10);
         // 应用管理 (目录)
-        long appsId = insertResource(null, "应用管理", "core:apps", 0, "box", "/apps", null, sort += 10);
-        insertResource(appsId, "创建应用", "core:apps:create", 1, "plus", "/apps/apply", null, sort += 10);
+        long appsId = upsertResource(null, "应用管理", "core:apps", 0, "box", "/apps", null, sort += 10);
+        upsertResource(appsId, "创建应用", "core:apps:create", 1, "plus", "/apps/apply", null, sort += 10);
 
         // 管理中心 (目录 - 仅管理员可见)
-        long adminId = insertResource(null, "管理中心", "core:admin", 0, "shield", "/admin", null, sort += 10);
-        insertResource(adminId, "应用审核", "core:oauth:audit", 1, "clipboard-check", "/admin/apps", null, sort += 10);
-        insertResource(adminId, "用户管理", "core:admin:users:read", 1, "users", "/admin/users", null, sort += 10);
-        insertResource(adminId, "角色管理", "core:admin:roles:read", 1, "shield-check", "/admin/roles", null, sort += 10);
-        insertResource(adminId, "资源管理", "core:admin:resources:read", 1, "list", "/admin/resources", null, sort += 10);
-        insertResource(adminId, "接口端点", "core:admin:endpoints:read", 1, "plug", "/admin/endpoints", null, sort += 10);
+        long adminId = upsertResource(null, "管理中心", "core:admin", 0, "shield", "/admin", null, sort += 10);
+        upsertResource(adminId, "应用审核", "core:oauth:audit", 1, "clipboard-check", "/admin/apps", null, sort += 10);
+        upsertResource(adminId, "用户管理", "core:admin:users:read", 1, "users", "/admin/users", null, sort += 10);
+        upsertResource(adminId, "角色管理", "core:admin:roles:read", 1, "shield-check", "/admin/roles", null, sort += 10);
+        upsertResource(adminId, "资源管理", "core:admin:resources:read", 1, "list", "/admin/resources", null, sort += 10);
+        upsertResource(adminId, "接口端点", "core:admin:endpoints:read", 1, "plug", "/admin/endpoints", null, sort += 10);
 
         // 个人 (目录)
-        insertResource(null, "个人中心", null, 0, "user", "/profile", null, sort += 10);
+        upsertResource(null, "个人中心", null, 0, "user", "/profile", null, sort += 10);
         // 设置 (目录)
-        insertResource(null, "系统设置", null, 0, "settings", "/settings", null, sort += 10);
+        upsertResource(null, "系统设置", null, 0, "settings", "/settings", null, sort += 10);
 
         // 按钮权限
-        insertResource(null, "保存资料", "core:user:self:edit", 2, null, null, null, sort += 10);
-        insertResource(null, "上传头像", "core:file:avatar:upload", 2, null, null, null, sort += 10);
-        insertResource(null, "管理用户", "admin:users:write", 2, null, null, null, sort += 10);
-        insertResource(null, "分配角色", "admin:users:roles:assign", 2, null, null, null, sort += 10);
-        insertResource(null, "管理角色", "admin:system:roles:write", 2, null, null, null, sort += 10);
-        insertResource(null, "管理资源", "admin:system:resources:write", 2, null, null, null, sort += 10);
-        insertResource(null, "管理端点", "admin:system:endpoints:write", 2, null, null, null, sort += 10);
-        insertResource(null, "审核应用", "admin:oauth:audit", 2, null, null, null, sort += 10);
-        insertResource(null, "删除应用", "admin:oauth:client:delete", 2, null, null, null, sort += 10);
+        upsertResource(null, "保存资料", "core:user:self:edit", 2, null, null, null, sort += 10);
+        upsertResource(null, "上传头像", "core:file:avatar:upload", 2, null, null, null, sort += 10);
+        upsertResource(null, "管理用户", "admin:users:write", 2, null, null, null, sort += 10);
+        upsertResource(null, "分配角色", "admin:users:roles:assign", 2, null, null, null, sort += 10);
+        upsertResource(null, "管理角色", "admin:system:roles:write", 2, null, null, null, sort += 10);
+        upsertResource(null, "管理资源", "admin:system:resources:write", 2, null, null, null, sort += 10);
+        upsertResource(null, "管理端点", "admin:system:endpoints:write", 2, null, null, null, sort += 10);
+        upsertResource(null, "审核应用", "admin:oauth:audit", 2, null, null, null, sort += 10);
+        upsertResource(null, "删除应用", "admin:oauth:client:delete", 2, null, null, null, sort += 10);
 
         logger.info("默认资源数据初始化完成");
     }
 
-    private long insertResource(Long parentId, String name, String code, int type, String icon, String path,
+    /**
+     * 按 code 检测是否已有资源，有则返回已有ID，无则插入
+     */
+    private long upsertResource(Long parentId, String name, String code, int type, String icon, String path,
             String component, int sortNo) {
+        // 按 code 查已有资源（code 为 null 时按 name 查）
+        ResourceEntity existing = null;
+        if (code != null) {
+            existing = resourceMapper.selectOne(
+                    new LambdaQueryWrapper<ResourceEntity>()
+                            .eq(ResourceEntity::getCode, code)
+                            .last("LIMIT 1"));
+        } else {
+            existing = resourceMapper.selectOne(
+                    new LambdaQueryWrapper<ResourceEntity>()
+                            .eq(ResourceEntity::getName, name)
+                            .isNull(ResourceEntity::getCode)
+                            .last("LIMIT 1"));
+        }
+        if (existing != null) {
+            return existing.getId();
+        }
         ResourceEntity r = new ResourceEntity();
         r.setParentId(parentId != null ? parentId : 0L);
         r.setName(name);
