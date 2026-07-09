@@ -123,33 +123,38 @@
   color: var(--color-emphasis);
 }
 
-/* ========== 提示条 ========== */
-.toast {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
+/* ========== 通用输入状态 ========== */
+.input-error {
+  border-color: var(--color-error) !important;
+}
+.field-error-text {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-error);
+}
+.input-disabled, input:disabled, textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ========== 按钮 Loading 状态 ========== */
+.button:disabled, .button-loading {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ========== 骨架屏 ========== */
+.skeleton {
+  background: linear-gradient(90deg, var(--color-primary-background) 25%, var(--color-border) 50%, var(--color-primary-background) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
   border-radius: var(--radius-md);
-  font-size: 13px;
-  background: var(--color-card);
-  box-shadow: 0 0 0 1px var(--color-border);
-  max-width: 420px;
 }
-
-.toast + .toast {
-  margin-top: 6px;
-}
-
-.toast-success {
-  border-left: 3px solid var(--color-emphasis);
-}
-
-.toast-error {
-  border-left: 3px solid #d83931;
-}
-
-.toast-info {
-  border-left: 3px solid var(--color-font-assist);
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* ========== 文件列表 ========== */
@@ -281,10 +286,40 @@
   letter-spacing: 0.02em;
 }
 
-.panel-card-body {
+.panel-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 24px 0;
+}
+
+.panel-card-header-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--color-emphasis-soft);
+  color: var(--color-emphasis);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.panel-card-header-text h3 {
+  margin: 0;
   font-size: 14px;
+  font-weight: 600;
+}
+
+.panel-card-header-sub {
+  font-size: 11px;
+  color: var(--color-font-assist);
+}
+
+.panel-card-body {
   display: grid;
-  gap: 8px;
+  gap: 14px;
+  padding: 20px 24px;
 }
 
 .panel-card-body strong {
@@ -419,6 +454,11 @@
   transform: rotate(180deg);
 }
 
+.select-input-arrow:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .select-input-dropdown {
   position: absolute;
   top: 100%;
@@ -426,6 +466,8 @@
   right: 0;
   margin-top: 4px;
   padding: 4px 0;
+  max-height: 240px;
+  overflow-y: auto;
   list-style: none;
   background: var(--color-card);
   border: 1px solid var(--color-border);
@@ -445,6 +487,34 @@
 .select-input-dropdown-item:hover {
   background: var(--color-primary-background);
   color: var(--color-emphasis);
+}
+
+.select-input-dropdown-item.active {
+  background: var(--color-primary-background);
+  color: var(--color-emphasis);
+}
+
+.select-input-dropdown-item.selected {
+  font-weight: 600;
+}
+
+.select-input-empty {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--color-font-assist);
+  text-align: center;
+  cursor: default;
+}
+
+.select-input-field:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.select-input-error {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-danger, #e74c3c);
 }
 
 /* ========== 通用表单字段 ========== */

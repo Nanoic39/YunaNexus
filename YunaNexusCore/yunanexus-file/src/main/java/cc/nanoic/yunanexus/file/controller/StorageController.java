@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.file.controller;
 
 import cc.nanoic.yunanexus.common.web.common.Result;
+import cc.nanoic.yunanexus.common.web.auth.RequirePermission;
 import cc.nanoic.yunanexus.file.entity.DTO.QuotaResult;
 import cc.nanoic.yunanexus.file.service.QuotaService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +18,7 @@ public class StorageController {
         this.quotaService = quotaService;
     }
 
+    @RequirePermission
     @GetMapping("/summary")
     public Result<QuotaResult> summary() {
         return Result.success(quotaService.getQuota());

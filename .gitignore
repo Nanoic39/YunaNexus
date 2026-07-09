@@ -80,3 +80,7 @@ postman/
 
 ### 本地调试脚本 ###
 ScriptsDebug/
+
+# Mock 数据（从 .example.ts 复制生成）
+**/mock/*.ts
+!**/mock/*.example.ts

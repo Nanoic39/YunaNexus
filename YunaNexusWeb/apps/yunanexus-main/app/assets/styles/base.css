@@ -56,7 +56,11 @@ body {
   body[data-sidebar-collapsed="true"]
     .app-sidebar
     .sidebar-nav-item
-    > span:last-child,
+    > .nav-label,
+  body[data-sidebar-collapsed="true"]
+    .app-sidebar
+    .sidebar-nav-item
+    > .nav-arrow-slot,
   body[data-sidebar-collapsed="true"]
     .app-sidebar
     .sidebar-footer-item
@@ -82,7 +86,8 @@ body {
 }
 
 .app-sidebar.sidebar-collapsed .sidebar-brand-text,
-.app-sidebar.sidebar-collapsed .sidebar-nav-item > span:last-child,
+.app-sidebar.sidebar-collapsed .sidebar-nav-item > .nav-label,
+.app-sidebar.sidebar-collapsed .sidebar-nav-item > .nav-arrow-slot,
 .app-sidebar.sidebar-collapsed .sidebar-footer-item > span:last-child {
   display: none !important;
 }
@@ -359,10 +364,17 @@ body {
     color 0.2s;
 }
 
-/* 大屏内容区自动缩放，Sidebar/Topbar 不受影响 */
-@media (min-width: 1920px) {
+/* 大屏适配：内容居中 + 最大宽度限制 */
+/* 页面子级自行声明 max-width: 100%; margin: 0 auto 实现居中 */
+@media (min-width: 1400px) {
   .page-content {
-    zoom: 1.5;
+    padding: 32px 40px;
+  }
+}
+
+@media (min-width: 1800px) {
+  .page-content {
+    padding: 36px 56px;
   }
 }
 
@@ -471,7 +483,8 @@ body {
   }
 
   .app-sidebar.sidebar-collapsed .sidebar-brand-text,
-  .app-sidebar.sidebar-collapsed .sidebar-nav-item > span:last-child,
+  .app-sidebar.sidebar-collapsed .sidebar-nav-item > .nav-label,
+  .app-sidebar.sidebar-collapsed .sidebar-nav-item > .nav-arrow-slot,
   .app-sidebar.sidebar-collapsed .sidebar-footer-item > span:last-child {
     display: block !important;
   }

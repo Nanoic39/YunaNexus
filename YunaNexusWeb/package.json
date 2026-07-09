@@ -7,7 +7,8 @@
   "scripts": {
     "dev:main": "pnpm --dir apps/yunanexus-main dev",
     "build:main": "pnpm --dir apps/yunanexus-main build",
-    "preview:main": "pnpm --dir apps/yunanexus-main preview"
+    "preview:main": "pnpm --dir apps/yunanexus-main preview",
+    "mock:init": "node ../scripts/mock-init.cjs"
   },
   "keywords": [],
   "author": "YunaNexus|nanoic",

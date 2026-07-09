@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import mascot from "~/assets/mascot/YunaImageMascotQQ.jpg";
 import { useMyProfile } from "~/composables/useMyProfile";
+import { useToast } from "~/composables/useToast";
 
 definePageMeta({ layout: "default" });
 
+const toast = useToast();
 const { currentUuid, isLoggedIn } = useAuth();
 const { profile, loading, error, fetch: refreshProfile } = useMyProfile();
 
@@ -61,6 +63,7 @@ const avatarFile = ref<File | null>(null);
 const avatarPreview = ref("");
 const avatarError = ref("");
 const fileInputRef = ref<HTMLInputElement>();
+const croppingFile = ref<File | null>(null);
 
 function startEdit() {
   if (!profile.value) return;
@@ -74,6 +77,7 @@ function startEdit() {
   avatarError.value = "";
   avatarFile.value = null;
   avatarPreview.value = "";
+  croppingFile.value = null;
   editing.value = true;
 }
 
@@ -83,26 +87,42 @@ function cancelEdit() {
   avatarError.value = "";
   avatarFile.value = null;
   avatarPreview.value = "";
+  croppingFile.value = null;
 }
 
 function triggerAvatarUpload() {
   fileInputRef.value?.click();
 }
 
-function onAvatarChange(e: Event) {
+function onAvatarFilePicked(e: Event) {
   const target = e.target as HTMLInputElement;
   const file = target.files?.[0];
   if (!file) return;
   avatarError.value = "";
-  const MAX_SIZE = 2 * 1024 * 1024;
+  const MAX_SIZE = 5 * 1024 * 1024;
   if (file.size > MAX_SIZE) {
-    avatarError.value = "图片大小不能超过 2MB";
+    avatarError.value = "图片大小不能超过 5MB";
     target.value = "";
     return;
   }
-  avatarFile.value = file;
-  avatarPreview.value = URL.createObjectURL(file);
+  // 打开裁剪组件
+  croppingFile.value = file;
   target.value = "";
+}
+
+function onCropConfirm(blob: Blob) {
+  if (avatarPreview.value) {
+    URL.revokeObjectURL(avatarPreview.value);
+  }
+  avatarPreview.value = URL.createObjectURL(blob);
+  // 从 Blob 创建 File 用于上传
+  const croppedFile = new File([blob], "avatar.png", { type: "image/png" });
+  avatarFile.value = croppedFile;
+  croppingFile.value = null;
+}
+
+function onCropCancel() {
+  croppingFile.value = null;
 }
 
 function currentAvatarSrc(): string {
@@ -113,18 +133,54 @@ function currentAvatarSrc(): string {
 }
 
 async function saveEdit() {
-  const { $fetch: authFetch } = useNuxtApp();
-  const _fetch = authFetch as typeof $fetch;
+  if (!editForm.value.nickname.trim()) {
+    editError.value = "昵称不能为空";
+    return;
+  }
+
   editSaving.value = true;
   editError.value = "";
   avatarError.value = "";
+
+  // 开发模式：直接更新本地 profile state
+  if (import.meta.dev) {
+    const profileState = useState<any>("my-profile");
+    if (profileState.value) {
+      Object.assign(profileState.value, {
+        nickname: editForm.value.nickname,
+        gender: editForm.value.gender,
+        birthday: editForm.value.birthday,
+        bio: editForm.value.bio,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    // 模拟头像上传
+    if (avatarFile.value) {
+      await new Promise((r) => setTimeout(r, 300));
+      if (profileState.value) {
+        profileState.value.avatarUuid = "mock-avatar-" + Date.now();
+      }
+      toast.success("资料保存成功！");
+    } else {
+      toast.success("资料保存成功！");
+    }
+    editing.value = false;
+    editSaving.value = false;
+    avatarFile.value = null;
+    avatarPreview.value = "";
+    if (profile.value) profile.value = { ...profile.value };
+    return;
+  }
+
+  const { $fetch: authFetch } = useNuxtApp();
+  const _fetch = authFetch as typeof $fetch;
 
   try {
     const res = await _fetch<{ code: number; msg: string }>(
       "/api/user/profile",
       {
         method: "PUT",
-        body: editForm.value,
+        body: { ...editForm.value } as Record<string, string>,
       },
     );
     if (res.code !== 200) {
@@ -143,7 +199,7 @@ async function saveEdit() {
     avatarUploading.value = true;
     try {
       const form = new FormData();
-      form.append("file", avatarFile.value);
+      form.append("file", avatarFile.value!);
       const res = await _fetch<{
         code: number;
         msg: string;
@@ -153,18 +209,23 @@ async function saveEdit() {
         body: form,
       });
       if (res.code !== 200) {
-        avatarError.value = res.msg || "头像上传失败";
-        editSaving.value = false;
+        toast.error("资料已保存，但头像上传失败");
         avatarUploading.value = false;
+        editing.value = false;
+        editSaving.value = false;
+        avatarFile.value = null;
+        avatarPreview.value = "";
+        await refreshProfile();
         return;
       }
     } catch (e: any) {
-      const msg = e?.data?.msg || e?.message || "头像上传失败";
-      avatarError.value = msg.includes("Maximum upload size")
-        ? "图片大小超过服务器限制"
-        : msg;
-      editSaving.value = false;
+      toast.error("资料已保存，但头像上传失败");
       avatarUploading.value = false;
+      editing.value = false;
+      editSaving.value = false;
+      avatarFile.value = null;
+      avatarPreview.value = "";
+      await refreshProfile();
       return;
     }
     avatarUploading.value = false;
@@ -203,6 +264,12 @@ onMounted(async () => {
     /* ignore */
   }
 });
+
+onUnmounted(() => {
+  if (avatarPreview.value) {
+    URL.revokeObjectURL(avatarPreview.value);
+  }
+});
 </script>
 
 <template>
@@ -211,7 +278,7 @@ onMounted(async () => {
 
     <div v-else-if="error" class="profile-error">
       <p>{{ error }}</p>
-      <button class="button button-primary" @click="refreshProfile">
+      <button class="button button-primary" @click="() => refreshProfile()">
         重新加载
       </button>
     </div>
@@ -243,7 +310,7 @@ onMounted(async () => {
             type="file"
             accept="image/*"
             class="profile-avatar-input"
-            @change="onAvatarChange"
+            @change="onAvatarFilePicked"
           />
         </div>
         <div class="profile-hero-body">
@@ -362,7 +429,7 @@ onMounted(async () => {
               <button class="button" @click="cancelEdit">取消</button>
               <button
                 class="button button-primary"
-                :disabled="editSaving"
+                :disabled="editSaving || !editForm.nickname.trim()"
                 @click="saveEdit"
               >
                 {{ editSaving ? "保存中…" : "保存" }}
@@ -395,6 +462,15 @@ onMounted(async () => {
       <p>请先登录后查看</p>
       <NuxtLink to="/login" class="button button-primary">去登录</NuxtLink>
     </div>
+
+    <!-- 头像裁剪弹窗 -->
+    <AvatarCrop
+      v-if="croppingFile"
+      :file="croppingFile"
+      :output-size="256"
+      @confirm="onCropConfirm"
+      @cancel="onCropCancel"
+    />
   </div>
 </template>
 

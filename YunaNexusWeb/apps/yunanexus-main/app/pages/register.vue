@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { useToast } from "~/composables/useToast";
+
 definePageMeta({ layout: "default" });
 
 const { encryptPassword } = useAuth();
+const toast = useToast();
 
 const username = ref("");
 const password = ref("");
@@ -16,8 +19,58 @@ const sendingCode = ref(false);
 const codeSent = ref(false);
 const countdown = ref(0);
 const errorMsg = ref("");
+const fieldErrors = ref<Record<string, string>>({});
 
 let countdownTimer: ReturnType<typeof setInterval> | null = null;
+
+function validateField(field: string) {
+  const errs = { ...fieldErrors.value };
+  switch (field) {
+    case "email":
+      if (email.value && (!email.value.includes("@") || !email.value.includes("."))) {
+        errs.email = "请输入有效的邮箱地址";
+      } else {
+        delete errs.email;
+      }
+      break;
+    case "username":
+      if (username.value && username.value.trim().length < 3) {
+        errs.username = "用户名至少需要 3 个字符";
+      } else {
+        delete errs.username;
+      }
+      break;
+    case "verifyCode":
+      if (verifyCode.value && !/^\d{6}$/.test(verifyCode.value)) {
+        errs.verifyCode = "验证码必须为 6 位数字";
+      } else {
+        delete errs.verifyCode;
+      }
+      break;
+    case "password":
+      if (password.value && password.value.length < 6) {
+        errs.password = "密码长度不能少于 6 位";
+      } else {
+        delete errs.password;
+      }
+      break;
+    case "confirmPassword":
+      if (confirmPassword.value && confirmPassword.value !== password.value) {
+        errs.confirmPassword = "两次输入的密码不一致";
+      } else {
+        delete errs.confirmPassword;
+      }
+      break;
+    case "nickname":
+      if (nickname.value && nickname.value.trim().length < 1) {
+        errs.nickname = "昵称不能为空";
+      } else {
+        delete errs.nickname;
+      }
+      break;
+  }
+  fieldErrors.value = errs;
+}
 
 async function sendVerifyCode() {
   if (!email.value) {
@@ -55,6 +108,7 @@ async function sendVerifyCode() {
 }
 
 async function handleRegister() {
+  if (loading.value) return;
   errorMsg.value = "";
   if (
     !username.value ||
@@ -95,6 +149,7 @@ async function handleRegister() {
       errorMsg.value = res.msg || "注册失败";
       return;
     }
+    toast.success("注册成功");
     navigateTo("/login");
   } catch {
     errorMsg.value = "网络错误，请稍后重试";
@@ -131,7 +186,10 @@ onUnmounted(() => {
             type="text"
             autocomplete="username"
             placeholder="请输入用户名"
+            :class="{ 'input-error': fieldErrors.username }"
+            @blur="validateField('username')"
           />
+          <span v-if="fieldErrors.username" class="field-error-text">{{ fieldErrors.username }}</span>
         </label>
 
         <label class="auth-field">
@@ -141,7 +199,10 @@ onUnmounted(() => {
             type="email"
             autocomplete="email"
             placeholder="请输入邮箱地址"
+            :class="{ 'input-error': fieldErrors.email }"
+            @blur="validateField('email')"
           />
+          <span v-if="fieldErrors.email" class="field-error-text">{{ fieldErrors.email }}</span>
         </label>
 
         <label class="auth-field auth-field-full">
@@ -153,6 +214,8 @@ onUnmounted(() => {
               autocomplete="one-time-code"
               placeholder="请输入验证码"
               class="auth-field-code-input"
+              :class="{ 'input-error': fieldErrors.verifyCode }"
+              @blur="validateField('verifyCode')"
             />
             <button
               type="button"
@@ -169,6 +232,7 @@ onUnmounted(() => {
               }}
             </button>
           </div>
+          <span v-if="fieldErrors.verifyCode" class="field-error-text">{{ fieldErrors.verifyCode }}</span>
         </label>
 
         <label class="auth-field">
@@ -176,7 +240,14 @@ onUnmounted(() => {
             <span class="auth-required">昵称</span>
             <span class="auth-field-hint">对外展示的名称</span>
           </div>
-          <input v-model="nickname" type="text" placeholder="请输入昵称" />
+          <input
+            v-model="nickname"
+            type="text"
+            placeholder="请输入昵称"
+            :class="{ 'input-error': fieldErrors.nickname }"
+            @blur="validateField('nickname')"
+          />
+          <span v-if="fieldErrors.nickname" class="field-error-text">{{ fieldErrors.nickname }}</span>
         </label>
 
         <label class="auth-field">
@@ -194,7 +265,10 @@ onUnmounted(() => {
             type="password"
             autocomplete="new-password"
             placeholder="请输入密码"
+            :class="{ 'input-error': fieldErrors.password }"
+            @blur="validateField('password')"
           />
+          <span v-if="fieldErrors.password" class="field-error-text">{{ fieldErrors.password }}</span>
         </label>
 
         <label class="auth-field">
@@ -204,7 +278,10 @@ onUnmounted(() => {
             type="password"
             autocomplete="new-password"
             placeholder="请再次输入密码"
+            :class="{ 'input-error': fieldErrors.confirmPassword }"
+            @blur="validateField('confirmPassword')"
           />
+          <span v-if="fieldErrors.confirmPassword" class="field-error-text">{{ fieldErrors.confirmPassword }}</span>
         </label>
 
         <details class="auth-advanced auth-error-full">

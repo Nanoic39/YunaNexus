@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.user.controller;
 
 import cc.nanoic.yunanexus.common.web.auth.PermissionContext;
+import cc.nanoic.yunanexus.common.web.auth.RequirePermission;
 import cc.nanoic.yunanexus.common.web.common.BusinessException;
 import cc.nanoic.yunanexus.common.web.common.R;
 import cc.nanoic.yunanexus.common.web.common.Result;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@RequirePermission
 @RestController
 @RequestMapping("/user")
 public class UserController {

@@ -2,6 +2,7 @@ package cc.nanoic.yunanexus.file.controller;
 
 import cc.nanoic.yunanexus.file.service.PreviewService;
 import cc.nanoic.yunanexus.file.service.PreviewService.PreviewResult;
+import cc.nanoic.yunanexus.common.web.auth.RequirePermission;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +20,7 @@ public class PreviewController {
         this.previewService = previewService;
     }
 
+    @RequirePermission
     @GetMapping("/{fileUuid}")
     public ResponseEntity<byte[]> preview(@PathVariable String fileUuid) {
         PreviewResult result = previewService.getPreview(fileUuid);

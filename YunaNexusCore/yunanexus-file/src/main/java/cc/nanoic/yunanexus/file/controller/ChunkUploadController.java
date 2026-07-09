@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.file.controller;
 
 import cc.nanoic.yunanexus.common.web.auth.PermissionContext;
+import cc.nanoic.yunanexus.common.web.auth.RequirePermission;
 import cc.nanoic.yunanexus.common.web.common.R;
 import cc.nanoic.yunanexus.common.web.common.Result;
 import cc.nanoic.yunanexus.file.entity.UserFile;
@@ -24,6 +25,7 @@ public class ChunkUploadController {
         this.chunkUploadService = chunkUploadService;
     }
 
+    @RequirePermission
     @PostMapping("/init")
     public Result<Map<String, Object>> init(@RequestParam String fileName,
             @RequestParam long fileSize,
@@ -40,6 +42,7 @@ public class ChunkUploadController {
                 fileName, fileSize, fileExt, fileMime, fileCategory));
     }
 
+    @RequirePermission
     @PostMapping("/upload")
     public Result<?> upload(@RequestParam String uploadId,
             @RequestParam int chunkIndex,
@@ -53,6 +56,7 @@ public class ChunkUploadController {
         }
     }
 
+    @RequirePermission
     @PostMapping("/complete")
     public Result<Map<String, Object>> complete(@RequestParam String uploadId) {
         UserFile userFile = chunkUploadService.complete(uploadId);
@@ -63,6 +67,7 @@ public class ChunkUploadController {
         return Result.success(result);
     }
 
+    @RequirePermission
     @PostMapping("/abort")
     public Result<?> abort(@RequestParam String uploadId) {
         chunkUploadService.abort(uploadId, PermissionContext.getGlobalId());

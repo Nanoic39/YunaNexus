@@ -1,22 +1,60 @@
 <script setup lang="ts">
+import { useToast } from "~/composables/useToast";
+
 definePageMeta({ layout: "default" });
 
 const { login } = useAuth();
+const toast = useToast();
 
 const account = ref("");
 const password = ref("");
 const loading = ref(false);
 const errorMsg = ref("");
+const fieldErrors = ref<Record<string, string>>({});
+
+function validateField(field: string) {
+  const errs = { ...fieldErrors.value };
+  if (field === "account") {
+    if (!account.value.includes("@") || !account.value.includes(".")) {
+      errs.account = "请输入有效的邮箱地址";
+    } else {
+      delete errs.account;
+    }
+  } else if (field === "password") {
+    if (password.value && password.value.length < 6) {
+      errs.password = "密码长度不能少于 6 位";
+    } else {
+      delete errs.password;
+    }
+  }
+  fieldErrors.value = errs;
+}
+
+function validate(): boolean {
+  const errs: Record<string, string> = {};
+  if (!account.value) {
+    errs.account = "请输入用户名";
+  } else if (!account.value.includes("@") || !account.value.includes(".")) {
+    errs.account = "请输入有效的邮箱地址";
+  }
+  if (!password.value) {
+    errs.password = "请输入密码";
+  } else if (password.value.length < 6) {
+    errs.password = "密码长度不能少于 6 位";
+  }
+  fieldErrors.value = errs;
+  return Object.keys(errs).length === 0;
+}
 
 async function handleLogin() {
   errorMsg.value = "";
-  if (!account.value || !password.value) {
-    errorMsg.value = "请填写完整信息";
+  if (!validate()) {
     return;
   }
   loading.value = true;
   try {
     await login(account.value, password.value);
+    toast.success("登录成功");
     navigateTo("/");
   } catch (e: any) {
     errorMsg.value = e.message || "登录失败，请检查用户名或密码";
@@ -44,7 +82,10 @@ async function handleLogin() {
             type="text"
             autocomplete="username"
             placeholder="请输入用户名"
+            :class="{ 'input-error': fieldErrors.account }"
+            @blur="validateField('account')"
           />
+          <span v-if="fieldErrors.account" class="field-error-text">{{ fieldErrors.account }}</span>
         </label>
 
         <label class="auth-field">
@@ -54,7 +95,10 @@ async function handleLogin() {
             type="password"
             autocomplete="current-password"
             placeholder="请输入密码"
+            :class="{ 'input-error': fieldErrors.password }"
+            @blur="validateField('password')"
           />
+          <span v-if="fieldErrors.password" class="field-error-text">{{ fieldErrors.password }}</span>
         </label>
 
         <button

@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.file.controller;
 
 import cc.nanoic.yunanexus.common.web.auth.PermissionContext;
+import cc.nanoic.yunanexus.common.web.auth.RequirePermission;
 import cc.nanoic.yunanexus.common.web.common.Result;
 import cc.nanoic.yunanexus.file.entity.FileObject;
 import cc.nanoic.yunanexus.file.entity.FileShare;
@@ -38,6 +39,7 @@ public class ShareController {
         this.fileService = fileService;
     }
 
+    @RequirePermission
     @PostMapping("/create")
     public Result<Map<String, Object>> create(@RequestParam List<String> targetUuids,
             @RequestParam List<Integer> targetTypes,
@@ -62,6 +64,7 @@ public class ShareController {
         return Result.success(result);
     }
 
+    @RequirePermission
     @GetMapping("/{shareCode}")
     public Result<Map<String, Object>> detail(@PathVariable String shareCode,
             @RequestParam(required = false) String extractCode) {
@@ -96,6 +99,7 @@ public class ShareController {
         return Result.success(result);
     }
 
+    @RequirePermission
     @GetMapping("/{shareCode}/download")
     public ResponseEntity<byte[]> download(@PathVariable String shareCode,
             @RequestParam(required = false) String extractCode,
@@ -132,6 +136,7 @@ public class ShareController {
                 .body(data);
     }
 
+    @RequirePermission
     @GetMapping("/my")
     public Result<Map<String, Object>> myShares(@RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -145,6 +150,7 @@ public class ShareController {
         return Result.success(data);
     }
 
+    @RequirePermission
     @PostMapping("/cancel")
     public Result<?> cancel(@RequestParam String shareCode) {
         shareService.cancelShare(shareCode, PermissionContext.getGlobalId());

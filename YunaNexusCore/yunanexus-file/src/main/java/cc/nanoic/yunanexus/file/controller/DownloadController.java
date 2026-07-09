@@ -3,6 +3,7 @@ package cc.nanoic.yunanexus.file.controller;
 import cc.nanoic.yunanexus.file.entity.FileObject;
 import cc.nanoic.yunanexus.file.entity.UserFile;
 import cc.nanoic.yunanexus.file.service.FileService;
+import cc.nanoic.yunanexus.common.web.auth.RequirePermission;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -24,6 +25,7 @@ public class DownloadController {
         this.fileService = fileService;
     }
 
+    @RequirePermission
     @GetMapping("/download/{fileUuid}")
     public ResponseEntity<byte[]> download(@PathVariable String fileUuid) {
         UserFile userFile = fileService.getByFileUuid(fileUuid);

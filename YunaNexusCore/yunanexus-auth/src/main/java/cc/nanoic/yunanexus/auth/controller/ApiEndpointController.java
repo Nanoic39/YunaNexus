@@ -3,12 +3,14 @@ package cc.nanoic.yunanexus.auth.controller;
 import cc.nanoic.yunanexus.auth.entity.DTO.EndpointConfigItem;
 import cc.nanoic.yunanexus.auth.entity.DTO.EndpointReportRequest;
 import cc.nanoic.yunanexus.auth.service.ApiEndpointService;
+import cc.nanoic.yunanexus.common.web.auth.RequirePermission;
 import cc.nanoic.yunanexus.common.web.common.Result;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@RequirePermission
 @RestController
 @RequestMapping("/internal/endpoints")
 public class ApiEndpointController {

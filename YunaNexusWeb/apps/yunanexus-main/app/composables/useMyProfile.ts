@@ -17,8 +17,9 @@ export function useMyProfile() {
   const loading = ref(false);
   const error = ref("");
 
-  async function fetch() {
+  async function fetch(force = false) {
     if (!isLoggedIn.value) return;
+    if (!force && profile.value) return;
     loading.value = true;
     error.value = "";
     try {
@@ -39,5 +40,9 @@ export function useMyProfile() {
     }
   }
 
-  return { profile, loading, error, fetch };
+  function refreshProfile() {
+    return fetch(true);
+  }
+
+  return { profile, loading, error, fetch, refreshProfile };
 }

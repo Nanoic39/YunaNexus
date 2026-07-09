@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.file.controller;
 
 import cc.nanoic.yunanexus.common.web.auth.PermissionContext;
+import cc.nanoic.yunanexus.common.web.auth.RequirePermission;
 import cc.nanoic.yunanexus.common.web.common.R;
 import cc.nanoic.yunanexus.common.web.common.Result;
 import cc.nanoic.yunanexus.file.entity.UserFile;
@@ -25,6 +26,7 @@ public class FileController {
         this.fileService = fileService;
     }
 
+    @RequirePermission
     @GetMapping("/list")
     public Result<Map<String, Object>> list(@RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) Long folderId) {
@@ -38,6 +40,7 @@ public class FileController {
         return Result.success(data);
     }
 
+    @RequirePermission
     @GetMapping("/detail")
     public Result<UserFile> detail(@RequestParam String fileUuid) {
         UserFile userFile = fileService.getByFileUuid(fileUuid);
@@ -47,18 +50,21 @@ public class FileController {
         return Result.success(userFile);
     }
 
+    @RequirePermission
     @PostMapping("/delete")
     public Result<?> delete(@RequestParam String fileUuid) {
         fileService.softDelete(fileUuid, PermissionContext.getGlobalId());
         return Result.success(null);
     }
 
+    @RequirePermission
     @PostMapping("/rename")
     public Result<?> rename(@RequestParam String fileUuid, @RequestParam String newName) {
         fileService.rename(fileUuid, newName);
         return Result.success(null);
     }
 
+    @RequirePermission
     @PostMapping("/move")
     public Result<?> move(@RequestParam String fileUuid, @RequestParam Long targetFolderId) {
         fileService.move(fileUuid, targetFolderId);

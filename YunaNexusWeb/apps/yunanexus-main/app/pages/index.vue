@@ -83,11 +83,10 @@ onMounted(async () => {
         <div class="panel-card">
           <div class="panel-card-header">快速入口</div>
           <div class="panel-card-body">
-            <NuxtLink to="/files" class="quick-link">
-              <Icon name="lucide:folder" size="16" />
+            <div style="opacity: 0.5; cursor: not-allowed">
               <strong>文件管理</strong>
-              <span>上传与组织文件</span>
-            </NuxtLink>
+              <span>即将上线</span>
+            </div>
             <NuxtLink to="/profile" class="quick-link">
               <Icon name="lucide:user" size="16" />
               <strong>个人中心</strong>
@@ -157,6 +156,9 @@ onMounted(async () => {
 }
 
 .dashboard-grid {
+  max-width: 100%;
+  margin: 0 auto;
+  width: 100%;
   display: grid;
   gap: 20px;
 }

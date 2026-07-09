@@ -3,10 +3,12 @@ package cc.nanoic.yunanexus.auth.support;
 import cc.nanoic.yunanexus.auth.config.AuthProperties;
 import cc.nanoic.yunanexus.auth.entity.AdminInitKey;
 import cc.nanoic.yunanexus.auth.entity.OAuthClient;
+import cc.nanoic.yunanexus.auth.entity.ResourceEntity;
 import cc.nanoic.yunanexus.auth.entity.Roles;
 import cc.nanoic.yunanexus.auth.entity.UserRoles;
 import cc.nanoic.yunanexus.auth.mapper.AdminInitKeyMapper;
 import cc.nanoic.yunanexus.auth.mapper.OAuthClientMapper;
+import cc.nanoic.yunanexus.auth.mapper.ResourceMapper;
 import cc.nanoic.yunanexus.auth.mapper.RolesMapper;
 import cc.nanoic.yunanexus.auth.mapper.UserRolesMapper;
 import cn.hutool.core.io.FileUtil;
@@ -44,13 +46,17 @@ public class AuthInitializer {
     @Resource
     private UserRolesMapper userRolesMapper;
 
+    @Resource
+    private ResourceMapper resourceMapper;
+
     @PostConstruct
     public void init() {
         initDefaultRoles();
-        initBuiltinClients(); //
-        initAdminKey(); // Admin密钥初始化
-        initRsaKeyPair(); // Rsa密钥初始化
-        initAesKey(); // Aes密钥初始化
+        initDefaultResources();
+        initBuiltinClients();
+        initAdminKey();
+        initRsaKeyPair();
+        initAesKey();
     }
 
     // 初始化默认角色
@@ -61,7 +67,9 @@ public class AuthInitializer {
         }
         insertRole("SUPER_ADMIN", 99, "*:*:*:*"); // 所有权限
         insertRole("ADMIN", 60, "core:*:*:manage"); // 全局管理
+        insertRole("MODERATOR", 30, "admin:users:read", "admin:users:write", "admin:apps:read", "admin:apps:write", "core:admin:moderate:*");
         insertRole("USER", 1, "core:*:self:read", "core:*:self:edit");
+        insertRole("VIP", 10, "core:file:vip:upload", "core:file:vip:download", "core:identity:vip:badge");
         logger.info("默认角色初始化完成");
     }
 
@@ -70,9 +78,67 @@ public class AuthInitializer {
         Roles role = new Roles();
         role.setName(name);
         role.setLevel(level);
-        role.setPermissions(JSON.toJSONString(permissions)); // List转换为String格式
+        role.setPermissions(JSON.toJSONString(permissions));
         role.setStatus(1);
         rolesMapper.insert(role);
+    }
+
+    private void initDefaultResources() {
+        if (resourceMapper.selectCount(new LambdaQueryWrapper<ResourceEntity>()) > 0) {
+            logger.info("已存在资源数据（跳过）");
+            return;
+        }
+
+        int sort = 0;
+        // 仪表盘 (目录)
+        long dashboardId = insertResource(null, "仪表盘", "core:dashboard", 0, "dashboard", "/", null, sort += 10);
+        // 文件管理 (目录)
+        long filesId = insertResource(null, "文件管理", "core:file", 0, "folder", "/files", null, sort += 10);
+        // 应用管理 (目录)
+        long appsId = insertResource(null, "应用管理", "core:apps", 0, "box", "/apps", null, sort += 10);
+        insertResource(appsId, "创建应用", "core:apps:create", 1, "plus", "/apps/apply", null, sort += 10);
+
+        // 管理中心 (目录 - 仅管理员可见)
+        long adminId = insertResource(null, "管理中心", "core:admin", 0, "shield", "/admin", null, sort += 10);
+        insertResource(adminId, "应用审核", "core:oauth:audit", 1, "clipboard-check", "/admin/apps", null, sort += 10);
+        insertResource(adminId, "用户管理", "core:admin:users:read", 1, "users", "/admin/users", null, sort += 10);
+        insertResource(adminId, "角色管理", "core:admin:roles:read", 1, "shield-check", "/admin/roles", null, sort += 10);
+        insertResource(adminId, "资源管理", "core:admin:resources:read", 1, "list", "/admin/resources", null, sort += 10);
+        insertResource(adminId, "接口端点", "core:admin:endpoints:read", 1, "plug", "/admin/endpoints", null, sort += 10);
+
+        // 个人 (目录)
+        insertResource(null, "个人中心", null, 0, "user", "/profile", null, sort += 10);
+        // 设置 (目录)
+        insertResource(null, "系统设置", null, 0, "settings", "/settings", null, sort += 10);
+
+        // 按钮权限
+        insertResource(null, "保存资料", "core:user:self:edit", 2, null, null, null, sort += 10);
+        insertResource(null, "上传头像", "core:file:avatar:upload", 2, null, null, null, sort += 10);
+        insertResource(null, "管理用户", "admin:users:write", 2, null, null, null, sort += 10);
+        insertResource(null, "分配角色", "admin:users:roles:assign", 2, null, null, null, sort += 10);
+        insertResource(null, "管理角色", "admin:system:roles:write", 2, null, null, null, sort += 10);
+        insertResource(null, "管理资源", "admin:system:resources:write", 2, null, null, null, sort += 10);
+        insertResource(null, "管理端点", "admin:system:endpoints:write", 2, null, null, null, sort += 10);
+        insertResource(null, "审核应用", "admin:oauth:audit", 2, null, null, null, sort += 10);
+        insertResource(null, "删除应用", "admin:oauth:client:delete", 2, null, null, null, sort += 10);
+
+        logger.info("默认资源数据初始化完成");
+    }
+
+    private long insertResource(Long parentId, String name, String code, int type, String icon, String path,
+            String component, int sortNo) {
+        ResourceEntity r = new ResourceEntity();
+        r.setParentId(parentId != null ? parentId : 0L);
+        r.setName(name);
+        r.setCode(code);
+        r.setType(type);
+        r.setIcon(icon);
+        r.setPath(path);
+        r.setComponent(component);
+        r.setSortNo(sortNo);
+        r.setVisible(1);
+        resourceMapper.insert(r);
+        return r.getId() != null ? r.getId() : 0L;
     }
 
     // 初始化客户端
@@ -87,8 +153,7 @@ public class AuthInitializer {
             OAuthClient oAuthClient = oAuthClientMapper.selectOne(
                     new LambdaQueryWrapper<OAuthClient>()
                             .eq(OAuthClient::getClientName, builtinClients.getClientName())
-                            .last("LIMIT 1")
-            );
+                            .last("LIMIT 1"));
             // 如果已经存在
             if (oAuthClient != null) {
                 logger.info("OAuth客户端已存在：{}", builtinClients.getClientName());
@@ -114,8 +179,7 @@ public class AuthInitializer {
         Roles role = rolesMapper.selectOne(
                 new LambdaQueryWrapper<Roles>()
                         .eq(Roles::getName, "SUPER_ADMIN")
-                        .last("LIMIT 1")
-        );
+                        .last("LIMIT 1"));
         if (role == null) {
             logger.info("角色表没有对应的超级管理员角色");
             return; // 角色表没有对应的超级管理员角色
@@ -164,7 +228,8 @@ public class AuthInitializer {
     }
 
     // 创建初始化客户端数据
-    private static OAuthClient createInitOAuthClient(AuthProperties.BuiltinClients builtinClients, String uuid, String encodedSecret) {
+    private static OAuthClient createInitOAuthClient(AuthProperties.BuiltinClients builtinClients, String uuid,
+            String encodedSecret) {
         OAuthClient client = new OAuthClient();
         client.setUuid(uuid);
         client.setClientName(builtinClients.getClientName());

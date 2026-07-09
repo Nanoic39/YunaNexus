@@ -344,4 +344,24 @@ public class AuthService {
         return resp;
     }
 
+    public void logout(String refreshToken) {
+        if (refreshToken != null && !refreshToken.isEmpty()) {
+            redissonClient.getBucket("refresh:" + refreshToken).delete();
+        }
+    }
+
+    public void logoutAll() {
+        byte[] globalId = PermissionContext.getGlobalId();
+        if (globalId == null) return;
+        String prefix = "refresh:";
+        // 遍历所有 refresh token，删除属于当前用户的
+        var keys = redissonClient.getKeys();
+        for (String key : keys.getKeysByPattern("refresh:*", 1000)) {
+            RBucket<String> bucket = redissonClient.getBucket(key);
+            String data = bucket.get();
+            if (data != null && data.contains(HexUtil.encodeHexStr(globalId))) {
+                bucket.delete();
+            }
+        }
+    }
 }

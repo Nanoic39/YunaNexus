@@ -3,6 +3,7 @@
   src: url("../font/cjkfonts_handingwriting4.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -10,6 +11,7 @@
   src: url("../font/JetBrainsMonoNerdFontMono-Medium.ttf") format("truetype");
   font-weight: 500;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -17,6 +19,7 @@
   src: url("../font/LXGWWenKai-Regular.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -24,4 +27,5 @@
   src: url("../font/lolifont.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }

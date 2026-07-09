@@ -60,6 +60,7 @@ onMounted(() => {
 });
 
 const overlayRef = ref<HTMLDivElement>();
+let observer: MutationObserver | null = null;
 
 // 防移除：MutationObserver 监听水印层被删除后自动恢复
 onMounted(() => {
@@ -67,11 +68,15 @@ onMounted(() => {
   const overlay = overlayRef.value;
   if (!container || !overlay) return;
 
-  const observer = new MutationObserver((mutations) => {
+  observer = new MutationObserver((mutations) => {
     for (const m of mutations) {
       for (const node of m.removedNodes) {
         if (node === overlay || overlay.contains(node as Node)) {
-          container.insertBefore(overlay, container.firstChild);
+          try {
+            container.insertBefore(overlay, container.firstChild);
+          } catch {
+            /* container may have been detached */
+          }
         }
       }
     }
@@ -84,6 +89,11 @@ onMounted(() => {
   overlay.style.setProperty("inset", "0", "important");
   overlay.style.setProperty("pointer-events", "none", "important");
   overlay.style.setProperty("z-index", "9999", "important");
+});
+
+onUnmounted(() => {
+  observer?.disconnect();
+  observer = null;
 });
 </script>
 

@@ -3,6 +3,7 @@ package cc.nanoic.yunanexus.auth.controller;
 import cc.nanoic.yunanexus.auth.entity.VO.ResourceVO;
 import cc.nanoic.yunanexus.auth.service.ResourceService;
 import cc.nanoic.yunanexus.common.web.auth.PermissionContext;
+import cc.nanoic.yunanexus.common.web.auth.RequirePermission;
 import cc.nanoic.yunanexus.common.web.common.Result;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.*;
 
+@RequirePermission
 @RestController
 @RequestMapping("/user")
 public class UserResourcesController {

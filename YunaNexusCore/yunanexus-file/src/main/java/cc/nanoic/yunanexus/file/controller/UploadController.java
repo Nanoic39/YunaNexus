@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.file.controller;
 
 import cc.nanoic.yunanexus.common.web.auth.PermissionContext;
+import cc.nanoic.yunanexus.common.web.auth.RequirePermission;
 import cc.nanoic.yunanexus.common.web.common.R;
 import cc.nanoic.yunanexus.common.web.common.Result;
 import cc.nanoic.yunanexus.file.entity.UserFile;
@@ -24,6 +25,7 @@ public class UploadController {
         this.fileService = fileService;
     }
 
+    @RequirePermission
     @PostMapping("/upload")
     public Result<Map<String, Object>> upload(@RequestParam("file") MultipartFile file,
             @RequestParam(required = false) Long folderId,

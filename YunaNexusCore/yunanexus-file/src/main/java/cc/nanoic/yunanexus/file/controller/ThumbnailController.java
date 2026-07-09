@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.file.controller;
 
 import cc.nanoic.yunanexus.file.service.ThumbnailService;
+import cc.nanoic.yunanexus.common.web.auth.RequirePermission;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +19,7 @@ public class ThumbnailController {
         this.thumbnailService = thumbnailService;
     }
 
+    @RequirePermission
     @GetMapping("/{fileUuid}")
     public ResponseEntity<byte[]> thumbnail(@PathVariable String fileUuid) {
         byte[] data = thumbnailService.getThumbnail(fileUuid);

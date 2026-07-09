@@ -312,4 +312,10 @@ public class OAuthService {
         client.setUpdatedAt(java.time.LocalDateTime.now());
         oAuthClientMapper.updateById(client);
     }
+
+    public void deleteClient(String uuid) {
+        PermissionUtil.checkPermission("core:oauth:audit");
+        OAuthClient client = findClientByUuid(uuid);
+        oAuthClientMapper.deleteById(client.getId());
+    }
 }
