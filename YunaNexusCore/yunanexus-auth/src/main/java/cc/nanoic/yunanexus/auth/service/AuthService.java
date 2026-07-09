@@ -17,6 +17,7 @@ import cc.nanoic.yunanexus.auth.mapper.UserRolesMapper;
 import cc.nanoic.yunanexus.common.mail.service.MailService;
 import cc.nanoic.yunanexus.common.mail.template.MailTemplateType;
 import cc.nanoic.yunanexus.common.web.auth.JwtUtil;
+import cc.nanoic.yunanexus.common.web.auth.PermissionContext;
 import cc.nanoic.yunanexus.common.web.common.BusinessException;
 import cc.nanoic.yunanexus.common.web.common.R;
 import cc.nanoic.yunanexus.common.web.common.Result;
@@ -351,7 +352,7 @@ public class AuthService {
     }
 
     public void logoutAll() {
-        byte[] globalId = PermissionContext.getGlobalId();
+        byte[] globalId = cc.nanoic.yunanexus.common.web.auth.PermissionContext.getGlobalId();
         if (globalId == null) return;
         String prefix = "refresh:";
         // 遍历所有 refresh token，删除属于当前用户的
