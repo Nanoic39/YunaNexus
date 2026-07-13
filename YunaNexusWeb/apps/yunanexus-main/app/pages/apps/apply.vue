@@ -17,6 +17,20 @@ const form = ref({
 
 const fieldErrors = ref<Record<string, string>>({});
 const saving = ref(false);
+const secretDialog = ref({ show: false, secret: "", uuid: "" });
+
+function showSecretDialog(secret: string, uuid: string) {
+  secretDialog.value = { show: true, secret, uuid };
+}
+
+function copySecret() {
+  navigator.clipboard.writeText(secretDialog.value.secret);
+  toast.success("密钥已复制到剪贴板");
+}
+
+function closeSecretDialog() {
+  secretDialog.value.show = false;
+}
 
 // ---- 授权模式（仅后端实际支持的） ----
 const grantTypeOptions = [
@@ -253,7 +267,14 @@ async function submit() {
       body,
     });
     if (res.code === 200) {
-      toast.success("应用提交成功！");
+      const secret = res.data?.clientSecret;
+      if (secret) {
+        toast.success("应用创建成功！请保存密钥");
+        // 显示密钥对话框
+        showSecretDialog(secret, res.data?.uuid);
+      } else {
+        toast.success("应用提交成功！");
+      }
       form.value = { clientName: "", redirectUri: "", description: "", grantTypes: ["authorization_code"], scope: [], selectedRole: "" };
       fieldErrors.value = {};
       customScope.value = "";
@@ -269,6 +290,36 @@ async function submit() {
 </script>
 
 <template>
+  <!-- 密钥展示对话框 -->
+  <div v-if="secretDialog.show" class="secret-overlay" @click.self="closeSecretDialog">
+    <div class="secret-dialog panel-card">
+      <div class="secret-dialog-header">
+        <Icon name="lucide:key" size="20" style="color: var(--color-warning)" />
+        <h3>应用密钥</h3>
+        <button class="secret-dialog-close" @click="closeSecretDialog">
+          <Icon name="lucide:x" size="16" />
+        </button>
+      </div>
+      <div class="secret-dialog-body">
+        <p class="secret-warning">
+          <Icon name="lucide:alert-triangle" size="14" />
+          密钥仅在创建时显示一次，请立即复制并妥善保存！
+        </p>
+        <div class="secret-field">
+          <label class="apply-label">Client ID</label>
+          <code class="secret-value">{{ secretDialog.uuid }}</code>
+        </div>
+        <div class="secret-field">
+          <label class="apply-label">Client Secret</label>
+          <code class="secret-value secret-value-blur">{{ secretDialog.secret }}</code>
+        </div>
+        <button class="button button-primary secret-copy-btn" @click="copySecret">
+          <Icon name="lucide:copy" size="14" /> 复制密钥
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="apply-page">
     <!-- 面包屑导航 -->
     <nav class="apply-breadcrumb fade-up">
@@ -1028,5 +1079,55 @@ async function submit() {
   .apply-form-card {
     padding: 18px;
   }
+}
+
+/* 密钥对话框 */
+.secret-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex; align-items: center; justify-content: center;
+}
+.secret-dialog {
+  width: 420px; max-width: 90vw; padding: 24px;
+}
+.secret-dialog-header {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px;
+}
+.secret-dialog-header h3 {
+  margin: 0; font-size: 16px; flex: 1;
+}
+.secret-dialog-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: none; background: transparent;
+  color: var(--color-font-assist); border-radius: 6px; cursor: pointer;
+}
+.secret-dialog-close:hover { background: var(--color-primary-background); }
+.secret-warning {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--color-warning);
+  background: var(--color-warning-soft); padding: 8px 12px;
+  border-radius: var(--radius-md); margin-bottom: 16px;
+}
+.secret-field {
+  margin-bottom: 12px;
+}
+.secret-value {
+  display: block; padding: 10px 12px; margin-top: 4px;
+  background: var(--color-primary-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono); font-size: 12px;
+  word-break: break-all; color: var(--color-font-secondary);
+}
+.secret-value-blur {
+  color: transparent; text-shadow: 0 0 10px rgba(0,0,0,0.6);
+  user-select: none;
+}
+.secret-value-blur:focus, .secret-value-blur:active {
+  color: var(--color-font-secondary); text-shadow: none; user-select: text;
+}
+.secret-copy-btn {
+  width: 100%; margin-top: 8px;
 }
 </style>

@@ -14,6 +14,9 @@ const app = ref<AppDetail | null>(null);
 const loading = ref(true);
 const error = ref("");
 const copiedField = ref("");
+const showSecret = ref(false);
+const secretLoading = ref(false);
+const secretText = ref("");
 
 async function load() {
   loading.value = true;
@@ -169,6 +172,26 @@ async function copyToClipboard(text: string, field: string) {
     ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
     copiedField.value = field;
     setTimeout(() => { copiedField.value = ""; }, 1500);
+  }
+}
+
+async function fetchSecret() {
+  if (showSecret.value) { showSecret.value = false; return; }
+  secretLoading.value = true;
+  try {
+    const { $fetch: _f } = useNuxtApp();
+    const fetch = _f as typeof $fetch;
+    const res = await fetch<{ code: number; data: string; message: string }>(`/api/oauth/client/${uuid}/secret`);
+    if (res.code === 200) {
+      secretText.value = res.data;
+      showSecret.value = true;
+    } else {
+      toast.error(res.message || "获取密钥失败");
+    }
+  } catch {
+    toast.error("获取密钥失败");
+  } finally {
+    secretLoading.value = false;
   }
 }
 
@@ -328,6 +351,45 @@ onMounted(() => {
             </div>
           </div>
 
+          <!-- 密钥 -->
+          <div class="panel-card detail-card">
+            <div class="panel-card-header">
+              <div class="panel-card-header-icon"><Icon name="lucide:key" size="15" /></div>
+              <div class="panel-card-header-text"><h3>应用密钥</h3><span class="panel-card-header-sub">用于 OAuth2 认证的 Client Secret</span></div>
+            </div>
+            <div class="panel-card-body">
+              <div v-if="!showSecret && !secretLoading" style="display:flex;flex-direction:column;gap:12px">
+                <p class="detail-secret-hint">密钥不会明文存储，需要主动获取。</p>
+                <button class="button button-primary" style="align-self:flex-start" @click="fetchSecret">
+                  <Icon name="lucide:eye" size="14" /> 获取密钥
+                </button>
+              </div>
+              <div v-else-if="secretLoading" class="detail-loading-placeholder">
+                <Icon name="lucide:loader" size="14" class="spin" /> 正在获取...
+              </div>
+              <div v-else class="detail-info-list">
+                <div class="detail-info-item">
+                  <span class="detail-info-label">Client ID</span>
+                  <div class="detail-info-value-row">
+                    <code class="detail-code detail-code-dim">{{ app.uuid }}</code>
+                    <button class="detail-copy-btn" @click="copyToClipboard(app.uuid, 'secret-id')">
+                      <Icon :name="copiedField === 'secret-id' ? 'lucide:check' : 'lucide:copy'" size="13" />
+                    </button>
+                  </div>
+                </div>
+                <div class="detail-info-item">
+                  <span class="detail-info-label">Client Secret</span>
+                  <div class="detail-info-value-row">
+                    <code class="detail-code detail-code-secret">{{ secretText }}</code>
+                    <button class="detail-copy-btn" @click="copyToClipboard(secretText, 'secret-val')">
+                      <Icon :name="copiedField === 'secret-val' ? 'lucide:check' : 'lucide:copy'" size="13" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- 审核信息 -->
           <div class="panel-card detail-card">
             <div class="panel-card-header">
@@ -419,7 +481,10 @@ onMounted(() => {
   background: var(--color-primary-background); border-radius: var(--radius-sm);
   color: var(--color-font-secondary); word-break: break-all;
 }
-.detail-code-dim { color: var(--color-font-assist); font-size: 11px; }
+.detail-code-dim { color: var(--color-font-assist); }
+.detail-code-secret { color: var(--color-warning); letter-spacing: 0.5px; }
+.detail-secret-hint { font-size: 12px; color: var(--color-font-assist); margin: 0; }
+.detail-loading-placeholder { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-font-secondary); }
 .detail-code-tag {
   font-family: var(--font-mono); font-size: 12px; padding: 2px 8px;
   background: var(--color-emphasis-soft); border-radius: var(--radius-sm); color: var(--color-emphasis);

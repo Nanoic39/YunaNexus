@@ -5,6 +5,7 @@ definePageMeta({ layout: "default" });
 
 const { login } = useAuth();
 const toast = useToast();
+const route = useRoute();
 
 const account = ref("");
 const password = ref("");
@@ -55,7 +56,7 @@ async function handleLogin() {
   try {
     await login(account.value, password.value);
     toast.success("登录成功");
-    navigateTo("/");
+    navigateTo((route.query.redirect as string) || "/");
   } catch (e: any) {
     errorMsg.value = e.message || "登录失败，请检查用户名或密码";
   } finally {

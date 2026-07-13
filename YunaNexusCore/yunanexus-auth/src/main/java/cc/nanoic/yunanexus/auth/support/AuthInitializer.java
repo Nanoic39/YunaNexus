@@ -94,12 +94,12 @@ public class AuthInitializer {
         // 文件管理 (目录)
         long filesId = upsertResource(null, "文件管理", "core:file", 0, "folder", "/files", null, sort += 10);
         // 应用管理 (目录)
-        long appsId = upsertResource(null, "应用管理", "core:apps", 0, "box", "/apps", null, sort += 10);
+        long appsId = upsertResource(null, "应用管理", "core:apps", 0, "box", null, null, sort += 10);
         upsertResource(appsId, "我的应用", "core:apps:list", 1, "layout", "/apps", null, sort += 10);
         upsertResource(appsId, "创建应用", "core:apps:create", 1, "plus", "/apps/apply", null, sort += 10);
 
         // 管理中心 (目录 - 仅管理员可见)
-        long adminId = upsertResource(null, "管理中心", "core:admin", 0, "shield", "/admin", null, sort += 10);
+        long adminId = upsertResource(null, "管理中心", "core:admin", 0, "shield", null, null, sort += 10);
         upsertResource(adminId, "应用审核", "core:oauth:audit", 1, "clipboard-check", "/admin/apps", null, sort += 10);
         upsertResource(adminId, "用户管理", "core:admin:users:read", 1, "users", "/admin/users", null, sort += 10);
         upsertResource(adminId, "角色管理", "core:admin:roles:read", 1, "shield-check", "/admin/roles", null, sort += 10);
