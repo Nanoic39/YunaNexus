@@ -458,6 +458,7 @@ interface ActivityItem {
 }
 
 function mockActivityForUser(user: UserVO): ActivityItem[] {
+  if (!import.meta.dev) return []; // 生产环境无活动数据则留空
   const base = user.createdAt;
   return [
     { action: "登录", detail: "从 IP 192.168.1.100 登录", time: randomDate(base, "2026-07-09"), type: "info" },

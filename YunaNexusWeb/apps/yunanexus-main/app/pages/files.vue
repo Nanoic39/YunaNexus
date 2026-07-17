@@ -678,16 +678,25 @@ async function openPreview(item: FileItemData) {
     return;
   }
 
-  // 生产环境：通过后端预览/下载接口获取
+  // 生产环境：通过后端预览/下载接口获取（携带认证 Token）
   try {
+    // 读取 Token
+    let token = "";
+    try {
+      const raw = localStorage.getItem("user-auth-info");
+      if (raw) token = JSON.parse(raw).accessToken || "";
+    } catch {}
+    const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
     if (["image", "video", "audio", "pdf"].includes(type)) {
-      previewUrl.value = `/api/file/download/${item.fileUuid}`;
+      const res = await fetch(`/api/file/download/${item.fileUuid}`, { headers: authHeaders });
+      if (!res.ok) { previewError.value = "加载预览失败"; previewLoading.value = false; return; }
+      const blob = await res.blob();
+      previewUrl.value = URL.createObjectURL(blob);
     } else if (type === "text") {
-      const res = await $fetch<string>(`/api/file/download/${item.fileUuid}`, {
-        responseType: "text",
-        headers: { Accept: "text/plain" },
-      });
-      previewTextContent.value = res || "";
+      const res = await fetch(`/api/file/download/${item.fileUuid}`, { headers: authHeaders });
+      if (!res.ok) { previewError.value = "加载预览失败"; previewLoading.value = false; return; }
+      previewTextContent.value = await res.text();
     } else {
       previewError.value = "该文件类型暂不支持预览";
     }

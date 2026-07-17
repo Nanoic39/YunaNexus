@@ -60,7 +60,18 @@ async function confirmAuthorize() {
   error.value = "";
 
   try {
-    const { $fetch: _f } = useNuxtApp();
+    // 显式携带 Token（不依赖 auth-fetch 插件的隐式注入）
+    let token = "";
+    try {
+      const raw = localStorage.getItem("user-auth-info");
+      if (raw) token = JSON.parse(raw).accessToken || "";
+    } catch {}
+    if (!token) {
+      error.value = "未登录，请先登录后再授权";
+      authorizing.value = false;
+      return;
+    }
+
     const body: Record<string, string> = {
       clientId: clientId.value,
       redirectUri: redirectUri.value,
@@ -73,9 +84,13 @@ async function confirmAuthorize() {
       body.codeChallengeMethod = codeChallengeMethod.value;
     }
 
-    const res = await (_f as typeof $fetch)<{ code: number; data: any; msg: string }>(
+    const res = await $fetch<{ code: number; data: any; msg: string }>(
       "/api/oauth/authorize",
-      { method: "POST", body },
+      {
+        method: "POST",
+        body,
+        headers: { Authorization: `Bearer ${token}` },
+      },
     );
 
     if (res.code === 200) {
