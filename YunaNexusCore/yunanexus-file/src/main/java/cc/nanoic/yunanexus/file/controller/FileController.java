@@ -5,6 +5,7 @@ import cc.nanoic.yunanexus.common.web.auth.RequirePermission;
 import cc.nanoic.yunanexus.common.web.common.R;
 import cc.nanoic.yunanexus.common.web.common.Result;
 import cc.nanoic.yunanexus.file.entity.UserFile;
+import cc.nanoic.yunanexus.file.entity.VO.UserFileVO;
 import cc.nanoic.yunanexus.file.service.FileService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,12 +29,19 @@ public class FileController {
 
     @RequirePermission
     @GetMapping("/list")
-    public Result<Map<String, Object>> list(@RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) Long folderId) {
+    public Result<Map<String, Object>> list(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String folderId,
+            @RequestParam(required = false) String keyword) {
         byte[] globalId = PermissionContext.getGlobalId();
-        Page<UserFile> result = fileService.listFiles(globalId, folderId, page, size);
+        Long folderIdLong = null;
+        if (folderId != null && !folderId.isBlank()) {
+            folderIdLong = Long.valueOf(folderId);
+        }
+        Page<UserFileVO> result = fileService.listFiles(globalId, folderIdLong, keyword, page, size);
         Map<String, Object> data = new HashMap<>();
-        data.put("list", result.getRecords());
+        data.put("records", result.getRecords());
         data.put("total", result.getTotal());
         data.put("page", result.getCurrent());
         data.put("size", result.getSize());

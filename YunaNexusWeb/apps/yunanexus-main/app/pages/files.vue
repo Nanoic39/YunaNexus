@@ -257,7 +257,8 @@ async function loadFiles() {
     if (searchQuery.value) params.set("keyword", searchQuery.value);
     const res = await apiGet<{ records: FileItemData[]; total: number }>(`/api/file/list?${params.toString()}`);
     if (res.code === 200) {
-      files.value = res.data.records || [];
+      const records = res.data.records || [];
+      files.value = records;
       totalItems.value = res.data.total || 0;
     } else {
       error.value = res.msg || "加载文件列表失败";

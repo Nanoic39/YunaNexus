@@ -14,14 +14,6 @@ interface RoleVO {
   status: number; // 0=取消 1=启用 2=删除
 }
 
-interface UserProfileVO {
-  nickname: string;
-  avatarUuid: string;
-  gender: string;
-  birthday: string;
-  bio: string;
-}
-
 interface UserVO {
   globalId: string;
   username: string;
@@ -29,8 +21,12 @@ interface UserVO {
   phone: string;
   createdAt: string;
   status: number; // 0=注销 1=正常 2=封禁 3=冻结
+  nickname: string;
+  avatarUuid: string;
+  gender: string;
+  birthday: string;
+  bio: string;
   roles: RoleVO[];
-  profile: UserProfileVO;
 }
 
 interface PageVO<T> {
@@ -59,24 +55,24 @@ function randomDate(start: string, end: string): string {
 }
 
 const mockUsers: UserVO[] = [
-  { globalId: makeGlobalId(1), username: "YunaAdmin", email: "admin@yunanexus.com", phone: "13800001001", createdAt: "2024-01-15 10:30:00", status: 1, roles: [mockRoles[0]!, mockRoles[1]!], profile: { nickname: "尤娜", avatarUuid: "", gender: "女", birthday: "2001-03-07", bio: "平台超级管理员" } },
-  { globalId: makeGlobalId(2), username: "dev_admin", email: "dev@yunanexus.com", phone: "13800001002", createdAt: "2024-02-20 14:20:00", status: 1, roles: [mockRoles[1]!], profile: { nickname: "开发者001", avatarUuid: "", gender: "男", birthday: "1998-08-15", bio: "后端开发工程师" } },
-  { globalId: makeGlobalId(3), username: "vip_zhang", email: "zhang@example.com", phone: "13800001003", createdAt: "2024-03-10 09:00:00", status: 1, roles: [mockRoles[2]!], profile: { nickname: "张先生", avatarUuid: "", gender: "男", birthday: "1995-12-01", bio: "VIP 用户" } },
-  { globalId: makeGlobalId(4), username: "vip_wang", email: "wang@example.com", phone: "13800001004", createdAt: "2024-04-05 16:45:00", status: 1, roles: [mockRoles[2]!], profile: { nickname: "王小姐", avatarUuid: "", gender: "女", birthday: "1997-06-20", bio: "设计师" } },
-  { globalId: makeGlobalId(5), username: "user_li", email: "li@example.com", phone: "13800001005", createdAt: "2024-05-18 08:15:00", status: 1, roles: [mockRoles[3]!], profile: { nickname: "小李同学", avatarUuid: "", gender: "男", birthday: "2000-01-10", bio: "大学生" } },
-  { globalId: makeGlobalId(6), username: "user_chen", email: "chen@example.com", phone: "13800001006", createdAt: "2024-06-01 11:30:00", status: 1, roles: [mockRoles[3]!], profile: { nickname: "阿晨", avatarUuid: "", gender: "男", birthday: "1999-09-22", bio: "独立开发者" } },
-  { globalId: makeGlobalId(7), username: "banned_one", email: "banned1@example.com", phone: "13800001007", createdAt: "2024-06-15 10:00:00", status: 2, roles: [mockRoles[3]!], profile: { nickname: "违规用户A", avatarUuid: "", gender: "未知", birthday: "2002-04-04", bio: "" } },
-  { globalId: makeGlobalId(8), username: "banned_two", email: "banned2@example.com", phone: "13800001008", createdAt: "2024-07-01 09:20:00", status: 2, roles: [mockRoles[3]!], profile: { nickname: "违规用户B", avatarUuid: "", gender: "未知", birthday: "2003-11-11", bio: "因发布不当内容被封禁" } },
-  { globalId: makeGlobalId(9), username: "banned_spam", email: "spam@example.com", phone: "13800001009", createdAt: "2024-07-10 15:40:00", status: 2, roles: [mockRoles[3]!], profile: { nickname: "垃圾账号001", avatarUuid: "", gender: "未知", birthday: "2000-01-01", bio: "" } },
-  { globalId: makeGlobalId(10), username: "frozen_liu", email: "liufrozen@example.com", phone: "13800001010", createdAt: "2024-07-22 13:10:00", status: 3, roles: [mockRoles[2]!], profile: { nickname: "刘先生", avatarUuid: "", gender: "男", birthday: "1993-05-18", bio: "待核实身份" } },
-  { globalId: makeGlobalId(11), username: "frozen_zhao", email: "zhao@example.com", phone: "13800001011", createdAt: "2024-08-05 12:00:00", status: 3, roles: [mockRoles[3]!], profile: { nickname: "赵女士", avatarUuid: "", gender: "女", birthday: "1996-02-28", bio: "账号存在异常登录" } },
-  { globalId: makeGlobalId(12), username: "cancelled_one", email: "cancelled@example.com", phone: "13800001012", createdAt: "2024-08-15 08:30:00", status: 0, roles: [mockRoles[3]!], profile: { nickname: "已注销用户", avatarUuid: "", gender: "未知", birthday: "", bio: "" } },
-  { globalId: makeGlobalId(13), username: "user_xu", email: "xu@example.com", phone: "13800001013", createdAt: "2024-09-01 14:00:00", status: 1, roles: [mockRoles[3]!], profile: { nickname: "徐徐", avatarUuid: "", gender: "女", birthday: "2001-07-17", bio: "插画师" } },
-  { globalId: makeGlobalId(14), username: "user_sun", email: "sun@example.com", phone: "13800001014", createdAt: "2024-09-10 16:20:00", status: 1, roles: [mockRoles[3]!], profile: { nickname: "阳光", avatarUuid: "", gender: "男", birthday: "1998-12-25", bio: "游戏玩家" } },
-  { globalId: makeGlobalId(15), username: "mod_huang", email: "huang@yunanexus.com", phone: "13800001015", createdAt: "2024-10-05 10:00:00", status: 1, roles: [mockRoles[1]!, mockRoles[2]!], profile: { nickname: "黄管理员", avatarUuid: "", gender: "男", birthday: "1992-03-15", bio: "内容审核" } },
-  { globalId: makeGlobalId(16), username: "vip_zhou", email: "zhou@example.com", phone: "13800001016", createdAt: "2024-10-20 09:40:00", status: 1, roles: [mockRoles[2]!], profile: { nickname: "周先生", avatarUuid: "", gender: "男", birthday: "1994-10-01", bio: "高级会员" } },
-  { globalId: makeGlobalId(17), username: "user_wu", email: "wu@example.com", phone: "13800001017", createdAt: "2024-11-01 11:15:00", status: 1, roles: [mockRoles[3]!], profile: { nickname: "小吴", avatarUuid: "", gender: "女", birthday: "2002-02-14", bio: "学生" } },
-  { globalId: makeGlobalId(18), username: "frozen_test", email: "testfrozen@example.com", phone: "13800001018", createdAt: "2024-11-12 13:55:00", status: 3, roles: [mockRoles[3]!], profile: { nickname: "测试账号", avatarUuid: "", gender: "未知", birthday: "2000-06-06", bio: "风控测试" } },
+  { globalId: makeGlobalId(1), username: "YunaAdmin", email: "admin@yunanexus.com", phone: "13800001001", createdAt: "2024-01-15 10:30:00", status: 1, roles: [mockRoles[0]!, mockRoles[1]!],nickname: "尤娜", avatarUuid: "", gender: "女", birthday: "2001-03-07", bio: "平台超级管理员" },
+  { globalId: makeGlobalId(2), username: "dev_admin", email: "dev@yunanexus.com", phone: "13800001002", createdAt: "2024-02-20 14:20:00", status: 1, roles: [mockRoles[1]!],nickname: "开发者001", avatarUuid: "", gender: "男", birthday: "1998-08-15", bio: "后端开发工程师" },
+  { globalId: makeGlobalId(3), username: "vip_zhang", email: "zhang@example.com", phone: "13800001003", createdAt: "2024-03-10 09:00:00", status: 1, roles: [mockRoles[2]!],nickname: "张先生", avatarUuid: "", gender: "男", birthday: "1995-12-01", bio: "VIP 用户" },
+  { globalId: makeGlobalId(4), username: "vip_wang", email: "wang@example.com", phone: "13800001004", createdAt: "2024-04-05 16:45:00", status: 1, roles: [mockRoles[2]!],nickname: "王小姐", avatarUuid: "", gender: "女", birthday: "1997-06-20", bio: "设计师" },
+  { globalId: makeGlobalId(5), username: "user_li", email: "li@example.com", phone: "13800001005", createdAt: "2024-05-18 08:15:00", status: 1, roles: [mockRoles[3]!],nickname: "小李同学", avatarUuid: "", gender: "男", birthday: "2000-01-10", bio: "大学生" },
+  { globalId: makeGlobalId(6), username: "user_chen", email: "chen@example.com", phone: "13800001006", createdAt: "2024-06-01 11:30:00", status: 1, roles: [mockRoles[3]!],nickname: "阿晨", avatarUuid: "", gender: "男", birthday: "1999-09-22", bio: "独立开发者" },
+  { globalId: makeGlobalId(7), username: "banned_one", email: "banned1@example.com", phone: "13800001007", createdAt: "2024-06-15 10:00:00", status: 2, roles: [mockRoles[3]!],nickname: "违规用户A", avatarUuid: "", gender: "未知", birthday: "2002-04-04", bio: "" },
+  { globalId: makeGlobalId(8), username: "banned_two", email: "banned2@example.com", phone: "13800001008", createdAt: "2024-07-01 09:20:00", status: 2, roles: [mockRoles[3]!],nickname: "违规用户B", avatarUuid: "", gender: "未知", birthday: "2003-11-11", bio: "因发布不当内容被封禁" },
+  { globalId: makeGlobalId(9), username: "banned_spam", email: "spam@example.com", phone: "13800001009", createdAt: "2024-07-10 15:40:00", status: 2, roles: [mockRoles[3]!],nickname: "垃圾账号001", avatarUuid: "", gender: "未知", birthday: "2000-01-01", bio: "" },
+  { globalId: makeGlobalId(10), username: "frozen_liu", email: "liufrozen@example.com", phone: "13800001010", createdAt: "2024-07-22 13:10:00", status: 3, roles: [mockRoles[2]!],nickname: "刘先生", avatarUuid: "", gender: "男", birthday: "1993-05-18", bio: "待核实身份" },
+  { globalId: makeGlobalId(11), username: "frozen_zhao", email: "zhao@example.com", phone: "13800001011", createdAt: "2024-08-05 12:00:00", status: 3, roles: [mockRoles[3]!],nickname: "赵女士", avatarUuid: "", gender: "女", birthday: "1996-02-28", bio: "账号存在异常登录" },
+  { globalId: makeGlobalId(12), username: "cancelled_one", email: "cancelled@example.com", phone: "13800001012", createdAt: "2024-08-15 08:30:00", status: 0, roles: [mockRoles[3]!],nickname: "已注销用户", avatarUuid: "", gender: "未知", birthday: "", bio: "" },
+  { globalId: makeGlobalId(13), username: "user_xu", email: "xu@example.com", phone: "13800001013", createdAt: "2024-09-01 14:00:00", status: 1, roles: [mockRoles[3]!],nickname: "徐徐", avatarUuid: "", gender: "女", birthday: "2001-07-17", bio: "插画师" },
+  { globalId: makeGlobalId(14), username: "user_sun", email: "sun@example.com", phone: "13800001014", createdAt: "2024-09-10 16:20:00", status: 1, roles: [mockRoles[3]!],nickname: "阳光", avatarUuid: "", gender: "男", birthday: "1998-12-25", bio: "游戏玩家" },
+  { globalId: makeGlobalId(15), username: "mod_huang", email: "huang@yunanexus.com", phone: "13800001015", createdAt: "2024-10-05 10:00:00", status: 1, roles: [mockRoles[1]!, mockRoles[2]!],nickname: "黄管理员", avatarUuid: "", gender: "男", birthday: "1992-03-15", bio: "内容审核" },
+  { globalId: makeGlobalId(16), username: "vip_zhou", email: "zhou@example.com", phone: "13800001016", createdAt: "2024-10-20 09:40:00", status: 1, roles: [mockRoles[2]!],nickname: "周先生", avatarUuid: "", gender: "男", birthday: "1994-10-01", bio: "高级会员" },
+  { globalId: makeGlobalId(17), username: "user_wu", email: "wu@example.com", phone: "13800001017", createdAt: "2024-11-01 11:15:00", status: 1, roles: [mockRoles[3]!],nickname: "小吴", avatarUuid: "", gender: "女", birthday: "2002-02-14", bio: "学生" },
+  { globalId: makeGlobalId(18), username: "frozen_test", email: "testfrozen@example.com", phone: "13800001018", createdAt: "2024-11-12 13:55:00", status: 3, roles: [mockRoles[3]!],nickname: "测试账号", avatarUuid: "", gender: "未知", birthday: "2000-06-06", bio: "风控测试" },
 ];
 
 // ==================== 状态 ====================
@@ -112,7 +108,7 @@ const confirmTitle = computed(() => {
 const confirmMessage = computed(() => {
   if (!confirmTarget.value) return "";
   const labels: Record<number, string> = { 0: "注销", 1: "启用", 2: "封禁", 3: "冻结" };
-  const name = confirmTarget.value.profile?.nickname || confirmTarget.value.username;
+  const name = confirmTarget.value.nickname || confirmTarget.value.username;
   return `确定要将用户「${name}」状态改为「${labels[confirmNewStatus.value]}」吗？`;
 });
 
@@ -155,7 +151,7 @@ const filteredUsers = computed(() => {
       (u) =>
         u.username.toLowerCase().includes(kw) ||
         u.email.toLowerCase().includes(kw) ||
-        (u.profile?.nickname || "").toLowerCase().includes(kw),
+        (u.nickname || "").toLowerCase().includes(kw),
     );
   }
   return list;
@@ -193,7 +189,7 @@ function roleLabel(role: RoleVO): string {
 }
 
 function getInitials(user: UserVO): string {
-  const name = user.profile?.nickname || user.username;
+  const name = user.nickname || user.username;
   return name.charAt(0).toUpperCase();
 }
 
@@ -651,7 +647,7 @@ onMounted(() => {
                     </div>
                     <div class="users-cell-user-text">
                       <span class="users-cell-username">{{ user.username }}</span>
-                      <span class="users-cell-nickname">{{ user.profile?.nickname || "--" }}</span>
+                      <span class="users-cell-nickname">{{ user.nickname || "--" }}</span>
                     </div>
                   </div>
                 </td>
@@ -766,7 +762,7 @@ onMounted(() => {
                 {{ getInitials(selectedUser!) }}
               </div>
               <div>
-                <h3 class="users-detail-name">{{ selectedUser!.profile?.nickname || selectedUser!.username }}</h3>
+                <h3 class="users-detail-name">{{ selectedUser!.nickname || selectedUser!.username }}</h3>
                 <p class="users-detail-username">@{{ selectedUser!.username }}</p>
               </div>
             </div>
@@ -845,19 +841,19 @@ onMounted(() => {
               <div class="detail-info-list">
                 <div class="detail-info-item">
                   <span class="detail-info-label">昵称</span>
-                  <span class="detail-info-value">{{ selectedUser!.profile?.nickname || "未设置" }}</span>
+                  <span class="detail-info-value">{{ selectedUser!.nickname || "未设置" }}</span>
                 </div>
                 <div class="detail-info-item">
                   <span class="detail-info-label">性别</span>
-                  <span class="detail-info-value">{{ selectedUser!.profile?.gender || "未知" }}</span>
+                  <span class="detail-info-value">{{ selectedUser!.gender || "未知" }}</span>
                 </div>
                 <div class="detail-info-item">
                   <span class="detail-info-label">生日</span>
-                  <span class="detail-info-value">{{ selectedUser!.profile?.birthday || "未设置" }}</span>
+                  <span class="detail-info-value">{{ selectedUser!.birthday || "未设置" }}</span>
                 </div>
                 <div class="detail-info-item">
                   <span class="detail-info-label">个人简介</span>
-                  <span class="detail-info-value">{{ selectedUser!.profile?.bio || "这个人很懒，什么都没写…" }}</span>
+                  <span class="detail-info-value">{{ selectedUser!.bio || "这个人很懒，什么都没写…" }}</span>
                 </div>
               </div>
             </div>
@@ -946,7 +942,7 @@ onMounted(() => {
     <Modal :show="roleDialogShow" title="分配角色" width="480px" @close="roleDialogShow = false">
       <p style="margin-bottom: 12px">
         为用户
-        <strong>{{ roleDialogTarget?.profile?.nickname || roleDialogTarget?.username }}</strong>
+        <strong>{{ roleDialogTarget?.nickname || roleDialogTarget?.username }}</strong>
         分配角色：
       </p>
       <div class="users-role-checkboxes">

@@ -3,6 +3,7 @@ package cc.nanoic.yunanexus.file.service;
 import cc.nanoic.yunanexus.file.entity.FileObject;
 import cc.nanoic.yunanexus.file.entity.UserFile;
 import cc.nanoic.yunanexus.file.entity.UserFolder;
+import cc.nanoic.yunanexus.file.entity.VO.UserFileVO;
 import cc.nanoic.yunanexus.file.mapper.FileObjectMapper;
 import cc.nanoic.yunanexus.file.mapper.UserFileMapper;
 import cc.nanoic.yunanexus.file.mapper.UserFolderMapper;
@@ -19,6 +20,9 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class FileService {
@@ -167,7 +171,7 @@ public class FileService {
         return fileObjectMapper.selectById(objectId);
     }
 
-    public Page<UserFile> listFiles(byte[] globalId, Long folderId, int page, int size) {
+    public Page<UserFileVO> listFiles(byte[] globalId, Long folderId, String keyword, int page, int size) {
         LambdaQueryWrapper<UserFile> wrapper = new LambdaQueryWrapper<UserFile>()
                 .eq(UserFile::getGlobalId, globalId)
                 .eq(UserFile::getDeleteStage, 0)
@@ -179,7 +183,47 @@ public class FileService {
             wrapper.eq(UserFile::getFolderId, folderId);
         }
 
-        return userFileMapper.selectPage(Page.of(page, size), wrapper);
+        if (keyword != null && !keyword.isBlank()) {
+            wrapper.and(w -> w
+                    .like(UserFile::getFileName, keyword)
+                    .or()
+                    .like(UserFile::getOriginName, keyword));
+        }
+
+        Page<UserFile> entityPage = userFileMapper.selectPage(Page.of(page, size), wrapper);
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+        List<UserFileVO> voList = entityPage.getRecords().stream().map(entity -> {
+            UserFileVO vo = new UserFileVO();
+            vo.setFileUuid(entity.getFileUuid());
+            vo.setName(entity.getFileName() != null ? entity.getFileName() : entity.getOriginName());
+            vo.setSize(entity.getFileSize());
+            vo.setFileType(entity.getFileMime());
+            vo.setFileExt(entity.getFileExt());
+            vo.setFolderId(entity.getFolderId() != null ? String.valueOf(entity.getFolderId()) : null);
+            vo.setCreatedAt(entity.getCreateTime() != null ? entity.getCreateTime().format(fmt) : null);
+            vo.setUpdatedAt(entity.getUpdateTime() != null ? entity.getUpdateTime().format(fmt) : null);
+
+            // fileCategory: 2 = 文件夹
+            boolean isDir = entity.getFileCategory() != null && entity.getFileCategory() == 2;
+            vo.setIsFolder(isDir);
+
+            if (isDir) {
+                Long childCount = userFileMapper.selectCount(new LambdaQueryWrapper<UserFile>()
+                        .eq(UserFile::getGlobalId, globalId)
+                        .eq(UserFile::getFolderId, entity.getId())
+                        .eq(UserFile::getDeleteStage, 0)
+                        .eq(UserFile::getStatus, 1));
+                vo.setChildCount(childCount.intValue());
+            }
+
+            return vo;
+        }).collect(Collectors.toList());
+
+        Page<UserFileVO> voPage = new Page<>(entityPage.getCurrent(), entityPage.getSize(), entityPage.getTotal());
+        voPage.setRecords(voList);
+        return voPage;
     }
 
     @Transactional
