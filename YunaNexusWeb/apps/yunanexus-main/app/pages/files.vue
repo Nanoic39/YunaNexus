@@ -576,13 +576,13 @@ async function cancelShare(shareUuid: string) {
   }
 }
 
-function downloadFile(item: FileItemData) {
+async function downloadFile(item: FileItemData) {
   const url = `/api/file/download/${item.fileUuid}`;
   if (import.meta.dev) {
     toast.info(`开发模式：模拟下载 ${item.name}`);
     return;
   }
-  window.open(url, "_blank");
+  await downloadWithAuth(url, item.name);
 }
 
 function downloadSelected() {
@@ -592,7 +592,35 @@ function downloadSelected() {
     toast.info(`开发模式：模拟批量下载 ${items.length} 个文件`);
     return;
   }
-  items.forEach((uuid) => window.open(`/api/file/download/${uuid}`, "_blank"));
+  items.forEach((uuid) => downloadWithAuth(`/api/file/download/${uuid}`));
+}
+
+async function downloadWithAuth(url: string, filename?: string) {
+  try {
+    let token = "";
+    try {
+      const raw = localStorage.getItem("user-auth-info");
+      if (raw) token = JSON.parse(raw).accessToken || "";
+    } catch {}
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      toast.error("下载失败");
+      return;
+    }
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename || "";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  } catch (e: any) {
+    toast.error(e?.message || "下载失败");
+  }
 }
 
 // ==================== 预览 ====================

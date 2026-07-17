@@ -56,7 +56,13 @@ async function handleLogin() {
   try {
     await login(account.value, password.value);
     toast.success("登录成功");
-    navigateTo((route.query.redirect as string) || "/");
+    const redirect = route.query.redirect as string;
+    if (redirect) {
+      const isExternal = /^https?:\/\//.test(redirect);
+      navigateTo(redirect, isExternal ? { external: true } : undefined);
+    } else {
+      navigateTo("/");
+    }
   } catch (e: any) {
     errorMsg.value = e.message || "登录失败，请检查用户名或密码";
   } finally {

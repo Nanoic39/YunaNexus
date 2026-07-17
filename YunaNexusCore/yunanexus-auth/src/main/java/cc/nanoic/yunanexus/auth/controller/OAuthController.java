@@ -35,8 +35,7 @@ public class OAuthController {
 
     /**
      * OAuth 2.0 授权端点 — 浏览器跳转（GET）
-     * 未登录则重定向到前端登录页，登录后回到此处；
-     * 已登录则生成授权码并重定向到回调地址。
+     * 重定向到前端授权页面（同域下可读取登录态），由前端完成授权交互。
      */
     @GetMapping("/authorize")
     public void authorizeGet(
@@ -50,36 +49,12 @@ public class OAuthController {
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
 
-        if (!PermissionContext.hasIdentity()) {
-            // 未登录 → 重定向到前端登录页，同时传回当前 OAuth 请求的完整 URL
-            // （登录成功后前端会跳转回来继续授权流程）
-            String currentUrl = request.getRequestURL().toString();
-            String queryString = request.getQueryString();
-            if (queryString != null) {
-                currentUrl += "?" + queryString;
-            }
-            response.sendRedirect(webBaseUrl + "/login?redirect="
-                    + URLEncoder.encode(currentUrl, StandardCharsets.UTF_8));
-            return;
+        String queryString = request.getQueryString();
+        String frontendUrl = webBaseUrl + "/oauth/authorize";
+        if (queryString != null) {
+            frontendUrl += "?" + queryString;
         }
-
-        AuthorizeRequest req = new AuthorizeRequest();
-        req.setClientId(clientId);
-        req.setRedirectUri(redirectUri);
-        req.setResponseType(responseType);
-        req.setScope(scope);
-        req.setState(state);
-        req.setCodeChallenge(codeChallenge);
-        req.setCodeChallengeMethod(codeChallengeMethod);
-
-        Map<String, String> result = oAuthService.authorize(req);
-        // 重定向到 redirect_uri?code=xxx&state=yyy
-        String location = result.get("redirectUri");
-        location += (location.contains("?") ? "&" : "?") + "code=" + result.get("code");
-        if (result.get("state") != null && !result.get("state").isEmpty()) {
-            location += "&state=" + URLEncoder.encode(result.get("state"), StandardCharsets.UTF_8);
-        }
-        response.sendRedirect(location);
+        response.sendRedirect(frontendUrl);
     }
 
     /**

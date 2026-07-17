@@ -189,7 +189,8 @@ function roleLabel(role: RoleVO): string {
 }
 
 function getInitials(user: UserVO): string {
-  const name = user.nickname || user.username;
+  const name = user.nickname || user.username || "";
+  if (!name) return "?";
   return name.charAt(0).toUpperCase();
 }
 
@@ -484,8 +485,9 @@ onMounted(() => {
       </div>
     </section>
 
-    <!-- 统计卡片 -->
-    <div class="stat-row fade-up">
+    <ClientOnly>
+      <!-- 统计卡片 -->
+      <div class="stat-row fade-up">
       <div class="stat-card" @click="filterStatus = null; filterRoleId = null">
         <div class="stat-card-number">{{ stats.total }}</div>
         <div class="stat-card-label">总用户数</div>
@@ -1009,6 +1011,7 @@ onMounted(() => {
         </button>
       </template>
     </Modal>
+    </ClientOnly>
   </div>
 </template>
 
