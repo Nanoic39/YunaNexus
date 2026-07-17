@@ -11,6 +11,11 @@ import java.util.List;
 public class WebProperties {
     private Jwt jwt = new Jwt();
     private List<String> excludePaths = new ArrayList<>();
+    /**
+     * 前端站点 URL，用于 OAuth 授权等场景跳转登录页。
+     * 默认 http://localhost:3000，生产环境通过 yunanexus.web.base-url 配置
+     */
+    private String baseUrl = "http://localhost:3000";
 
     public WebProperties() {
         excludePaths.add("/register/**");
