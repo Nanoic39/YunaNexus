@@ -17,7 +17,7 @@ spring:
             - id: auth-service
               uri: lb://YunaNexus-AuthService
               predicates:
-                - Path=/auth/**,/login/**,/register/**,/key/**,/oauth/**,/admin/**
+                - Path=/auth/**,/login/**,/register/**,/key/**,/oauth/**,/oauth2/**,/admin/**
             - id: file-avatar
               uri: lb://YunaNexus-FileService
               predicates:

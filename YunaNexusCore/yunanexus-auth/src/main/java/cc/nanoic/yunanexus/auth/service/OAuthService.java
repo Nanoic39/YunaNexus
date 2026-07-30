@@ -82,6 +82,28 @@ public class OAuthService {
     }
 
     public TokenResponse token(TokenRequest req) {
+        // 1. 校验 grant_type
+        if (req.getGrantType() == null || req.getGrantType().isEmpty()) {
+            throw new BusinessException(R.PARAM_ERROR, "缺少 grant_type");
+        }
+        if (!"authorization_code".equals(req.getGrantType()) && !"refresh_token".equals(req.getGrantType())) {
+            throw new BusinessException(R.PARAM_ERROR, "不支持的 grant_type: " + req.getGrantType());
+        }
+
+        // 2. refresh_token 类型处理
+        if ("refresh_token".equals(req.getGrantType())) {
+            return refreshTokenGrant(req);
+        }
+
+        // 3. authorization_code 类型处理
+        return authorizationCodeGrant(req);
+    }
+
+    /**
+     * 处理 authorization_code 授权类型.
+     * <p>关键修复：先构建 Token 响应（可能抛异常），成功后再删除授权码.</p>
+     */
+    private TokenResponse authorizationCodeGrant(TokenRequest req) {
         OAuthClient client = findActiveClient(req.getClientId());
         if (client.getClientSecret() == null || !BCrypt.checkpw(req.getClientSecret(), client.getClientSecret())) {
             throw new BusinessException(R.PARAM_ERROR, "客户端密钥错误");
@@ -98,6 +120,7 @@ public class OAuthService {
             throw new BusinessException(R.PARAM_ERROR, "redirect_uri 不匹配");
         }
 
+        // PKCE 验证
         String storedChallenge = obj.getString("codeChallenge");
         if (storedChallenge != null) {
             if (req.getCodeVerifier() == null) {
@@ -113,15 +136,72 @@ public class OAuthService {
             }
         }
 
-        bucket.delete();
-
+        // ★ 关键修复：先构建 Token（可能抛异常），成功后再删授权码
         byte[] globalId = HexUtil.decodeHex(obj.getString("globalId"));
         String scope = obj.getString("scope");
         LoginResponse loginResp = authService.issueTokens(globalId);
 
+        // 构建响应成功后再删除授权码（保证一次性使用）
+        bucket.delete();
+
         TokenResponse resp = new TokenResponse();
         resp.setAccessToken(loginResp.getAccessToken());
         resp.setRefreshToken(loginResp.getRefreshToken());
+        resp.setExpiresIn(loginResp.getExpiresIn());
+        resp.setTokenType("Bearer");
+        resp.setScope(scope);
+        resp.setUuid(loginResp.getUuid());
+        return resp;
+    }
+
+    /**
+     * 处理 refresh_token 授权类型.
+     */
+    private TokenResponse refreshTokenGrant(TokenRequest req) {
+        OAuthClient client = findActiveClient(req.getClientId());
+        if (client.getClientSecret() == null || !BCrypt.checkpw(req.getClientSecret(), client.getClientSecret())) {
+            throw new BusinessException(R.PARAM_ERROR, "客户端密钥错误");
+        }
+
+        if (req.getRefreshToken() == null || req.getRefreshToken().isEmpty()) {
+            throw new BusinessException(R.PARAM_ERROR, "refresh_token 不能为空");
+        }
+
+        // 加载 refresh token
+        RBucket<String> bucket = redissonClient.getBucket("oauth2:refresh:" + req.getRefreshToken());
+        String data = bucket.get();
+        if (data == null) {
+            throw new BusinessException(R.PARAM_ERROR, "refresh_token 无效或已过期");
+        }
+
+        JSONObject tokenData = JSON.parseObject(data);
+        String storedClientId = tokenData.getString("clientId");
+        if (!req.getClientId().equals(storedClientId)) {
+            throw new BusinessException(R.PARAM_ERROR, "refresh_token 不属于此客户端");
+        }
+
+        // 删除旧 refresh token（轮转）
+        bucket.delete();
+
+        // 签发新令牌
+        byte[] globalId = HexUtil.decodeHex(tokenData.getString("globalId"));
+        String scope = tokenData.getString("scope");
+        LoginResponse loginResp = authService.issueTokens(globalId);
+
+        // 存储新 refresh token
+        String newRefreshToken = loginResp.getRefreshToken();
+        if (newRefreshToken != null && !newRefreshToken.isEmpty()) {
+            JSONObject newData = new JSONObject();
+            newData.put("clientId", req.getClientId());
+            newData.put("globalId", tokenData.getString("globalId"));
+            newData.put("scope", scope);
+            redissonClient.getBucket("oauth2:refresh:" + newRefreshToken)
+                    .set(newData.toJSONString(), Duration.ofDays(30));
+        }
+
+        TokenResponse resp = new TokenResponse();
+        resp.setAccessToken(loginResp.getAccessToken());
+        resp.setRefreshToken(newRefreshToken);
         resp.setExpiresIn(loginResp.getExpiresIn());
         resp.setTokenType("Bearer");
         resp.setScope(scope);
@@ -175,6 +255,13 @@ public class OAuthService {
             throw new BusinessException(R.PARAM_ERROR, "客户端不存在或已禁用");
         }
         return client;
+    }
+
+    /**
+     * 查找活跃客户端（公开方法，供 Controller 调用）.
+     */
+    public OAuthClient findActiveClientForAuth(String uuid) {
+        return findActiveClient(uuid);
     }
 
     private OAuthClient findClientByUuid(String uuid) {

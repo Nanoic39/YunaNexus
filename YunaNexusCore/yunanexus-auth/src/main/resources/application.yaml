@@ -13,6 +13,8 @@ mybatis-plus:
       id-type: auto
 
 yunanexus:
+  web:
+    base-url: ${YUNANEXUS_WEB_URL:http://localhost:3000}
   auth:
     jwt:
       access-exp: 7200
@@ -21,3 +23,9 @@ yunanexus:
       key-path: ./SecretKey
     aes:
       key-path: ./SecretKey
+  oauth2:
+    authorization-code-ttl: 300
+    authorization-session-ttl: 600
+    refresh-token-ttl: 2592000
+    pkce-required: false
+    issuer: https://yunanexus.example.com

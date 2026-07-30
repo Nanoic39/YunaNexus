@@ -84,6 +84,13 @@
             <groupId>cc.nanoic.yunanexus</groupId>
             <artifactId>common-mail</artifactId>
         </dependency>
+
+        <!-- test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

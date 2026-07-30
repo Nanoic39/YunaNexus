@@ -23,6 +23,9 @@ public class WebProperties {
         excludePaths.add("/key/**");
         excludePaths.add("/oauth/token/**");
         excludePaths.add("/oauth/authorize/**");
+        excludePaths.add("/oauth2/token/**");
+        excludePaths.add("/oauth2/authorize/**");
+        excludePaths.add("/oauth2/revoke/**");
         excludePaths.add("/internal/**");
         excludePaths.add("/actuator/**");
         excludePaths.add("/error");

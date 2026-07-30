@@ -3,6 +3,7 @@ package cc.nanoic.yunanexus.auth.controller;
 import cc.nanoic.yunanexus.auth.entity.DTO.AuthorizeRequest;
 import cc.nanoic.yunanexus.auth.entity.DTO.TokenRequest;
 import cc.nanoic.yunanexus.auth.entity.DTO.TokenResponse;
+import cc.nanoic.yunanexus.auth.entity.OAuthClient;
 import cc.nanoic.yunanexus.auth.entity.VO.OAuthClientVO;
 import cc.nanoic.yunanexus.auth.service.OAuthService;
 import cc.nanoic.yunanexus.common.web.auth.PermissionContext;
@@ -14,8 +15,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -35,8 +34,11 @@ public class OAuthController {
 
     /**
      * OAuth 2.0 授权端点 — 浏览器跳转（GET）
-     * 重定向到前端授权页面（同域下可读取登录态），由前端完成授权交互。
+     *
+     * @deprecated 请使用 {@code /oauth2/authorize}（新端点带完整参数校验）.
+     *             此端点保留向后兼容，但增加了基本的 client_id / redirect_uri 校验.
      */
+    @Deprecated
     @GetMapping("/authorize")
     public void authorizeGet(
             @RequestParam("client_id") String clientId,
@@ -48,6 +50,18 @@ public class OAuthController {
             @RequestParam(value = "code_challenge_method", required = false) String codeChallengeMethod,
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
+
+        // 基本安全校验：确认客户端存在且 redirect_uri 匹配
+        try {
+            OAuthClient client = oAuthService.findActiveClientForAuth(clientId);
+            if (!redirectUri.equals(client.getRedirectUri())) {
+                response.sendError(400, "redirect_uri mismatch");
+                return;
+            }
+        } catch (Exception e) {
+            response.sendError(400, "invalid client_id or redirect_uri");
+            return;
+        }
 
         String queryString = request.getQueryString();
         String frontendUrl = webBaseUrl + "/oauth/authorize";

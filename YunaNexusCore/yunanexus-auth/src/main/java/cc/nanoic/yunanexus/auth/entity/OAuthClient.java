@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.auth.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -15,6 +16,7 @@ public class OAuthClient {
     private String uuid; // 客户端UUID
     private String clientName; // 客户端名称
     private String clientSecret; // 客户端密钥(BCrypt哈希)
+    @TableField(exist = false)
     private String clientSecretEncrypted; // 客户端密钥(AES加密原文，允许用户反复查看)
     private Integer clientType; // 客户端类型 1:官方 2:第三方
     private String grantTypes; // 认证方式 账号密码：password,Token刷新：refresh_token,OAuth：authorization_code

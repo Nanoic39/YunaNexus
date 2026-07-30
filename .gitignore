@@ -60,6 +60,7 @@ build/
 postman/
 .postman/
 **/.venv
+**/test/**
 
 ### 前端项目 ###
 **/node_modules
@@ -84,3 +85,8 @@ ScriptsDebug/
 # Mock 数据（从 .example.ts 复制生成）
 **/mock/*.ts
 !**/mock/*.example.ts
+
+mvnw
+mvnw.cmd
+.mvn/**
+

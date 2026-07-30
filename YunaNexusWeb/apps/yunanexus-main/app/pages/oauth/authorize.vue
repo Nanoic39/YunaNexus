@@ -4,55 +4,125 @@ import { useToast } from "~/composables/useToast";
 definePageMeta({ layout: "default" });
 
 const toast = useToast();
-const { isLoggedIn } = useAuth();
+const { isLoggedIn, getAccessToken } = useAuth();
 const route = useRoute();
 
 // ==================== 参数 ====================
-const clientId = ref((route.query.client_id as string) || "");
-const redirectUri = ref((route.query.redirect_uri as string) || "");
-const responseType = ref((route.query.response_type as string) || "code");
-const scope = ref((route.query.scope as string) || "read");
-const state = ref((route.query.state as string) || "");
-const codeChallenge = ref((route.query.code_challenge as string) || "");
-const codeChallengeMethod = ref((route.query.code_challenge_method as string) || "S256");
+// 新流程：服务端已验证的授权会话 ID
+const sessionId = ref((route.query.session as string) || "");
+
+// 旧流程兼容：直接接收原始 OAuth 参数（将在后续版本移除）
+const legacyClientId = ref((route.query.client_id as string) || "");
+const legacyRedirectUri = ref((route.query.redirect_uri as string) || "");
+const legacyScope = ref((route.query.scope as string) || "read");
+const legacyState = ref((route.query.state as string) || "");
+const legacyCodeChallenge = ref((route.query.code_challenge as string) || "");
+const legacyCodeChallengeMethod = ref((route.query.code_challenge_method as string) || "S256");
+
+const isLegacyMode = computed(() => !sessionId.value && !!legacyClientId.value);
 
 // ==================== 状态 ====================
 const loading = ref(true);
 const authorizing = ref(false);
 const error = ref("");
-const appInfo = ref<{ clientName: string; description: string } | null>(null);
+const appInfo = ref<{
+  clientName: string;
+  description: string;
+  scope: string;
+  redirectUri: string;
+} | null>(null);
 
-// ==================== 检查登录态 ====================
+// ==================== 初始化 ====================
 onMounted(async () => {
   if (!isLoggedIn.value) {
-    // 未登录 → 保存当前页地址，跳转登录
     const currentUrl = route.fullPath;
     navigateTo(`/login?redirect=${encodeURIComponent(currentUrl)}`);
     return;
   }
 
-  // 验证参数
-  if (!clientId.value || !redirectUri.value) {
+  if (isLegacyMode.value) {
+    // 旧流程：兼容模式
+    await initLegacy();
+  } else if (sessionId.value) {
+    // 新流程：通过 session ID 获取授权详情
+    await initSession();
+  } else {
+    error.value = "缺少必要参数";
+    loading.value = false;
+  }
+});
+
+/** 新流程：从后端获取授权会话详情 */
+async function initSession() {
+  try {
+    const { $fetch: _f } = useNuxtApp();
+    const res = await (_f as typeof $fetch)<{
+      code: number;
+      data: {
+        clientName: string;
+        description: string;
+        scope: string;
+        redirectUri: string;
+        isLoggedIn: boolean;
+      };
+      msg: string;
+    }>(`/api/oauth2/authorize/${sessionId.value}`);
+
+    if (res.code === 200) {
+      appInfo.value = res.data;
+      if (!res.data.isLoggedIn) {
+        navigateTo(`/login?redirect=${encodeURIComponent(route.fullPath)}`);
+        return;
+      }
+    } else {
+      error.value = res.msg || "授权会话已过期或不存在";
+    }
+  } catch (e: any) {
+    error.value = e?.data?.msg || e?.message || "获取授权信息失败";
+  } finally {
+    loading.value = false;
+  }
+}
+
+/** 旧流程兼容：直接使用 URL 参数 */
+async function initLegacy() {
+  if (!legacyClientId.value || !legacyRedirectUri.value) {
     error.value = "缺少必要参数 (client_id / redirect_uri)";
     loading.value = false;
     return;
   }
 
-  // 尝试获取应用信息（可选，失败不影响流程）
   try {
     const { $fetch: _f } = useNuxtApp();
     const res = await (_f as typeof $fetch)<{ code: number; data: any }>(
-      `/api/oauth/client/${clientId.value}`,
+      `/api/oauth/client/${legacyClientId.value}`,
     );
     if (res.code === 200) {
-      appInfo.value = res.data;
+      appInfo.value = {
+        clientName: res.data.clientName || legacyClientId.value,
+        description: res.data.description || "",
+        scope: legacyScope.value,
+        redirectUri: legacyRedirectUri.value,
+      };
+    } else {
+      appInfo.value = {
+        clientName: legacyClientId.value,
+        description: "",
+        scope: legacyScope.value,
+        redirectUri: legacyRedirectUri.value,
+      };
     }
   } catch {
-    // 获取应用信息失败不阻塞流程
+    appInfo.value = {
+      clientName: legacyClientId.value,
+      description: "",
+      scope: legacyScope.value,
+      redirectUri: legacyRedirectUri.value,
+    };
   }
 
   loading.value = false;
-});
+}
 
 // ==================== 确认授权 ====================
 async function confirmAuthorize() {
@@ -60,50 +130,17 @@ async function confirmAuthorize() {
   error.value = "";
 
   try {
-    // 显式携带 Token（不依赖 auth-fetch 插件的隐式注入）
-    let token = "";
-    try {
-      const raw = localStorage.getItem("user-auth-info");
-      if (raw) token = JSON.parse(raw).accessToken || "";
-    } catch {}
+    const token = await getAccessToken();
     if (!token) {
       error.value = "未登录，请先登录后再授权";
       authorizing.value = false;
       return;
     }
 
-    const body: Record<string, string> = {
-      clientId: clientId.value,
-      redirectUri: redirectUri.value,
-      responseType: responseType.value,
-      scope: scope.value,
-    };
-    if (state.value) body.state = state.value;
-    if (codeChallenge.value) {
-      body.codeChallenge = codeChallenge.value;
-      body.codeChallengeMethod = codeChallengeMethod.value;
-    }
-
-    const res = await $fetch<{ code: number; data: any; msg: string }>(
-      "/api/oauth/authorize",
-      {
-        method: "POST",
-        body,
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    );
-
-    if (res.code === 200) {
-      const data = res.data;
-      let location = data.redirectUri || redirectUri.value;
-      location += (location.includes("?") ? "&" : "?") + "code=" + data.code;
-      if (data.state) {
-        location += "&state=" + encodeURIComponent(data.state);
-      }
-      // 跳转到第三方回调（外部 URL，需用 location.href）
-      window.location.href = location;
+    if (isLegacyMode.value) {
+      await confirmLegacy(token);
     } else {
-      error.value = res.msg || "授权失败";
+      await confirmSession(token);
     }
   } catch (e: any) {
     error.value = e?.data?.msg || e?.message || "请求失败";
@@ -112,9 +149,102 @@ async function confirmAuthorize() {
   }
 }
 
-function cancelAuthorize() {
+/** 新流程：POST session action */
+async function confirmSession(token: string) {
+  const { $fetch: _f } = useNuxtApp();
+  const res = await (_f as typeof $fetch)<{ code: number; data: any; msg: string }>(
+    `/api/oauth2/authorize/${sessionId.value}`,
+    {
+      method: "POST",
+      body: { action: "approve" },
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+
+  if (res.code === 200) {
+    const data = res.data;
+    const redirectUrl = data.redirectUri
+      ? `${data.redirectUri}${data.redirectUri.includes("?") ? "&" : "?"}code=${data.code}${data.state ? "&state=" + encodeURIComponent(data.state) : ""}`
+      : null;
+
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+    } else {
+      error.value = "授权成功但未获取到回调地址";
+    }
+  } else {
+    error.value = res.msg || "授权失败";
+  }
+}
+
+/** 旧流程兼容 */
+async function confirmLegacy(token: string) {
+  const { $fetch: _f } = useNuxtApp();
+
+  const body: Record<string, string> = {
+    clientId: legacyClientId.value,
+    redirectUri: legacyRedirectUri.value,
+    responseType: "code",
+    scope: legacyScope.value,
+  };
+  if (legacyState.value) body.state = legacyState.value;
+  if (legacyCodeChallenge.value) {
+    body.codeChallenge = legacyCodeChallenge.value;
+    body.codeChallengeMethod = legacyCodeChallengeMethod.value;
+  }
+
+  const res = await (_f as typeof $fetch)<{ code: number; data: any; msg: string }>(
+    "/api/oauth/authorize",
+    {
+      method: "POST",
+      body,
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+
+  if (res.code === 200) {
+    const data = res.data;
+    let location = data.redirectUri || legacyRedirectUri.value;
+    location += (location.includes("?") ? "&" : "?") + "code=" + data.code;
+    if (data.state) {
+      location += "&state=" + encodeURIComponent(data.state);
+    }
+    window.location.href = location;
+  } else {
+    error.value = res.msg || "授权失败";
+  }
+}
+
+// ==================== 拒绝授权 ====================
+async function cancelAuthorize() {
+  if (isLegacyMode.value) {
+    toast.info("已取消授权");
+    navigateTo("/");
+    return;
+  }
+
+  // 新流程：通知后端用户拒绝
+  try {
+    const token = await getAccessToken();
+    const { $fetch: _f } = useNuxtApp();
+    const res = await (_f as typeof $fetch)<{ code: number; data: any }>(
+      `/api/oauth2/authorize/${sessionId.value}`,
+      {
+        method: "POST",
+        body: { action: "deny" },
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      },
+    );
+
+    if (res.code === 200 && res.data?.redirectUrl) {
+      window.location.href = res.data.redirectUrl;
+      return;
+    }
+  } catch {
+    // ignore
+  }
+
   toast.info("已取消授权");
-  // 回到首页
   navigateTo("/");
 }
 </script>
@@ -142,14 +272,14 @@ function cancelAuthorize() {
         </div>
         <h2 style="font-size: 20px; font-weight: 600; margin: 0;">授权请求</h2>
         <p style="color: var(--color-font-assist); font-size: 13px; margin: 8px 0 0;">
-          {{ appInfo?.clientName || clientId }} 请求访问你的账户
+          {{ appInfo?.clientName || "未知应用" }} 请求访问你的账户
         </p>
       </div>
 
       <div class="oauth-card-body">
         <div class="oauth-info-row">
           <span class="oauth-info-label">应用</span>
-          <span class="oauth-info-value">{{ appInfo?.clientName || clientId }}</span>
+          <span class="oauth-info-value">{{ appInfo?.clientName || "未知" }}</span>
         </div>
         <div v-if="appInfo?.description" class="oauth-info-row">
           <span class="oauth-info-label">简介</span>
@@ -157,11 +287,11 @@ function cancelAuthorize() {
         </div>
         <div class="oauth-info-row">
           <span class="oauth-info-label">授权范围</span>
-          <span class="oauth-info-value">{{ scope }}</span>
+          <span class="oauth-info-value">{{ appInfo?.scope || "read" }}</span>
         </div>
         <div class="oauth-info-row">
           <span class="oauth-info-label">回调地址</span>
-          <span class="oauth-info-value oauth-uri">{{ redirectUri }}</span>
+          <span class="oauth-info-value oauth-uri">{{ appInfo?.redirectUri }}</span>
         </div>
       </div>
 
