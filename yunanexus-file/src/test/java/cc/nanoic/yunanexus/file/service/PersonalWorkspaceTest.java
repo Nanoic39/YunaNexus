@@ -18,7 +18,7 @@ class PersonalWorkspaceTest {
     FileMetaMapper files=mock(FileMetaMapper.class);
     FileStorage storage=mock(FileStorage.class);
     FileService legacy=mock(FileService.class);
-    PersonalFileService personal=new PersonalFileService(files,id->0,new FileProperties(),storage,legacy);
+    PersonalFileService personal=new PersonalFileService(files,id->0,new FileProperties(),storage,legacy,mock(FileShareMapper.class));
     FileShareMapper shares=mock(FileShareMapper.class);
     FileShareService service=new FileShareService(personal,shares);
     @Test void strictOwnershipAppliesEvenWithoutDepartmentScope(){

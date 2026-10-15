@@ -8,6 +8,8 @@ public interface FileShareMapper {
     void insert(FileShare share);
     @Select("SELECT * FROM file_share WHERE user_id=#{userId} ORDER BY created_at DESC LIMIT 200")
     List<FileShare> list(long userId);
+    @Update("UPDATE file_share SET revoked=1 WHERE file_id=#{fileId} AND user_id=#{userId}")
+    int revokeFile(@Param("fileId") long fileId,@Param("userId") long userId);
     @Select("SELECT * FROM file_share WHERE share_id=#{shareId}")
     FileShare find(String shareId);
     @Update("UPDATE file_share SET revoked=1 WHERE share_id=#{shareId} AND user_id=#{userId}")

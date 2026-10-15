@@ -47,6 +47,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -480,5 +481,20 @@ class FileServiceImplTest {
         BizException ex = assertThrows(BizException.class, () -> service.listVisible(USER_ID, 1, 20));
         assertEquals(ErrorCode.INTERNAL_ERROR.getCode(), ex.getCode());
         assertTrue(ex.getMessage().contains("数据范围"));
+    }
+    @Test
+    void personalDeletionWorksWithoutAnyDepartmentRole() {
+        when(fileMetaMapper.selectByFileId(16L)).thenReturn(normalMeta(16L,USER_ID,3L));
+        service.deleteOwned(16L,USER_ID);
+        verify(fileMetaMapper).updateById(any(FileMeta.class));
+        verifyNoInteractions(permissionClient);
+    }
+
+    @Test
+    void personalDeletionCannotUseAdministrativeDataScopeToDeleteAnotherOwner() {
+        when(fileMetaMapper.selectByFileId(16L)).thenReturn(normalMeta(16L,99L,3L));
+        assertThrows(BizException.class,()->service.deleteOwned(16L,USER_ID));
+        verify(fileMetaMapper,never()).updateById(any(FileMeta.class));
+        verifyNoInteractions(permissionClient,fileStorage);
     }
 }

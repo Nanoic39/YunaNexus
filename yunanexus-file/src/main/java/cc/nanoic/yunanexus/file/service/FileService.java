@@ -97,6 +97,9 @@ public interface FileService {
      */
     void delete(long fileId, long userId);
 
+    /** 严格本人删除，不依赖部门角色数据范围。 */
+    void deleteOwned(long fileId,long userId);
+
     /**
      * 分页列出当前用户在数据范围内可见的文件（跨物理库扫描后内存分页）。
      *

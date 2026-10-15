@@ -129,7 +129,20 @@ public class FileServiceImpl implements FileService {
     @Override
     @ShardRoute
     public void delete(long fileId, long userId) {
-        FileMeta meta = requireVisible(fileId, userId);
+        deleteMeta(requireVisible(fileId,userId),userId);
+    }
+
+    @Override
+    @ShardRoute
+    public void deleteOwned(long fileId,long userId) {
+        FileMeta meta=fileMetaMapper.selectByFileId(fileId);
+        if(meta==null || !Integer.valueOf(FileMeta.STATUS_NORMAL).equals(meta.getStatus()) || !Long.valueOf(userId).equals(meta.getCreateBy()))
+            throw new BizException(ErrorCode.FILE_NOT_FOUND);
+        deleteMeta(meta,userId);
+    }
+
+    private void deleteMeta(FileMeta meta,long userId) {
+        long fileId=meta.getFileId();
         meta.setStatus(FileMeta.STATUS_DELETED);
         fileMetaMapper.updateById(meta);
         // 秒传复用的内容被多条元数据共享：仅当无其他有效引用时才物理删除

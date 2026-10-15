@@ -23,9 +23,10 @@ public class PersonalFileService {
     private final FileProperties properties;
     private final FileStorage storage;
     private final FileService files;
+    private final cc.nanoic.yunanexus.file.mapper.FileShareMapper shares;
     public PersonalFileService(FileMetaMapper mapper, ShardRouter router, FileProperties properties,
-                               FileStorage storage, FileService files) {
-        this.mapper=mapper; this.router=router; this.properties=properties; this.storage=storage; this.files=files;
+                               FileStorage storage, FileService files,cc.nanoic.yunanexus.file.mapper.FileShareMapper shares) {
+        this.mapper=mapper; this.router=router; this.properties=properties; this.storage=storage; this.files=files; this.shares=shares;
     }
     public <T> T inShard(int shard, Supplier<T> action) {
         Integer previous=ShardContextHolder.get();
@@ -59,6 +60,7 @@ public class PersonalFileService {
     }
     public void delete(long fileId,long userId) {
         requireOwned(fileId,userId);
-        files.delete(fileId,userId);
+        files.deleteOwned(fileId,userId);
+        inShard(0,()->shares.revokeFile(fileId,userId));
     }
 }
