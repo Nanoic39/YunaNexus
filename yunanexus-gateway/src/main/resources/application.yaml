@@ -141,6 +141,15 @@ yunanexus:
     cors-allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:}
     # 网关鉴权（调用权限中心内部 check 接口）；默认开启，开启后须配置 check-url 才真正拦截（未配置时 fail-open 直通并告警）
     permission:
+      # 仍要求 JWT；业务服务按网关注入的用户 ID 验证本人资源。
+      permit-paths:
+        - /api/v1/permission/me
+        - /api/v1/auth/me
+        - /api/v1/auth/logout
+        - /api/v1/auth/logout-all
+        - /api/v1/notice/inbox
+        - /api/v1/notice/inbox/*
+        - /api/v1/notice/read/*
       enabled: ${GATEWAY_PERMISSION_ENABLED:true}
       check-url: ${PERMISSION_CHECK_URL:}
       timeout-millis: ${PERMISSION_CHECK_TIMEOUT_MILLIS:2000}

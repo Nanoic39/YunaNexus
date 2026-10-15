@@ -57,6 +57,19 @@ public class NoticeController {
         return Result.success(noticeService.inbox(String.valueOf(requireUserId(userId)), page, size));
     }
 
+    /** 查询当前用户可见的单条站内信，不依赖收件箱第一页。 */
+    @GetMapping("/inbox/{noticeId}")
+    public Result<NoticeRecordView> inboxRecord(@PathVariable("noticeId") long noticeId,
+            @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        String receiver = String.valueOf(requireUserId(userId));
+        NoticeRecordView record = noticeService.getRecord(noticeId);
+        if (record == null || !receiver.equals(record.getReceiver()) || !Integer.valueOf(1).equals(record.getChannel())
+                || (!Integer.valueOf(1).equals(record.getStatus()) && !Integer.valueOf(3).equals(record.getStatus()))) {
+            throw new BizException(ErrorCode.NOTICE_RECORD_NOT_FOUND, "通知不存在: " + noticeId);
+        }
+        return Result.success(record);
+    }
+
     /**
      * 标记当前用户某条站内信已读。
      */
