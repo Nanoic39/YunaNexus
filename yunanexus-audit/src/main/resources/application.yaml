@@ -1,0 +1,100 @@
+server:
+  port: 8600
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: yunanexus-audit
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  config:
+    # 可选导入 Nacos 配置中心（数据 ID = yunanexus-audit.yaml）；optional 保证 Nacos 不可用/未发布配置时不影响启动
+    import: optional:nacos:${spring.application.name}.yaml
+  cloud:
+    nacos:
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        metadata:
+          management.port: ${management.server.port}
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        fail-fast: ${NACOS_FAIL_FAST:false}
+      config:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  health:
+    # 分库数据源无请求上下文时无法路由，默认 db 健康指示器不适用；改由 ShardDataSourceHealthIndicator 逐库探活
+    db:
+      enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      # 灰度标识：金丝雀实例带 YUNANEXUS_TRACK=canary，便于按 track 区分新旧版本指标
+      track: ${YUNANEXUS_TRACK:stable}
+  server:
+    port: 8601
+
+yunanexus:
+  audit:
+    shard:
+      # 逻辑分片总数（1~16）
+      logical-count: ${AUDIT_SHARD_LOGICAL_COUNT:16}
+      # 物理库数量（逻辑分片按 shardIndex % physical-count 映射到物理库）
+      physical-count: ${AUDIT_SHARD_PHYSICAL_COUNT:2}
+    datasource:
+      host: ${DB_HOST:localhost}
+      port: ${DB_PORT:3306}
+      # 物理库名前缀（实际库名 = 前缀 + 物理库索引）
+      database-prefix: ${AUDIT_DB_PREFIX:yunanexus_audit_}
+      username: ${DB_USERNAME:root}
+      password: ${DB_PASSWORD:}
+    rocketmq:
+      # 是否启用 RocketMQ 异步落库（本地无 MQ 时可关闭，仅记录日志）
+      enabled: ${AUDIT_MQ_ENABLED:true}
+      name-server: ${ROCKETMQ_NAMESERVER:localhost:9876}
+      producer-group: ${AUDIT_MQ_PRODUCER_GROUP:audit-producer-group}
+      consumer-group: ${AUDIT_MQ_CONSUMER_GROUP:audit-consumer-group}
+      topic: ${AUDIT_MQ_TOPIC:YUNA_AUDIT_TOPIC}
+      tag: ${AUDIT_MQ_TAG:audit}
+      send-timeout-millis: ${AUDIT_MQ_SEND_TIMEOUT:3000}
+    archive:
+      # 归档保留月数（超期分区滚动删除并冷备）
+      retention-months: ${AUDIT_ARCHIVE_RETENTION_MONTHS:36}
+      # 提前预建的未来分区月数
+      pre-create-months: ${AUDIT_ARCHIVE_PRE_CREATE_MONTHS:2}
+      # 冷备导出根目录
+      backup-dir: ${AUDIT_ARCHIVE_BACKUP_DIR:./data/audit-archive}
+      # 归档任务是否启用
+      enabled: ${AUDIT_ARCHIVE_ENABLED:true}
+      # 归档执行计划（默认每日 03:30）
+      cron: ${AUDIT_ARCHIVE_CRON:0 30 3 * * ?}
