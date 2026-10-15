@@ -18,8 +18,9 @@ private=base64.b64encode(subprocess.check_output(['openssl','pkcs8','-topk8','-n
 public=base64.b64encode(subprocess.check_output(['openssl','pkey','-pubout','-outform','DER'],input=key)).decode()
 aes=base64.b64encode(secrets.token_bytes(32)).decode();hmac=base64.b64encode(secrets.token_bytes(32)).decode()
 env('secrets/compose.env',{'MYSQL_ROOT_PASSWORD':passwords['mysql'],'NACOS_AUTH_TOKEN':base64.b64encode(secrets.token_bytes(48)).decode(),'NACOS_AUTH_IDENTITY_VALUE':rand()})
-write('secrets/redis.conf',f'bind 0.0.0.0\nprotected-mode yes\nrequirepass {passwords["redis"]}\nappendonly yes\nmaxmemory 48mb\nmaxmemory-policy noeviction\ndir /data\n')
-os.chown(ROOT/'secrets/redis.conf',0,999);(ROOT/'secrets/redis.conf').chmod(0o640)
+(ROOT/'secrets/redis').mkdir(mode=0o755,exist_ok=True)
+write('secrets/redis/redis.conf',f'bind 0.0.0.0\nprotected-mode yes\nrequirepass {passwords["redis"]}\nappendonly yes\nmaxmemory 48mb\nmaxmemory-policy noeviction\ndir /data\n')
+os.chown(ROOT/'secrets/redis/redis.conf',999,1000);(ROOT/'secrets/redis/redis.conf').chmod(0o600)
 write('secrets/credentials.json',json.dumps(passwords))
 init=[]
 for name in ['meta','auth','gateway','user','permission','file','notice','audit','analytics']:
@@ -34,8 +35,8 @@ for name in ['meta','auth','gateway','user','permission','file','notice','audit'
  if name=='auth':common.update(JWT_PRIVATE_KEY_V1=private,AUTH_ADMIN_TOKEN=passwords['admin'],AUTH_MOBILE_ENABLED='false',AUTH_CAPTCHA_DEV_RETURN='false')
  if name=='permission':common['PERMISSION_ADMIN_TOKEN']=passwords['permission']
  if name=='notice':common['NOTICE_ADMIN_TOKEN']=passwords['admin']
- if name=='file':common['FILE_STORAGE_BASE_DIR']='/app/data/storage'
- if name=='audit':common['AUDIT_ARCHIVE_BACKUP_DIR']='/app/data/archive'
+ if name=='file':common['FILE_STORAGE_BASE_DIR']='/data/storage'
+ if name=='audit':common['AUDIT_ARCHIVE_BACKUP_DIR']='/data/archive'
  if name=='analytics':common['ANALYTICS_CLICKHOUSE_ENABLED']='false'
  env('secrets/'+name+'.env',common)
  config={'spring':{},'server':{'forward-headers-strategy':'framework'},'management':{'endpoints':{'web':{'exposure':{'include':'health,info'}}},'endpoint':{'health':{'show-details':'never'}}}}
@@ -43,7 +44,7 @@ for name in ['meta','auth','gateway','user','permission','file','notice','audit'
  config['spring']['cloud']['openfeign']={'client':{'config':{'default':{'connectTimeout':3000,'readTimeout':5000}}}}
  # JSON is valid YAML and avoids a runtime YAML dependency.
  if name in ['auth','meta','notice','permission']:config['spring']['datasource']={'hikari':{'minimum-idle':1,'maximum-pool-size':4}}
- if name=='auth':config['yunanexus']={'auth':{'security':{'public-origin':'https://103.39.66.135','allow-local-http':False,'cors-allowed-origins':['https://103.39.66.135','https://103.39.66.135:8443']}}}
+ if name=='auth':config['yunanexus']={'auth':{'security':{'public-origin':'https://103.39.66.135:3000','allow-local-http':False,'cors-allowed-origins':['https://103.39.66.135:3000','https://103.39.66.135:3001']}}}
  if name=='gateway':config['yunanexus']={'gateway':{'permission':{'enabled':True,'check-url':'http://permission:8300/internal/permission/check','permit-paths':['/api/v1/permission/me','/api/v1/auth/me','/api/v1/auth/logout','/api/v1/auth/logout-all']}}}
  write('config/'+name+'.yaml',json.dumps(config),0o644)
 for source in (ROOT/'ops/sql').glob('*.sql'):shutil.copy2(source,ROOT/'data/sqlinit'/source.name)

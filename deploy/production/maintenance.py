@@ -11,7 +11,7 @@ def maintain():
     with path.open('r+b') as output:output.truncate(0)
  for path in (R/'cache').glob('*.tar.gz'):
   if path.is_file() and not path.is_symlink() and time.time()-path.stat().st_mtime>86400:path.unlink()
- if (R/'data/acme/account.json').is_file():
+ if (R/'config/acme.enabled').is_file():
   subprocess.run(['bash',str(R/'ops/renew-certificate.sh')],timeout=180,capture_output=True)
 if __name__=='__main__':
  while True:

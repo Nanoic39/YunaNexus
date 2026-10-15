@@ -33,6 +33,10 @@ if [ ! -S "$ROOT/runtime/containerd.sock" ]; then
 nohup containerd --root "$ROOT/runtime/containerd-root" --state "$ROOT/runtime/containerd-state" --address "$ROOT/runtime/containerd.sock" >"$ROOT/logs/containerd.log" 2>&1 </dev/null &
 fi
 for i in {1..30}; do [ -S "$ROOT/runtime/containerd.sock" ] && break; sleep 1; done
+touch "$ROOT/logs/dockerd.log"
+chmod 600 "$ROOT/logs/dockerd.log"
+umask 022
 nohup dockerd --config-file "$ROOT/config/docker.json" >"$ROOT/logs/dockerd.log" 2>&1 </dev/null &
+umask 077
 for i in {1..60}; do timeout 3 docker info >/dev/null 2>&1 && exit 0; sleep 1; done
 echo 'Engine failed; inspect logs'; exit 1

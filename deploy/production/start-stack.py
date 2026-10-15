@@ -21,10 +21,10 @@ compose('up','-d','mysql','redis','nacos','namesrv','broker')
 pwd=json.loads((R/'secrets/credentials.json').read_text())['nacos']
 for i in range(90):
  try:
-  url='http://'+ip('nacos')+':8848/nacos/v1/auth/users/admin'
+  url='http://'+ip('nacos')+':8848/nacos/v3/auth/user/admin'
   try:urllib.request.urlopen(urllib.request.Request(url,data=urllib.parse.urlencode({'password':pwd}).encode()),timeout=3).close()
   except urllib.error.HTTPError:pass
-  login=urllib.request.urlopen(urllib.request.Request('http://'+ip('nacos')+':8848/nacos/v1/auth/login',data=urllib.parse.urlencode({'username':'nacos','password':pwd}).encode()),timeout=3)
+  login=urllib.request.urlopen(urllib.request.Request('http://'+ip('nacos')+':8848/nacos/v3/auth/user/login',data=urllib.parse.urlencode({'username':'nacos','password':pwd}).encode()),timeout=3)
   if 'accessToken' in json.load(login):break
  except Exception:pass
  time.sleep(2)
@@ -32,4 +32,4 @@ else:raise RuntimeError('Nacos authenticated bootstrap failed')
 for name,port in [('meta',8001),('permission',8301),('user',8201),('file',8401),('notice',8501),('auth',8101),('audit',8601),('analytics',8701),('gateway',8081)]:
  compose('up','-d','--no-deps',name);health(name,port)
 compose('up','-d','--no-deps','edge')
-print('Stack started; HTTPS user=:443 console=:8443',flush=True)
+print('Stack started; HTTPS user=:3000 console=:3001',flush=True)

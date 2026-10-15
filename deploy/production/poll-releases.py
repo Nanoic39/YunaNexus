@@ -30,13 +30,14 @@ def check(kind,repo):
  if digest.hexdigest()!=expected:path.unlink(missing_ok=True);raise ValueError('Checksum mismatch')
  subprocess.run(['python3',str(R/'ops/deploy-release.py'),kind,str(path),revision],check=True,timeout=1800)
  path.unlink(missing_ok=True);log.info('%s deployment complete %s',kind,revision)
-def cycle():
+def cycle(selected=None):
  for kind,repo in [('backend','YunaNexus'),('frontend','YunaNexusClient')]:
+  if selected and kind!=selected:continue
   try:check(kind,repo)
   except Exception as error:log.error('%s deployment failed: %s',kind,type(error).__name__)
 if __name__=='__main__':
- parser=argparse.ArgumentParser();parser.add_argument('--once',action='store_true');args=parser.parse_args()
+ parser=argparse.ArgumentParser();parser.add_argument('--once',action='store_true');parser.add_argument('--kind',choices=['backend','frontend']);args=parser.parse_args()
  while True:
-  cycle()
+  cycle(args.kind)
   if args.once:break
   time.sleep(300)

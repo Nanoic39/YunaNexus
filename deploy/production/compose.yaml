@@ -34,6 +34,8 @@ services:
       core:
         soft: 0
         hard: 0
+    cap_drop:
+    - NET_RAW
   redis:
     restart: unless-stopped
     logging: *id001
@@ -43,14 +45,16 @@ services:
     mem_limit: 96m
     command:
     - redis-server
-    - /usr/local/etc/redis/redis.conf
+    - /config/redis.conf
     volumes:
     - /YunaNexus/platform/data/redis:/data
-    - /YunaNexus/platform/secrets/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    - /YunaNexus/platform/secrets/redis:/config:ro
     ulimits:
       core:
         soft: 0
         hard: 0
+    cap_drop:
+    - NET_RAW
   nacos:
     restart: unless-stopped
     logging: *id001
@@ -77,6 +81,8 @@ services:
       core:
         soft: 0
         hard: 0
+    cap_drop:
+    - NET_RAW
   namesrv:
     restart: unless-stopped
     logging: *id001
@@ -95,6 +101,8 @@ services:
       core:
         soft: 0
         hard: 0
+    cap_drop:
+    - NET_RAW
   broker:
     restart: unless-stopped
     logging: *id001
@@ -106,20 +114,22 @@ services:
     - sh
     - mqbroker
     - -c
-    - /home/rocketmq/conf/broker.conf
+    - /home/rocketmq/rocketmq-5.3.1/conf/broker.conf
     depends_on:
     - namesrv
     environment:
       NAMESRV_ADDR: namesrv:9876
       JAVA_OPT_EXT: -Xms64m -Xmx128m -Xmn32m
     volumes:
-    - /YunaNexus/platform/config/broker.conf:/home/rocketmq/conf/broker.conf:ro
+    - /YunaNexus/platform/config/broker.conf:/home/rocketmq/rocketmq-5.3.1/conf/broker.conf:ro
     - /YunaNexus/platform/data/rocketmq:/home/rocketmq/store
     - /YunaNexus/platform/logs/broker:/home/rocketmq/logs
     ulimits:
       core:
         soft: 0
         hard: 0
+    cap_drop:
+    - NET_RAW
   meta:
     restart: unless-stopped
     logging: *id001
@@ -138,20 +148,20 @@ services:
     - /YunaNexus/platform/secrets/meta.env
     environment:
       SPRING_PROFILES_ACTIVE: prd
-      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      SPRING_CONFIG_IMPORT: optional:file:/config/meta.yaml
       JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
-        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
-        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/data/sentinel
         -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
-        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+        -XX:ErrorFile=/data/hs_err_pid%p.log
     command:
     - java
     - -jar
-    - /app/app.jar
+    - /app/yunanexus-meta.jar
     volumes:
-    - /YunaNexus/platform/releases/backend/current/yunanexus-meta.jar:/app/app.jar:ro
-    - /YunaNexus/platform/config/meta.yaml:/app/config/runtime.yaml:ro
-    - /YunaNexus/platform/data/meta:/app/data
+    - /YunaNexus/platform/releases/backend/current:/app:ro
+    - /YunaNexus/platform/config:/config:ro
+    - /YunaNexus/platform/data/meta:/data
     depends_on:
       mysql:
         condition: service_healthy
@@ -179,20 +189,20 @@ services:
     - /YunaNexus/platform/secrets/auth.env
     environment:
       SPRING_PROFILES_ACTIVE: prd
-      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      SPRING_CONFIG_IMPORT: optional:file:/config/auth.yaml
       JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
-        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
-        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/data/sentinel
         -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
-        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+        -XX:ErrorFile=/data/hs_err_pid%p.log
     command:
     - java
     - -jar
-    - /app/app.jar
+    - /app/yunanexus-auth.jar
     volumes:
-    - /YunaNexus/platform/releases/backend/current/yunanexus-auth.jar:/app/app.jar:ro
-    - /YunaNexus/platform/config/auth.yaml:/app/config/runtime.yaml:ro
-    - /YunaNexus/platform/data/auth:/app/data
+    - /YunaNexus/platform/releases/backend/current:/app:ro
+    - /YunaNexus/platform/config:/config:ro
+    - /YunaNexus/platform/data/auth:/data
     depends_on:
       mysql:
         condition: service_healthy
@@ -220,20 +230,20 @@ services:
     - /YunaNexus/platform/secrets/gateway.env
     environment:
       SPRING_PROFILES_ACTIVE: prd
-      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      SPRING_CONFIG_IMPORT: optional:file:/config/gateway.yaml
       JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
-        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
-        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/data/sentinel
         -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
-        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+        -XX:ErrorFile=/data/hs_err_pid%p.log
     command:
     - java
     - -jar
-    - /app/app.jar
+    - /app/yunanexus-gateway.jar
     volumes:
-    - /YunaNexus/platform/releases/backend/current/yunanexus-gateway.jar:/app/app.jar:ro
-    - /YunaNexus/platform/config/gateway.yaml:/app/config/runtime.yaml:ro
-    - /YunaNexus/platform/data/gateway:/app/data
+    - /YunaNexus/platform/releases/backend/current:/app:ro
+    - /YunaNexus/platform/config:/config:ro
+    - /YunaNexus/platform/data/gateway:/data
     depends_on:
       mysql:
         condition: service_healthy
@@ -261,20 +271,20 @@ services:
     - /YunaNexus/platform/secrets/user.env
     environment:
       SPRING_PROFILES_ACTIVE: prd
-      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      SPRING_CONFIG_IMPORT: optional:file:/config/user.yaml
       JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
-        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
-        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/data/sentinel
         -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
-        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+        -XX:ErrorFile=/data/hs_err_pid%p.log
     command:
     - java
     - -jar
-    - /app/app.jar
+    - /app/yunanexus-user.jar
     volumes:
-    - /YunaNexus/platform/releases/backend/current/yunanexus-user.jar:/app/app.jar:ro
-    - /YunaNexus/platform/config/user.yaml:/app/config/runtime.yaml:ro
-    - /YunaNexus/platform/data/user:/app/data
+    - /YunaNexus/platform/releases/backend/current:/app:ro
+    - /YunaNexus/platform/config:/config:ro
+    - /YunaNexus/platform/data/user:/data
     depends_on:
       mysql:
         condition: service_healthy
@@ -302,20 +312,20 @@ services:
     - /YunaNexus/platform/secrets/permission.env
     environment:
       SPRING_PROFILES_ACTIVE: prd
-      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      SPRING_CONFIG_IMPORT: optional:file:/config/permission.yaml
       JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
-        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
-        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/data/sentinel
         -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
-        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+        -XX:ErrorFile=/data/hs_err_pid%p.log
     command:
     - java
     - -jar
-    - /app/app.jar
+    - /app/yunanexus-permission.jar
     volumes:
-    - /YunaNexus/platform/releases/backend/current/yunanexus-permission.jar:/app/app.jar:ro
-    - /YunaNexus/platform/config/permission.yaml:/app/config/runtime.yaml:ro
-    - /YunaNexus/platform/data/permission:/app/data
+    - /YunaNexus/platform/releases/backend/current:/app:ro
+    - /YunaNexus/platform/config:/config:ro
+    - /YunaNexus/platform/data/permission:/data
     depends_on:
       mysql:
         condition: service_healthy
@@ -343,20 +353,20 @@ services:
     - /YunaNexus/platform/secrets/file.env
     environment:
       SPRING_PROFILES_ACTIVE: prd
-      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      SPRING_CONFIG_IMPORT: optional:file:/config/file.yaml
       JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
-        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
-        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/data/sentinel
         -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
-        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+        -XX:ErrorFile=/data/hs_err_pid%p.log
     command:
     - java
     - -jar
-    - /app/app.jar
+    - /app/yunanexus-file.jar
     volumes:
-    - /YunaNexus/platform/releases/backend/current/yunanexus-file.jar:/app/app.jar:ro
-    - /YunaNexus/platform/config/file.yaml:/app/config/runtime.yaml:ro
-    - /YunaNexus/platform/data/file:/app/data
+    - /YunaNexus/platform/releases/backend/current:/app:ro
+    - /YunaNexus/platform/config:/config:ro
+    - /YunaNexus/platform/data/file:/data
     depends_on:
       mysql:
         condition: service_healthy
@@ -384,20 +394,20 @@ services:
     - /YunaNexus/platform/secrets/notice.env
     environment:
       SPRING_PROFILES_ACTIVE: prd
-      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      SPRING_CONFIG_IMPORT: optional:file:/config/notice.yaml
       JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
-        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
-        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/data/sentinel
         -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
-        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+        -XX:ErrorFile=/data/hs_err_pid%p.log
     command:
     - java
     - -jar
-    - /app/app.jar
+    - /app/yunanexus-notice.jar
     volumes:
-    - /YunaNexus/platform/releases/backend/current/yunanexus-notice.jar:/app/app.jar:ro
-    - /YunaNexus/platform/config/notice.yaml:/app/config/runtime.yaml:ro
-    - /YunaNexus/platform/data/notice:/app/data
+    - /YunaNexus/platform/releases/backend/current:/app:ro
+    - /YunaNexus/platform/config:/config:ro
+    - /YunaNexus/platform/data/notice:/data
     depends_on:
       mysql:
         condition: service_healthy
@@ -425,20 +435,20 @@ services:
     - /YunaNexus/platform/secrets/audit.env
     environment:
       SPRING_PROFILES_ACTIVE: prd
-      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      SPRING_CONFIG_IMPORT: optional:file:/config/audit.yaml
       JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
-        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
-        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/data/sentinel
         -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
-        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+        -XX:ErrorFile=/data/hs_err_pid%p.log
     command:
     - java
     - -jar
-    - /app/app.jar
+    - /app/yunanexus-audit.jar
     volumes:
-    - /YunaNexus/platform/releases/backend/current/yunanexus-audit.jar:/app/app.jar:ro
-    - /YunaNexus/platform/config/audit.yaml:/app/config/runtime.yaml:ro
-    - /YunaNexus/platform/data/audit:/app/data
+    - /YunaNexus/platform/releases/backend/current:/app:ro
+    - /YunaNexus/platform/config:/config:ro
+    - /YunaNexus/platform/data/audit:/data
     depends_on:
       mysql:
         condition: service_healthy
@@ -466,20 +476,20 @@ services:
     - /YunaNexus/platform/secrets/analytics.env
     environment:
       SPRING_PROFILES_ACTIVE: prd
-      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      SPRING_CONFIG_IMPORT: optional:file:/config/analytics.yaml
       JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
-        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
-        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/data/sentinel
         -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
-        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+        -XX:ErrorFile=/data/hs_err_pid%p.log
     command:
     - java
     - -jar
-    - /app/app.jar
+    - /app/yunanexus-analytics.jar
     volumes:
-    - /YunaNexus/platform/releases/backend/current/yunanexus-analytics.jar:/app/app.jar:ro
-    - /YunaNexus/platform/config/analytics.yaml:/app/config/runtime.yaml:ro
-    - /YunaNexus/platform/data/analytics:/app/data
+    - /YunaNexus/platform/releases/backend/current:/app:ro
+    - /YunaNexus/platform/config:/config:ro
+    - /YunaNexus/platform/data/analytics:/data
     depends_on:
       mysql:
         condition: service_healthy
@@ -503,9 +513,8 @@ services:
     tmpfs:
     - /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101
     ports:
-    - 80:8080
-    - 443:8443
-    - 8443:9443
+    - 3000:8443
+    - 3001:9443
     volumes:
     - /YunaNexus/platform/config/nginx.conf:/etc/nginx/nginx.conf:ro
     - /YunaNexus/platform/secrets/tls:/etc/nginx/tls:ro
