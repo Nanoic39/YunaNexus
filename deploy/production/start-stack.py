@@ -32,4 +32,4 @@ else:raise RuntimeError('Nacos authenticated bootstrap failed')
 for name,port in [('meta',8001),('permission',8301),('user',8201),('file',8401),('notice',8501),('auth',8101),('audit',8601),('analytics',8701),('gateway',8081)]:
  compose('up','-d','--no-deps',name);health(name,port)
 compose('up','-d','--no-deps','edge')
-print('Stack started; HTTPS user=:3000 console=:3001',flush=True)
+print('Stack started; HTTP user=:3000 console=:3001',flush=True)

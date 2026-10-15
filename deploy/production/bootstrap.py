@@ -44,7 +44,7 @@ for name in ['meta','auth','gateway','user','permission','file','notice','audit'
  config['spring']['cloud']['openfeign']={'client':{'config':{'default':{'connectTimeout':3000,'readTimeout':5000}}}}
  # JSON is valid YAML and avoids a runtime YAML dependency.
  if name in ['auth','meta','notice','permission']:config['spring']['datasource']={'hikari':{'minimum-idle':1,'maximum-pool-size':4}}
- if name=='auth':config['yunanexus']={'auth':{'security':{'public-origin':'https://103.39.66.135:3000','allow-local-http':False,'cors-allowed-origins':['https://103.39.66.135:3000','https://103.39.66.135:3001']}}}
+ if name=='auth':config['yunanexus']={'auth':{'security':{'public-origin':'http://103.39.66.135:3000','allow-local-http':False,'allow-insecure-http':True,'cors-allowed-origins':['http://103.39.66.135:3000','http://103.39.66.135:3001']}}}
  if name=='gateway':config['yunanexus']={'gateway':{'permission':{'enabled':True,'check-url':'http://permission:8300/internal/permission/check','permit-paths':['/api/v1/permission/me','/api/v1/auth/me','/api/v1/auth/logout','/api/v1/auth/logout-all']}}}
  write('config/'+name+'.yaml',json.dumps(config),0o644)
 for source in (ROOT/'ops/sql').glob('*.sql'):shutil.copy2(source,ROOT/'data/sqlinit'/source.name)
