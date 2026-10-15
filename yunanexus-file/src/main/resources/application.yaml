@@ -1,0 +1,102 @@
+server:
+  port: 8400
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: yunanexus-file
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  config:
+    # 可选导入 Nacos 配置中心（数据 ID = yunanexus-file.yaml）；optional 保证 Nacos 不可用/未发布配置时不影响启动
+    import: optional:nacos:${spring.application.name}.yaml
+  cloud:
+    nacos:
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        metadata:
+          management.port: ${management.server.port}
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        fail-fast: ${NACOS_FAIL_FAST:false}
+      config:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+  servlet:
+    multipart:
+      # 与 yunanexus.file.upload.max-size 保持一致（略留请求体余量）
+      max-file-size: 20MB
+      max-request-size: 25MB
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  health:
+    # 分库数据源无请求上下文时无法路由，默认 db 健康指示器不适用；改由 ShardDataSourceHealthIndicator 逐库探活
+    db:
+      enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      # 灰度标识：金丝雀实例带 YUNANEXUS_TRACK=canary，便于按 track 区分新旧版本指标
+      track: ${YUNANEXUS_TRACK:stable}
+  server:
+    port: 8401
+
+yunanexus:
+  file:
+    shard:
+      # 逻辑分片总数（1~16）
+      logical-count: ${FILE_SHARD_LOGICAL_COUNT:16}
+      # 物理库数量（逻辑分片按 shardIndex % physical-count 映射到物理库）
+      physical-count: ${FILE_SHARD_PHYSICAL_COUNT:2}
+    datasource:
+      host: ${DB_HOST:localhost}
+      port: ${DB_PORT:3306}
+      # 物理库名前缀（实际库名 = 前缀 + 物理库索引）
+      database-prefix: ${FILE_DB_PREFIX:yunanexus_file_}
+      username: ${DB_USERNAME:root}
+      password: ${DB_PASSWORD:}
+    storage:
+      # 存储后端：local（预留 minio / oss，见 FileStorage 抽象）
+      type: ${FILE_STORAGE_TYPE:local}
+      # 本地存储根目录
+      base-dir: ${FILE_STORAGE_BASE_DIR:./data/file-storage}
+    upload:
+      # 单文件最大字节数（默认 20MB）
+      max-size: ${FILE_UPLOAD_MAX_SIZE:20971520}
+    chunk:
+      # 单个分片最大字节数（须 ≤ spring.servlet.multipart.max-file-size）
+      max-chunk-size: ${FILE_CHUNK_MAX_SIZE:20971520}
+      # 分片文件总大小上限（默认 5GB）
+      max-size: ${FILE_CHUNK_MAX_TOTAL_SIZE:5368709120}
+      # 上传会话过期时间（秒，默认 24h）
+      session-ttl-seconds: ${FILE_CHUNK_SESSION_TTL_SECONDS:86400}
+      # 过期清理任务执行间隔（毫秒，默认 1h）
+      cleanup-interval-ms: ${FILE_CHUNK_CLEANUP_INTERVAL_MS:3600000}

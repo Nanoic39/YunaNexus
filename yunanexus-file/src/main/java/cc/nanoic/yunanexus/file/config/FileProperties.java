@@ -1,0 +1,86 @@
+package cc.nanoic.yunanexus.file.config;
+
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+import java.util.List;
+
+/**
+ * 文件中心配置（前缀 {@code yunanexus.file}）。<p>
+ *
+ * 分库连接信息在此显式声明（不使用 {@code spring.datasource}），由
+ * {@link DynamicDataSourceConfig} 按物理库数构建多个数据源。
+ *
+ * @author yunanexus
+ */
+@Data
+@ConfigurationProperties(prefix = "yunanexus.file")
+public class FileProperties {
+
+    private Shard shard = new Shard();
+
+    private Datasource datasource = new Datasource();
+
+    private Storage storage = new Storage();
+
+    private Upload upload = new Upload();
+
+    private Chunk chunk = new Chunk();
+
+    /** 分片参数 */
+    @Data
+    public static class Shard {
+        /** 逻辑分片总数（1~16） */
+        private int logicalCount = 16;
+        /** 物理库数量（逻辑分片按 shardIndex % physicalCount 映射） */
+        private int physicalCount = 2;
+    }
+
+    /** 分库连接参数 */
+    @Data
+    public static class Datasource {
+        private String host = "localhost";
+        private int port = 3306;
+        /** 物理库名前缀（实际库名 = 前缀 + 物理库索引） */
+        private String databasePrefix = "yunanexus_file_";
+        private String username = "root";
+        private String password = "";
+        private String urlParams =
+                "serverTimezone=Asia/Shanghai&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true";
+        private String poolNamePrefix = "file-hikari-";
+        private int maximumPoolSize = 10;
+        private int minimumIdle = 2;
+        private long connectionTimeout = 3000;
+    }
+
+    /** 文件存储参数（存储后端由 {@code type} 选择，当前仅实现 local） */
+    @Data
+    public static class Storage {
+        /** 存储后端类型：local（预留 minio / oss） */
+        private String type = "local";
+        /** 本地存储根目录 */
+        private String baseDir = "./data/file-storage";
+    }
+
+    /** 上传限制 */
+    @Data
+    public static class Upload {
+        /** 单文件最大字节数（默认 20MB） */
+        private long maxSize = 20L * 1024 * 1024;
+        /** 允许的扩展名（小写、不含点）；为空表示不限制 */
+        private List<String> allowedExtensions = List.of();
+    }
+
+    /** 分片上传 */
+    @Data
+    public static class Chunk {
+        /** 单个分片最大字节数（服务端校验，防单请求过大；默认 20MB） */
+        private long maxChunkSize = 20L * 1024 * 1024;
+        /** 分片文件总大小上限（默认 5GB） */
+        private long maxSize = 5L * 1024 * 1024 * 1024;
+        /** 上传会话过期时间（秒），超时后临时分片被清理任务回收（默认 24h） */
+        private long sessionTtlSeconds = 24L * 3600;
+        /** 过期清理任务执行间隔（毫秒，默认 1h） */
+        private long cleanupIntervalMs = 3600_000;
+    }
+}

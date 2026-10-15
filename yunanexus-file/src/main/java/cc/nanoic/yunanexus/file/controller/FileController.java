@@ -1,0 +1,227 @@
+package cc.nanoic.yunanexus.file.controller;
+
+import cc.nanoic.yunanexus.common.core.model.PageResult;
+import cc.nanoic.yunanexus.common.core.model.Result;
+import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
+import cc.nanoic.yunanexus.common.web.exception.BizException;
+import cc.nanoic.yunanexus.file.domain.ChunkInitRequest;
+import cc.nanoic.yunanexus.file.domain.ChunkInitResult;
+import cc.nanoic.yunanexus.file.domain.ChunkUploadStatus;
+import cc.nanoic.yunanexus.file.domain.FileRange;
+import cc.nanoic.yunanexus.file.domain.FileView;
+import cc.nanoic.yunanexus.file.service.FileService;
+import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.InvalidMediaTypeException;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.nio.charset.StandardCharsets;
+
+/**
+ * 文件中心外部接口（roadmap 7.3 / 7.4）。<p>
+ *
+ * 经网关访问：网关注入 {@code X-User-Id}（全局用户 ID），列表查询依此叠加数据范围过滤。<br>
+ * 下载支持 HTTP Range（{@code 206 Partial Content}）；大文件走分片上传（初始化 / 逐片 /
+ * 进度 / 合并 / 放弃），初始化时可基于内容指纹秒传。
+ *
+ * @author yunanexus
+ */
+@RestController
+@RequestMapping("/api/v1/file")
+public class FileController {
+
+    /** 网关下发的用户 ID 请求头（与 GatewayProperties.userIdHeader 一致） */
+    private static final String USER_ID_HEADER = "X-User-Id";
+
+    /** HTTP Range 前缀 */
+    private static final String RANGE_PREFIX = "bytes=";
+
+    @Resource
+    private FileService fileService;
+
+    /**
+     * 上传文件（单次上传，受 {@code yunanexus.file.upload.max-size} 限制）。
+     *
+     * @return 文件元数据（含全局文件 ID）
+     */
+    @PostMapping("/upload")
+    public Result<FileView> upload(@RequestParam("file") MultipartFile file,
+                                   @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        return Result.success(fileService.upload(file, requireUserId(userId)));
+    }
+
+    /**
+     * 下载文件内容，支持 HTTP Range 区间（断点续传 / 视频拖动）。
+     *
+     * @param range 形如 {@code bytes=0-1023} 或 {@code bytes=1024-}；缺省返回完整文件
+     */
+    @GetMapping("/download/{fileId}")
+    public ResponseEntity<InputStreamResource> download(
+            @PathVariable("fileId") long fileId,
+            @RequestHeader(value = HttpHeaders.RANGE, required = false) String range,
+            @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        long[] parsed = parseRange(range);
+        Long start = parsed == null ? null : parsed[0];
+        Long end = (parsed == null || parsed[1] < 0) ? null : parsed[1];
+        FileRange fileRange = fileService.download(fileId, requireUserId(userId), start, end);
+
+        long contentLength = Math.max(fileRange.end() - fileRange.start() + 1, 0);
+        ResponseEntity.BodyBuilder builder = fileRange.partial()
+                ? ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                : ResponseEntity.ok();
+        builder.header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(fileRange.fileName(), StandardCharsets.UTF_8)
+                        .build()
+                        .toString())
+                .contentType(parseContentType(fileRange.contentType()))
+                .contentLength(contentLength);
+        if (fileRange.partial()) {
+            builder.header(HttpHeaders.CONTENT_RANGE,
+                    "bytes " + fileRange.start() + "-" + fileRange.end() + "/" + fileRange.totalSize());
+        }
+        return builder.body(new InputStreamResource(fileRange.content()));
+    }
+
+    /**
+     * 初始化分片上传：秒传命中直接返回元数据，否则返回上传会话 ID。
+     */
+    @PostMapping("/chunk/init")
+    public Result<ChunkInitResult> chunkInit(@Valid @RequestBody ChunkInitRequest request,
+                                             @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        return Result.success(fileService.initChunkUpload(request, requireUserId(userId)));
+    }
+
+    /**
+     * 上传单个分片（幂等覆盖，支持失败重传）。
+     */
+    @PostMapping("/chunk/upload")
+    public Result<Void> chunkUpload(@RequestParam("uploadId") String uploadId,
+                                    @RequestParam("index") int index,
+                                    @RequestParam("chunk") MultipartFile chunk,
+                                    @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        requireUserId(userId);
+        fileService.uploadChunk(uploadId, index, chunk);
+        return Result.success();
+    }
+
+    /**
+     * 查询分片上传进度（断点续传）。
+     */
+    @GetMapping("/chunk/status")
+    public Result<ChunkUploadStatus> chunkStatus(@RequestParam("uploadId") String uploadId,
+                                                 @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        requireUserId(userId);
+        return Result.success(fileService.chunkStatus(uploadId));
+    }
+
+    /**
+     * 完成分片上传：合并分片 → 内容查重 → 元数据落库。
+     */
+    @PostMapping("/chunk/complete")
+    public Result<FileView> chunkComplete(@RequestParam("uploadId") String uploadId,
+                                          @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        return Result.success(fileService.completeChunkUpload(uploadId, requireUserId(userId)));
+    }
+
+    /**
+     * 放弃分片上传，清理临时分片。
+     */
+    @PostMapping("/chunk/abort")
+    public Result<Void> chunkAbort(@RequestParam("uploadId") String uploadId,
+                                   @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        requireUserId(userId);
+        fileService.abortChunkUpload(uploadId);
+        return Result.success();
+    }
+
+    /**
+     * 删除文件（逻辑删除元数据 + 引用计数归零后物理删除内容）。
+     */
+    @PostMapping("/delete/{fileId}")
+    public Result<Void> delete(@PathVariable("fileId") long fileId,
+                               @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        fileService.delete(fileId, requireUserId(userId));
+        return Result.success();
+    }
+
+    /**
+     * 分页查询当前用户在数据范围内可见的文件列表。
+     *
+     * @param page 页码（从 1 起，默认 1）
+     * @param size 每页大小（默认 20，上限 100）
+     */
+    @GetMapping("/list")
+    public Result<PageResult<FileView>> list(
+            @RequestHeader(value = USER_ID_HEADER, required = false) Long userId,
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        return Result.success(fileService.listVisible(requireUserId(userId), page, size));
+    }
+
+    /**
+     * 解析 HTTP Range 请求头，返回 {@code [start, end]}；{@code end < 0} 表示到文件末尾。<p>
+     * 不支持多区间（含逗号）与后缀区间（{@code bytes=-N}），此时返回 {@code null} 按整文件处理。
+     */
+    private long[] parseRange(String range) {
+        if (range == null || range.isBlank()) {
+            return null;
+        }
+        String value = range.trim();
+        if (!value.startsWith(RANGE_PREFIX)) {
+            return null;
+        }
+        String spec = value.substring(RANGE_PREFIX.length()).trim();
+        if (spec.isEmpty() || spec.contains(",")) {
+            return null;
+        }
+        int dash = spec.indexOf('-');
+        if (dash < 0) {
+            return null;
+        }
+        String startPart = spec.substring(0, dash).trim();
+        String endPart = spec.substring(dash + 1).trim();
+        if (startPart.isEmpty()) {
+            return null;
+        }
+        try {
+            long start = Long.parseLong(startPart);
+            long end = endPart.isEmpty() ? -1 : Long.parseLong(endPart);
+            return new long[]{start, end};
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private long requireUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new BizException(ErrorCode.UNAUTHORIZED, "缺少有效的 " + USER_ID_HEADER + " 请求头");
+        }
+        return userId;
+    }
+
+    private MediaType parseContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+        try {
+            return MediaType.parseMediaType(contentType);
+        } catch (InvalidMediaTypeException e) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+    }
+}
