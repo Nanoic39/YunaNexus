@@ -153,10 +153,6 @@ yunanexus:
       enabled: ${GATEWAY_PERMISSION_ENABLED:true}
       check-url: ${PERMISSION_CHECK_URL:}
       timeout-millis: ${PERMISSION_CHECK_TIMEOUT_MILLIS:2000}
-      # 免权限判定路径（仍需 JWT 登录态，仅跳过资源鉴权）：/me 为「登录后取当前用户身份/权限/菜单」，
-      # 每次登录必调，若不豁免将因尚无权限而自举失败（403）。
-      permit-paths:
-        - /api/v1/permission/me
     # Sentinel 网关限流（默认开启）；按路由 id 维度配置 QPS 阈值，覆盖全部路由
     rate-limit:
       enabled: ${GATEWAY_RATE_LIMIT_ENABLED:true}
