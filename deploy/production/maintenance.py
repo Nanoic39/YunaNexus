@@ -11,7 +11,7 @@ def maintain():
    if path.stat().st_size>10*1024**2:
     # Truncate in place so running processes continue to write the same inode.
     with path.open('r+b') as output:output.truncate(0)
- for path in (p for p in (R/'cache').iterdir() if p.name.endswith(('.tar.gz','.tar.xz'))):
+ for path in (p for p in (R/'cache').iterdir() if p.name.endswith(('.tar.gz','.tar.xz','.part'))):
   if path.is_file() and not path.is_symlink() and time.time()-path.stat().st_mtime>86400:path.unlink()
  if (R/'config/acme.enabled').is_file() and time.time()-last_certificate_check>=21600:
   last_certificate_check=time.time()
