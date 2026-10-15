@@ -16,7 +16,7 @@ def main():
  print('Creating deployment release',tag,flush=True)
  release=matches[0] if matches else api('/repos/'+repo+'/releases',{'tag_name':tag,'target_commitish':sha,'name':tag,'body':'Production build '+sha,'draft':True,'prerelease':True})
  present={a['name'] for a in release['assets']}
- for name in [kind+'.tar.gz','SHA256SUMS']:
+ for name in [kind+('.tar.xz' if kind=='backend' else '.tar.gz'),'SHA256SUMS']:
   if name in present:continue
   path=pathlib.Path('release')/name
   url=urllib.parse.urlsplit(release['upload_url'].split('{')[0]+'?name='+name)

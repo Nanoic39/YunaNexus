@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Package vetted build outputs; no source tree or local configuration is uploaded."""
 from pathlib import Path
-import argparse,tarfile,zipfile,hashlib,json,subprocess
+import argparse,tarfile,zipfile,hashlib,json,subprocess,lzma,gzip
 p=argparse.ArgumentParser();p.add_argument('kind',choices=['backend','frontend']);p.add_argument('--root',default='.');p.add_argument('--out',default='release');a=p.parse_args()
 r=Path(a.root).resolve();out=Path(a.out).resolve();out.mkdir(parents=True,exist_ok=True)
-archive=out/(a.kind+'.tar.gz')
-with tarfile.open(archive,'w:gz',compresslevel=1) as tar:
+archive=out/(a.kind+('.tar.xz' if a.kind=='backend' else '.tar.gz'))
+options={'filters':[{'id':lzma.FILTER_LZMA2,'preset':1,'dict_size':256*1024**2}]} if a.kind=='backend' else {'compresslevel':1}
+with (lzma.open(archive,'wb',**options) if a.kind=='backend' else gzip.open(archive,'wb',**options)) as compressed, tarfile.open(fileobj=compressed,mode='w') as tar:
  if a.kind=='backend':
   jars=list(r.glob('yunanexus-*/target/yunanexus-*.jar'));jars=[j for j in jars if not j.name.endswith('-sources.jar')]
   if len(jars)!=9:raise SystemExit('Expected exactly nine executable service jars')

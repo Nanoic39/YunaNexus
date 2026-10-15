@@ -25,7 +25,7 @@ def deploy(kind,archive,revision):
  if target.exists():raise RuntimeError('Release already installed; do not overwrite immutable release')
  target.mkdir(mode=0o755)
  try:
-  with tarfile.open(archive,'r:gz') as tar:
+  with tarfile.open(archive,'r:*') as tar:
    members=tar.getmembers();seen=set();total=0
    if len(members)>10000:raise ValueError('Too many archive entries')
    for member in members:
