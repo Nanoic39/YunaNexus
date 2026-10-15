@@ -2,7 +2,7 @@
 """Issue/renew a short-lived IP certificate using ACME v2 and system cryptography.
 No global packages, cron entries, or /etc certificate files are created.
 """
-import base64,datetime,hashlib,ipaddress,json,os,re,time,urllib.request,urllib.error,subprocess
+import base64,datetime,hashlib,ipaddress,json,os,re,time,urllib.request,urllib.error,subprocess,socket,ssl,threading
 from pathlib import Path
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes,serialization
@@ -57,20 +57,42 @@ def main():
  for auth_url in order['authorizations']:
   auth=json.loads(post(auth_url)[0])
   if auth['status']=='valid':continue
-  challenge=next(c for c in auth['challenges'] if c['type']=='http-01');token=challenge['token']
-  if not re.fullmatch('[A-Za-z0-9_-]+',token):raise ValueError('Invalid challenge token')
-  folder=R/'data/acme-webroot/.well-known/acme-challenge';folder.mkdir(parents=True,exist_ok=True)
-  for parent in [folder,folder.parent,folder.parent.parent]:parent.chmod(0o755)
-  path=folder/token;path.write_text(token+'.'+thumb);path.chmod(0o644)
+  challenge=next(c for c in auth['challenges'] if c['type']=='tls-alpn-01')
+  proof=hashlib.sha256((challenge['token']+'.'+thumb).encode()).digest()
+  tlskey=serialization.load_pem_private_key((R/'secrets/tls/server.key').read_bytes(),password=None)
+  now=datetime.datetime.now(datetime.timezone.utc)
+  subject=x509.Name([x509.NameAttribute(NameOID.COMMON_NAME,IP)])
+  leaf=x509.CertificateBuilder().subject_name(subject).issuer_name(subject).public_key(tlskey.public_key()).serial_number(x509.random_serial_number()).not_valid_before(now-datetime.timedelta(minutes=1)).not_valid_after(now+datetime.timedelta(days=1))
+  leaf=leaf.add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address(IP))]),critical=True)
+  leaf=leaf.add_extension(x509.UnrecognizedExtension(x509.ObjectIdentifier('1.3.6.1.5.5.7.1.31'),bytes([4,32])+proof),critical=True).sign(tlskey,hashes.SHA256())
+  temporary=R/'secrets/tls-alpn.crt';atomic(temporary,leaf.public_bytes(serialization.Encoding.PEM))
+  context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);context.load_cert_chain(str(temporary),str(R/'secrets/tls/server.key'));context.set_alpn_protocols(['acme-tls/1'])
+  subprocess.run([str(R/'ops/compose.sh'),'stop','edge'],check=True)
+  listener=socket.socket();listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);stop=threading.Event();thread=None
+  def accept():
+   while not stop.is_set():
+    try:
+     client,_=listener.accept();client.settimeout(3)
+     try:context.wrap_socket(client,server_side=True).close()
+     except (ssl.SSLError,OSError) as error:
+      print('TLS validation handshake:',type(error).__name__,flush=True);client.close()
+    except socket.timeout:pass
+    except OSError:break
   try:
+   listener.bind(('0.0.0.0',443));listener.listen(20);listener.settimeout(1)
+   thread=threading.Thread(target=accept,daemon=True);thread.start()
    post(challenge['url'],{})
    for attempt in range(60):
     auth=json.loads(post(auth_url)[0])
     if auth['status']=='valid':break
-    if auth['status']=='invalid':raise RuntimeError('IP HTTP challenge was rejected')
+    if auth['status']=='invalid':raise RuntimeError('IP TLS validation failed: '+json.dumps([c.get('error') for c in auth.get('challenges',[]) if c.get('error')]))
     time.sleep(2)
-   else:raise RuntimeError('IP HTTP challenge timed out')
-  finally:path.unlink(missing_ok=True)
+   else:raise RuntimeError('IP TLS validation timed out')
+  finally:
+   stop.set();listener.close()
+   if thread:thread.join(timeout=4)
+   temporary.unlink(missing_ok=True)
+   subprocess.run([str(R/'ops/compose.sh'),'up','-d','--no-deps','edge'],check=True)
  tlskey=serialization.load_pem_private_key((R/'secrets/tls/server.key').read_bytes(),password=None)
  csr=x509.CertificateSigningRequestBuilder().subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME,IP)]))
  csr=csr.add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address(IP))]),critical=False).sign(tlskey,hashes.SHA256())
