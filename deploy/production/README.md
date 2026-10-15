@@ -43,13 +43,13 @@
 
 | 入口 | 地址 |
 | :--- | :--- |
-| 用户门户 | `https://103.39.66.135` |
-| 管理控制台 | `https://103.39.66.135:8443` |
+| 用户门户 | `http://103.39.66.135:3000` |
+| 管理控制台 | `http://103.39.66.135:3001` |
 | API | 两个站点各自同源 `/api/v1` |
 | 服务状态 | `/api/v1/status`、`/api/v1/status/auth` 等 |
 | 未来域名 | `yuna.nanoic.cc`、`console.yuna.nanoic.cc`，备案完成后切换 |
 
-公网只映射 80、443、8443。数据库、Redis、Nacos、RocketMQ、业务端口及 Actuator
+公网仅映射 3000（用户端 HTTP）和 3001（管理端 HTTP），不开放 80、443、8443。数据库、Redis、Nacos、RocketMQ、业务端口及 Actuator
 均不映射宿主机端口。用户入口屏蔽管理 API，管理入口使用服务端管理员密钥验证。
 通知服务门户管理端也独立验证密钥，普通用户登录态不能修改门户。
 
@@ -130,13 +130,23 @@ Docker 日志每容器最多 3 × 10 MiB；维护进程会限制项目文件日�
 自动部署至少保留 4 GiB 可用磁盘，否则拒绝部署；旧版本只保留 current/previous。
 业务数据不能按日志方式删除，MySQL、上传和备份的总容量仍需监测，已有其他业务的数据不清理。
 
-首次初始化生成应急自签名证书。IP 地址可使用 Let's Encrypt 的 shortlived 证书；
-正式申请与自动续期所需的配置、工作目录和日志分别放在项目 data/cache/logs 下。
-请在确认公开可信证书申请成功前勿将应急证书视为可信 CA 证书。
-续期由项目维护进程每六小时检查；主机重启后未手动启动项目时，续期也不会运行。
+当前按部署者要求使用临时 HTTP IP 入口，`prd` 配置显式设置 `allow-insecure-http=true`。
+该开关默认关闭，启用后仍要求明确列出的同主机 origin；保留 CSRF、HttpOnly 和 SameSite Cookie，
+仅取消 HTTP 无法使用的 Secure / __Host 前缀。HTTP 会明文传输凭据，临时环境不应使用正式账号密码。
+主机 UFW 已有 3000、3001 放行规则，公网已验证两端口返回 200；未新增其他监听端口。
+当前不运行证书签发或续期；已有应急证书保留在 secrets/tls 中，未用于 HTTP 入口。
+域名和 HTTPS 可用后应关闭 `allow-insecure-http`、恢复 TLS 监听及 Secure Cookie。
 
 后续域名可用后，更新 Nginx server_name、认证 public-origin、CORS、客户端回调和前端用户入口，
-申请域名证书并重新构建前端；API 保持同源路径，服务内部地址保持容器网络。
+申请域名证书、关闭临时 HTTP 开关并重新构建前端；API 保持同源路径，服务内部地址保持容器网络。
 
 镜像行为依据 [Docker 数据目录说明](https://docs.docker.com/engine/daemon/)；
 IP 证书配置依据 [Let's Encrypt / Certbot 官方说明](https://letsencrypt.org/2026/03/11/shorter-certs-certbot/)。
+
+注册事务仅自动授予 `web` 门户授权，不自动授予其他平台。新用户可直接登录门户，
+其他客户端仍校验各自的授权关系。管理员入口继续要求服务端生成的管理密钥。
+
+联调脚本：`python3 /YunaNexus/platform/ops/smoke.py` 验证公开 API 与管理隔离；
+`smoke-auth.py` 使用专用测试账号验证注册、自动授权、登录、刷新及退出，并在结束时禁用测试账号。
+测试凭据仅写 secrets，不在日志中输出。后端归档采用 256 MiB 字典的 XZ，减少重复依赖的传输；
+解包需额外预留约 300 MiB 内存。部署器继续兼容已发布的 Gzip 包。
