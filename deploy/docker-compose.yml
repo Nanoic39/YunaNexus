@@ -1,0 +1,423 @@
+# YunaNexus · Docker Compose 联调编排（roadmap 阶段 9.6）
+#
+# 目标：一条命令拉起「中间件 + 9 个服务」，用于前后端联调、阶段验收。
+#
+# 用法：
+#   cp deploy/.env.example deploy/.env      # 填写密钥等敏感值
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+#   # 附带可观测性栈（Prometheus + Grafana + SkyWalking）：
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env --profile ops up -d --build
+#   docker compose -f deploy/docker-compose.yml down
+#
+# 说明：
+#   - 构建上下文为仓库根目录（context: ..），Dockerfile 位于 deploy/docker/Dockerfile；
+#   - 各服务管理端口（management.server.port）用于健康检查与 Prometheus 抓取；
+#   - 密钥/密码全部经 .env 注入，禁止硬编码（ADR-011）。
+
+name: yunanexus
+
+# ---------- 复用锚点 ----------
+x-common-env: &common-env
+  TZ: Asia/Shanghai
+  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
+  # Nacos 注册中心 + 配置中心
+  NACOS_ADDR: nacos:8848
+  NACOS_USERNAME: ${NACOS_USERNAME:-nacos}
+  NACOS_PASSWORD: ${NACOS_PASSWORD:-nacos}
+  # MySQL（分库服务另用 *_DB_PREFIX 指定物理库前缀）
+  DB_HOST: mysql
+  DB_PORT: "3306"
+  DB_USERNAME: root
+  DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-password}
+
+x-service-build: &service-build
+  context: ..
+  dockerfile: deploy/docker/Dockerfile
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+
+  # ==================== 中间件 ====================
+
+  mysql:
+    image: ${MYSQL_IMAGE:-mysql:8.4}
+    <<: *restart
+    command: [ "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci" ]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-password}
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 建库脚本按文件名顺序执行（audit/auth/file/meta/notice/permission/user）
+      - ../misc/data:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-password}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7.4-alpine}
+    <<: *restart
+    command: [ "redis-server", "--appendonly", "yes" ]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  nacos:
+    image: ${NACOS_IMAGE:-nacos/nacos-server:v3.0.2}
+    <<: *restart
+    environment:
+      MODE: standalone
+      # 本地联调关闭鉴权，简化接入；生产必须开启并配置 token（见 docs/deployment.md）
+      NACOS_AUTH_ENABLE: "false"
+      JVM_XMS: 512m
+      JVM_XMX: 512m
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+      - "9849:9849"
+    volumes:
+      - nacos-data:/home/nacos/data
+      - nacos-logs:/home/nacos/logs
+    healthcheck:
+      test: [ "CMD", "curl", "-fs", "http://127.0.0.1:8848/nacos/v1/console/health/readiness" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  rocketmq-namesrv:
+    image: ${ROCKETMQ_IMAGE:-apache/rocketmq:5.3.1}
+    <<: *restart
+    command: sh mqnamesrv
+    environment:
+      JAVA_OPT_EXT: "-Xms256m -Xmx256m -Xmn128m"
+    ports:
+      - "9876:9876"
+    volumes:
+      - rocketmq-namesrv-logs:/home/rocketmq/logs
+
+  rocketmq-broker:
+    image: ${ROCKETMQ_IMAGE:-apache/rocketmq:5.3.1}
+    <<: *restart
+    depends_on:
+      - rocketmq-namesrv
+    command: sh mqbroker -c /home/rocketmq/conf/broker.conf
+    environment:
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+      JAVA_OPT_EXT: "-Xms512m -Xmx512m -Xmn256m"
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+    volumes:
+      - ./rocketmq/broker.conf:/home/rocketmq/conf/broker.conf:ro
+      - rocketmq-broker-store:/home/rocketmq/store
+      - rocketmq-broker-logs:/home/rocketmq/logs
+
+  # ==================== 业务服务 ====================
+  # 依赖注入顺序：先中间件，再服务（服务对 Nacos 采用 fail-fast:false，可容忍短暂不可用）。
+
+  yunanexus-meta:
+    build:
+      <<: *service-build
+      args:
+        SERVICE: yunanexus-meta
+    image: yunanexus/yunanexus-meta:latest
+    <<: *restart
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      DB_NAME: yunanexus_meta
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+
+  yunanexus-auth:
+    build:
+      <<: *service-build
+      args:
+        SERVICE: yunanexus-auth
+    image: yunanexus/yunanexus-auth:latest
+    <<: *restart
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      DB_NAME: yunanexus_auth
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # JWT RS256 / 外部 ID 密钥（缺失将拒绝启动）
+      # 可预置多版本（v1/v2）：未注入的版本视为「尚未启用」被跳过，便于平滑轮换
+      JWT_ACTIVE_KID: ${JWT_ACTIVE_KID:-v1}
+      JWT_PUBLIC_KEY_V1: ${JWT_PUBLIC_KEY_V1:-}
+      JWT_PRIVATE_KEY_V1: ${JWT_PRIVATE_KEY_V1:-}
+      JWT_PUBLIC_KEY_V2: ${JWT_PUBLIC_KEY_V2:-}
+      JWT_PRIVATE_KEY_V2: ${JWT_PRIVATE_KEY_V2:-}
+      EXTERNAL_ID_AES_KEY_V1: ${EXTERNAL_ID_AES_KEY_V1:-}
+      EXTERNAL_ID_HMAC_KEY_V1: ${EXTERNAL_ID_HMAC_KEY_V1:-}
+      AUTH_ADMIN_TOKEN: ${AUTH_ADMIN_TOKEN:-}
+      AUTH_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-}
+      # 手机号能力开关：默认关闭（无 SMS 能力），接入短信通道后置 true 重开
+      AUTH_MOBILE_ENABLED: ${AUTH_MOBILE_ENABLED:-false}
+    ports:
+      - "8100:8100"
+      - "8101:8101"
+
+  yunanexus-gateway:
+    build:
+      <<: *service-build
+      args:
+        SERVICE: yunanexus-gateway
+    image: yunanexus/yunanexus-gateway:latest
+    <<: *restart
+    depends_on:
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # 仅需公钥；可预置多版本（v1/v2），未注入的版本被跳过
+      JWT_ACTIVE_KID: ${JWT_ACTIVE_KID:-v1}
+      JWT_PUBLIC_KEY_V1: ${JWT_PUBLIC_KEY_V1:-}
+      JWT_PUBLIC_KEY_V2: ${JWT_PUBLIC_KEY_V2:-}
+      EXTERNAL_ID_AES_KEY_V1: ${EXTERNAL_ID_AES_KEY_V1:-}
+      EXTERNAL_ID_HMAC_KEY_V1: ${EXTERNAL_ID_HMAC_KEY_V1:-}
+      GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-}
+    ports:
+      - "8010:8010"
+      - "8081:8081"
+
+  yunanexus-user:
+    build:
+      <<: *service-build
+      args:
+        SERVICE: yunanexus-user
+    image: yunanexus/yunanexus-user:latest
+    <<: *restart
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      USER_DB_PREFIX: yunanexus_user_
+      USER_SHARD_LOGICAL_COUNT: "16"
+      USER_SHARD_PHYSICAL_COUNT: "2"
+      # 手机号能力开关：默认关闭（无 SMS 能力），接入短信通道后置 true 重开
+      USER_MOBILE_ENABLED: ${USER_MOBILE_ENABLED:-false}
+    ports:
+      - "8200:8200"
+      - "8201:8201"
+
+  yunanexus-permission:
+    build:
+      <<: *service-build
+      args:
+        SERVICE: yunanexus-permission
+    image: yunanexus/yunanexus-permission:latest
+    <<: *restart
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      DB_NAME: yunanexus_permission
+      PERMISSION_ADMIN_TOKEN: ${PERMISSION_ADMIN_TOKEN:-}
+    ports:
+      - "8300:8300"
+      - "8301:8301"
+
+  yunanexus-file:
+    build:
+      <<: *service-build
+      args:
+        SERVICE: yunanexus-file
+    image: yunanexus/yunanexus-file:latest
+    <<: *restart
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      FILE_DB_PREFIX: yunanexus_file_
+      FILE_SHARD_LOGICAL_COUNT: "16"
+      FILE_SHARD_PHYSICAL_COUNT: "2"
+      FILE_STORAGE_TYPE: local
+      FILE_STORAGE_BASE_DIR: /app/data/file-storage
+    ports:
+      - "8400:8400"
+      - "8401:8401"
+    volumes:
+      - file-data:/app/data
+
+  yunanexus-notice:
+    build:
+      <<: *service-build
+      args:
+        SERVICE: yunanexus-notice
+    image: yunanexus/yunanexus-notice:latest
+    <<: *restart
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      rocketmq-broker:
+        condition: service_started
+    environment:
+      <<: *common-env
+      DB_NAME: yunanexus_notice
+      ROCKETMQ_NAMESERVER: rocketmq-namesrv:9876
+    ports:
+      - "8500:8500"
+      - "8501:8501"
+
+  yunanexus-audit:
+    build:
+      <<: *service-build
+      args:
+        SERVICE: yunanexus-audit
+    image: yunanexus/yunanexus-audit:latest
+    <<: *restart
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      rocketmq-broker:
+        condition: service_started
+    environment:
+      <<: *common-env
+      AUDIT_DB_PREFIX: yunanexus_audit_
+      AUDIT_SHARD_LOGICAL_COUNT: "16"
+      AUDIT_SHARD_PHYSICAL_COUNT: "2"
+      ROCKETMQ_NAMESERVER: rocketmq-namesrv:9876
+      AUDIT_ARCHIVE_BACKUP_DIR: /app/data/audit-archive
+    ports:
+      - "8600:8600"
+      - "8601:8601"
+    volumes:
+      - audit-data:/app/data
+
+  yunanexus-analytics:
+    build:
+      <<: *service-build
+      args:
+        SERVICE: yunanexus-analytics
+    image: yunanexus/yunanexus-analytics:latest
+    <<: *restart
+    depends_on:
+      nacos:
+        condition: service_healthy
+      rocketmq-broker:
+        condition: service_started
+    environment:
+      <<: *common-env
+      # 无业务数据库；事件经 RocketMQ 投递，消费者写 ClickHouse（阶段 10.2 落地）
+      ANALYTICS_MQ_ENABLED: "true"
+      ROCKETMQ_NAMESERVER: rocketmq-namesrv:9876
+      ANALYTICS_CLICKHOUSE_ENABLED: "false"
+    ports:
+      - "8700:8700"
+      - "8701:8701"
+
+  # ==================== 可观测性（profile: ops） ====================
+  # 启用：docker compose ... --profile ops up -d
+  # 说明：SkyWalking Java agent 需挂载到各服务 JVM（见 deploy/README.md「SkyWalking 接入」）。
+
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v2.54.1}
+    <<: *restart
+    profiles: [ "ops" ]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:11.2.0}
+    <<: *restart
+    profiles: [ "ops" ]
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+
+  skywalking-oap:
+    image: ${SKYWALKING_IMAGE:-apache/skywalking-oap-server:10.1.0}
+    <<: *restart
+    profiles: [ "ops" ]
+    environment:
+      SW_STORAGE: h2
+      TZ: Asia/Shanghai
+    ports:
+      - "11800:11800"
+      - "12800:12800"
+
+  skywalking-ui:
+    image: ${SKYWALKING_UI_IMAGE:-apache/skywalking-ui:10.1.0}
+    <<: *restart
+    profiles: [ "ops" ]
+    depends_on:
+      - skywalking-oap
+    environment:
+      SW_OAP_ADDRESS: http://skywalking-oap:12800
+      TZ: Asia/Shanghai
+    ports:
+      - "8080:8080"
+
+volumes:
+  mysql-data:
+  redis-data:
+  nacos-data:
+  nacos-logs:
+  rocketmq-namesrv-logs:
+  rocketmq-broker-store:
+  rocketmq-broker-logs:
+  file-data:
+  audit-data:
+  prometheus-data:
+  grafana-data:

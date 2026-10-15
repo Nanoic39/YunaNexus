@@ -1,0 +1,524 @@
+name: yunanexus-production
+services:
+  mysql:
+    restart: unless-stopped
+    logging: &id001
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '3'
+    pids_limit: 256
+    security_opt: &id002
+    - no-new-privileges:true
+    image: m.daocloud.io/docker.io/library/mysql@sha256:24989179f58856db763f418010c1169fecc944e3ec1ea7e921572d83eb070f70
+    mem_limit: 384m
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?required}
+    command:
+    - --innodb-buffer-pool-size=96M
+    - --max-connections=80
+    - --performance-schema=OFF
+    - --mysqlx=OFF
+    - --skip-log-bin
+    volumes:
+    - /YunaNexus/platform/data/mysql:/var/lib/mysql
+    - /YunaNexus/platform/data/sqlinit:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin ping -h127.0.0.1 -uroot --silent
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  redis:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/library/redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    mem_limit: 96m
+    command:
+    - redis-server
+    - /usr/local/etc/redis/redis.conf
+    volumes:
+    - /YunaNexus/platform/data/redis:/data
+    - /YunaNexus/platform/secrets/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  nacos:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/nacos/nacos-server@sha256:0e951a1d07bb8dca7ba1d89b45154fb01088c64663c865d1c5341561fdbf246a
+    mem_limit: 512m
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: 'true'
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:?required}
+      NACOS_AUTH_IDENTITY_KEY: yn-identity
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:?required}
+      JVM_XMS: 128m
+      JVM_XMX: 256m
+      JVM_XMN: 64m
+      JVM_MS: 64m
+      JVM_MMS: 128m
+      TOMCAT_ACCESSLOG_ENABLED: 'false'
+    volumes:
+    - /YunaNexus/platform/data/nacos:/home/nacos/data
+    - /YunaNexus/platform/logs/nacos:/home/nacos/logs
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  namesrv:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/apache/rocketmq@sha256:d2b231c1b9204129e4f4dd65ec1521c81b8d6826e5f1fe8daa521dab0db5bf16
+    mem_limit: 160m
+    command:
+    - sh
+    - mqnamesrv
+    environment:
+      JAVA_OPT_EXT: -Xms32m -Xmx64m -Xmn16m
+    volumes:
+    - /YunaNexus/platform/logs/namesrv:/home/rocketmq/logs
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  broker:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/apache/rocketmq@sha256:d2b231c1b9204129e4f4dd65ec1521c81b8d6826e5f1fe8daa521dab0db5bf16
+    mem_limit: 256m
+    command:
+    - sh
+    - mqbroker
+    - -c
+    - /home/rocketmq/conf/broker.conf
+    depends_on:
+    - namesrv
+    environment:
+      NAMESRV_ADDR: namesrv:9876
+      JAVA_OPT_EXT: -Xms64m -Xmx128m -Xmn32m
+    volumes:
+    - /YunaNexus/platform/config/broker.conf:/home/rocketmq/conf/broker.conf:ro
+    - /YunaNexus/platform/data/rocketmq:/home/rocketmq/store
+    - /YunaNexus/platform/logs/broker:/home/rocketmq/logs
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  meta:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
+    mem_limit: 288m
+    user: 10001:10001
+    read_only: true
+    cap_drop:
+    - ALL
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=32m,uid=10001,gid=10001
+    working_dir: /app
+    env_file:
+    - /YunaNexus/platform/secrets/meta.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prd
+      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
+        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+    command:
+    - java
+    - -jar
+    - /app/app.jar
+    volumes:
+    - /YunaNexus/platform/releases/backend/current/yunanexus-meta.jar:/app/app.jar:ro
+    - /YunaNexus/platform/config/meta.yaml:/app/config/runtime.yaml:ro
+    - /YunaNexus/platform/data/meta:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  auth:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
+    mem_limit: 288m
+    user: 10001:10001
+    read_only: true
+    cap_drop:
+    - ALL
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=32m,uid=10001,gid=10001
+    working_dir: /app
+    env_file:
+    - /YunaNexus/platform/secrets/auth.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prd
+      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
+        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+    command:
+    - java
+    - -jar
+    - /app/app.jar
+    volumes:
+    - /YunaNexus/platform/releases/backend/current/yunanexus-auth.jar:/app/app.jar:ro
+    - /YunaNexus/platform/config/auth.yaml:/app/config/runtime.yaml:ro
+    - /YunaNexus/platform/data/auth:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  gateway:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
+    mem_limit: 288m
+    user: 10001:10001
+    read_only: true
+    cap_drop:
+    - ALL
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=32m,uid=10001,gid=10001
+    working_dir: /app
+    env_file:
+    - /YunaNexus/platform/secrets/gateway.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prd
+      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
+        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+    command:
+    - java
+    - -jar
+    - /app/app.jar
+    volumes:
+    - /YunaNexus/platform/releases/backend/current/yunanexus-gateway.jar:/app/app.jar:ro
+    - /YunaNexus/platform/config/gateway.yaml:/app/config/runtime.yaml:ro
+    - /YunaNexus/platform/data/gateway:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  user:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
+    mem_limit: 288m
+    user: 10001:10001
+    read_only: true
+    cap_drop:
+    - ALL
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=32m,uid=10001,gid=10001
+    working_dir: /app
+    env_file:
+    - /YunaNexus/platform/secrets/user.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prd
+      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
+        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+    command:
+    - java
+    - -jar
+    - /app/app.jar
+    volumes:
+    - /YunaNexus/platform/releases/backend/current/yunanexus-user.jar:/app/app.jar:ro
+    - /YunaNexus/platform/config/user.yaml:/app/config/runtime.yaml:ro
+    - /YunaNexus/platform/data/user:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  permission:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
+    mem_limit: 288m
+    user: 10001:10001
+    read_only: true
+    cap_drop:
+    - ALL
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=32m,uid=10001,gid=10001
+    working_dir: /app
+    env_file:
+    - /YunaNexus/platform/secrets/permission.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prd
+      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
+        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+    command:
+    - java
+    - -jar
+    - /app/app.jar
+    volumes:
+    - /YunaNexus/platform/releases/backend/current/yunanexus-permission.jar:/app/app.jar:ro
+    - /YunaNexus/platform/config/permission.yaml:/app/config/runtime.yaml:ro
+    - /YunaNexus/platform/data/permission:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  file:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
+    mem_limit: 288m
+    user: 10001:10001
+    read_only: true
+    cap_drop:
+    - ALL
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=32m,uid=10001,gid=10001
+    working_dir: /app
+    env_file:
+    - /YunaNexus/platform/secrets/file.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prd
+      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
+        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+    command:
+    - java
+    - -jar
+    - /app/app.jar
+    volumes:
+    - /YunaNexus/platform/releases/backend/current/yunanexus-file.jar:/app/app.jar:ro
+    - /YunaNexus/platform/config/file.yaml:/app/config/runtime.yaml:ro
+    - /YunaNexus/platform/data/file:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  notice:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
+    mem_limit: 288m
+    user: 10001:10001
+    read_only: true
+    cap_drop:
+    - ALL
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=32m,uid=10001,gid=10001
+    working_dir: /app
+    env_file:
+    - /YunaNexus/platform/secrets/notice.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prd
+      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
+        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+    command:
+    - java
+    - -jar
+    - /app/app.jar
+    volumes:
+    - /YunaNexus/platform/releases/backend/current/yunanexus-notice.jar:/app/app.jar:ro
+    - /YunaNexus/platform/config/notice.yaml:/app/config/runtime.yaml:ro
+    - /YunaNexus/platform/data/notice:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  audit:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
+    mem_limit: 288m
+    user: 10001:10001
+    read_only: true
+    cap_drop:
+    - ALL
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=32m,uid=10001,gid=10001
+    working_dir: /app
+    env_file:
+    - /YunaNexus/platform/secrets/audit.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prd
+      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
+        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+    command:
+    - java
+    - -jar
+    - /app/app.jar
+    volumes:
+    - /YunaNexus/platform/releases/backend/current/yunanexus-audit.jar:/app/app.jar:ro
+    - /YunaNexus/platform/config/audit.yaml:/app/config/runtime.yaml:ro
+    - /YunaNexus/platform/data/audit:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  analytics:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
+    mem_limit: 288m
+    user: 10001:10001
+    read_only: true
+    cap_drop:
+    - ALL
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=32m,uid=10001,gid=10001
+    working_dir: /app
+    env_file:
+    - /YunaNexus/platform/secrets/analytics.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prd
+      SPRING_CONFIG_IMPORT: optional:file:/app/config/runtime.yaml
+      JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m
+        -XX:ActiveProcessorCount=1 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Duser.home=/app/data
+        -Djava.io.tmpdir=/tmp -Duser.timezone=Asia/Shanghai -Dcsp.sentinel.log.dir=/app/data/sentinel
+        -Xss512k -XX:MaxDirectMemorySize=32m -Dio.netty.eventLoopThreads=2 -Dio.netty.allocator.numDirectArenas=2
+        -XX:ErrorFile=/app/data/hs_err_pid%p.log
+    command:
+    - java
+    - -jar
+    - /app/app.jar
+    volumes:
+    - /YunaNexus/platform/releases/backend/current/yunanexus-analytics.jar:/app/app.jar:ro
+    - /YunaNexus/platform/config/analytics.yaml:/app/config/runtime.yaml:ro
+    - /YunaNexus/platform/data/analytics:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+  edge:
+    restart: unless-stopped
+    logging: *id001
+    pids_limit: 256
+    security_opt: *id002
+    image: m.daocloud.io/docker.io/library/nginx@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+    mem_limit: 48m
+    user: 101:101
+    read_only: true
+    cap_drop:
+    - ALL
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101
+    ports:
+    - 80:8080
+    - 443:8443
+    - 8443:9443
+    volumes:
+    - /YunaNexus/platform/config/nginx.conf:/etc/nginx/nginx.conf:ro
+    - /YunaNexus/platform/secrets/tls:/etc/nginx/tls:ro
+    - /YunaNexus/platform/releases/frontend:/srv:ro
+    - /YunaNexus/platform/data/acme-webroot:/srv/acme:ro
+    depends_on:
+    - gateway
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+networks:
+  default:
+    ipam:
+      config:
+      - subnet: 172.29.10.0/24

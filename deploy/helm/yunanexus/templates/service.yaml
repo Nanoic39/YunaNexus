@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "yunanexus.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  # 选择器不含 track：stable 与 canary 两套 Pod 同时挂在本 Service 后端，
+  # 流量按各自 Ready 副本数近似分配（金丝雀比例 = canary 副本 /(stable 副本 + canary 副本)）。
+  selector:
+    {{- include "yunanexus.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+    - name: management
+      port: {{ .Values.service.managementPort }}
+      targetPort: management
+      protocol: TCP

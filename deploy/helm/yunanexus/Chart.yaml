@@ -1,0 +1,12 @@
+apiVersion: v2
+name: yunanexus
+description: YunaNexus 微服务通用部署 Chart（滚动发布 + 原生比例金丝雀 + 一键回滚）
+type: application
+version: 1.0.0
+appVersion: "1.0.0.0.0"
+kubeVersion: ">=1.27.0-0"
+keywords:
+  - yunanexus
+  - microservice
+  - canary
+home: https://github.com/Nanoic39/YunaNexus

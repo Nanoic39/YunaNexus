@@ -1,0 +1,27 @@
+{
+  "data-root": "/YunaNexus/platform/runtime/docker",
+  "exec-root": "/YunaNexus/platform/runtime/docker-exec",
+  "pidfile": "/YunaNexus/platform/runtime/dockerd.pid",
+  "hosts": [
+    "unix:///YunaNexus/platform/runtime/docker.sock"
+  ],
+  "containerd": "/YunaNexus/platform/runtime/containerd.sock",
+  "bridge": "yn-docker0",
+  "default-address-pools": [
+    {
+      "base": "172.29.0.0/16",
+      "size": 24
+    }
+  ],
+  "log-driver": "local",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "storage-driver": "overlay2",
+  "features": {
+    "buildkit": true
+  },
+  "iptables": false,
+  "ip-masq": false
+}

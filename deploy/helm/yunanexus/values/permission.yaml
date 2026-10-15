@@ -1,0 +1,21 @@
+# yunanexus-permission · 权限中心
+# helm upgrade --install yunanexus-permission deploy/helm/yunanexus -f deploy/helm/yunanexus/values/permission.yaml -n yunanexus
+
+replicaCount: 2
+service:
+  port: 8300
+  managementPort: 8301
+
+env:
+  DB_HOST: mysql.yunanexus.svc.cluster.local
+  DB_PORT: "3306"
+  DB_USERNAME: root
+  DB_NAME: yunanexus_permission
+  NACOS_ADDR: nacos.yunanexus.svc.cluster.local:8848
+
+# 预创建 Secret，至少包含：DB_PASSWORD、NACOS_USERNAME、NACOS_PASSWORD、PERMISSION_ADMIN_TOKEN
+existingSecret: yunanexus-permission-secret
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

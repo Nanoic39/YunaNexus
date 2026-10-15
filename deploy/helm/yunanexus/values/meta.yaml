@@ -1,0 +1,21 @@
+# yunanexus-meta · 元数据服务（ID 号段）
+# helm upgrade --install yunanexus-meta deploy/helm/yunanexus -f deploy/helm/yunanexus/values/meta.yaml -n yunanexus
+
+replicaCount: 2
+service:
+  port: 8000
+  managementPort: 8001
+
+env:
+  DB_HOST: mysql.yunanexus.svc.cluster.local
+  DB_PORT: "3306"
+  DB_USERNAME: root
+  DB_NAME: yunanexus_meta
+  NACOS_ADDR: nacos.yunanexus.svc.cluster.local:8848
+
+# 预创建 Secret，至少包含：DB_PASSWORD、NACOS_USERNAME、NACOS_PASSWORD
+existingSecret: yunanexus-meta-secret
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

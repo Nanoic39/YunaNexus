@@ -1,0 +1,105 @@
+# YunaNexus · Prometheus 告警规则（roadmap 阶段 9.5）
+#
+# 规则来源：docs/observability.md 第四节「告警规则」。
+# 指标名说明：Micrometer 将 '.' 转为 '_'；计数器以 _total 结尾（已含则不重复追加）。
+#
+# 备注：
+#   - http_server_requests_seconds_* 为 Spring Boot Actuator 默认 HTTP 指标；
+#     其 *._max 为滑动窗口最大值，用于延迟类告警的近似（如需精确 P99 分位，
+#     需在各服务开启 management.metrics.distribution.percentiles-histogram.http.server.requests=true）。
+#   - 号段告警依赖 meta 的 yunanexus_segment_* 指标（阶段 2 埋点）。
+
+groups:
+  - name: yunanexus-service
+    rules:
+      # 服务不可达（管理端口抓取失败）
+      - alert: ServiceDown
+        expr: up{job="yunanexus-services"} == 0
+        for: 2m
+        labels:
+          severity: P1
+        annotations:
+          summary: "服务不可达：{{ $labels.instance }}"
+          description: "Prometheus 连续 2 分钟无法抓取 {{ $labels.instance }}，请检查进程与 Nacos 注册状态。"
+
+      # 服务错误率 > 1%（5xx 占比）
+      - alert: ServiceErrorRateHigh
+        expr: |
+          sum by (application) (rate(http_server_requests_seconds_count{job="yunanexus-services", status=~"5.."}[5m]))
+            /
+          sum by (application) (rate(http_server_requests_seconds_count{job="yunanexus-services"}[5m]))
+            > 0.01
+        for: 5m
+        labels:
+          severity: P1
+        annotations:
+          summary: "服务 {{ $labels.application }} 5xx 错误率 > 1%"
+          description: "近 5 分钟 5xx 占比达 {{ $value | humanizePercentage }}。"
+
+      # 接口延迟（窗口最大值 > 500ms）
+      - alert: InterfaceLatencyHigh
+        expr: |
+          max by (application, uri) (http_server_requests_seconds_max{job="yunanexus-services"}) > 0.5
+        for: 5m
+        labels:
+          severity: P2
+        annotations:
+          summary: "服务 {{ $labels.application }} 接口 {{ $labels.uri }} 延迟偏高"
+          description: "滑动窗口最大响应时间 {{ $value }}s > 500ms。"
+
+      # 网关限流触发（429）频繁
+      - alert: GatewayRateLimitFrequent
+        expr: |
+          sum by (application) (rate(http_server_requests_seconds_count{job="yunanexus-services", status="429"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: P2
+        annotations:
+          summary: "网关限流频繁触发（{{ $labels.application }}）"
+          description: "近 5 分钟 429 速率 > 1 req/s，请评估是否扩容或调整 Sentinel 阈值。"
+
+  - name: yunanexus-segment
+    rules:
+      # 号段剩余不足 10%（预警：需提前扩容号段）
+      - alert: SegmentRemainingLow
+        expr: |
+          yunanexus_segment_remaining < 0.1 * on(biz_tag) group_left yunanexus_segment_step
+        for: 1m
+        labels:
+          severity: P1
+        annotations:
+          summary: "号段剩余不足：biz_tag={{ $labels.biz_tag }}"
+          description: "当前剩余 {{ $value }} 已低于当前步长的 10%，可能导致取号抖动，请检查预加载。"
+
+      # 乐观锁冲突持续增长（扩容前预警信号）
+      - alert: SegmentOptimisticLockConflictGrowing
+        expr: |
+          sum by (biz_tag) (increase(yunanexus_segment_optimistic_lock_conflict_total[10m])) > 0
+        for: 10m
+        labels:
+          severity: P2
+        annotations:
+          summary: "号段乐观锁冲突持续增长：biz_tag={{ $labels.biz_tag }}"
+          description: "近 10 分钟持续出现乐观锁冲突，建议关注并发取号压力。"
+
+      # 号段降级
+      - alert: SegmentDegraded
+        expr: yunanexus_segment_degraded > 0
+        for: 1m
+        labels:
+          severity: P2
+        annotations:
+          summary: "号段服务进入降级：biz_tag={{ $labels.biz_tag }}"
+          description: "号段降级（可能是异步预加载连续失败），请检查 DB 与线程池。"
+
+  - name: yunanexus-auth
+    rules:
+      # 注册对账异常（对应 observability.md P1）
+      - alert: AuthOutboxReconciliationAlert
+        expr: yunanexus_auth_outbox_reconciliation_alert == 1
+        for: 1m
+        labels:
+          severity: P1
+        annotations:
+          summary: "认证中心注册 outbox 对账异常"
+          description: "yunanexus_auth_outbox_reconciliation_alert=1（或日志出现 [ALERT]），请人工介入对账。"

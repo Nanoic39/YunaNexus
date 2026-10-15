@@ -1,0 +1,40 @@
+# yunanexus-audit · 审计服务（分库 + 分区归档 + 冷备）
+# helm upgrade --install yunanexus-audit deploy/helm/yunanexus -f deploy/helm/yunanexus/values/audit.yaml -n yunanexus
+#
+# ⚠️ 归档任务会把超期分区导出到冷备目录（AUDIT_ARCHIVE_BACKUP_DIR），
+#    因此需持久化挂载；归档 cron 只在单副本生效（见 docs 说明），副本数建议 2（多副本时由抢锁/幂等保证）。
+
+replicaCount: 2
+service:
+  port: 8600
+  managementPort: 8601
+
+env:
+  DB_HOST: mysql.yunanexus.svc.cluster.local
+  DB_PORT: "3306"
+  DB_USERNAME: root
+  NACOS_ADDR: nacos.yunanexus.svc.cluster.local:8848
+  # 审计分库（物理库名前缀 + 分片映射），无单一 DB_NAME
+  AUDIT_DB_PREFIX: yunanexus_audit_
+  AUDIT_SHARD_LOGICAL_COUNT: "16"
+  AUDIT_SHARD_PHYSICAL_COUNT: "2"
+  # 无 MQ 环境时可置 false，审计事件仅记录日志
+  AUDIT_MQ_ENABLED: "true"
+  ROCKETMQ_NAMESERVER: rocketmq-nameserver.yunanexus.svc.cluster.local:9876
+  AUDIT_ARCHIVE_BACKUP_DIR: /app/data/audit-archive
+
+# 预创建 Secret，至少包含：DB_PASSWORD、NACOS_USERNAME、NACOS_PASSWORD
+existingSecret: yunanexus-audit-secret
+
+# 冷备目录持久化：预创建 PVC（名称示例 yunanexus-audit-archive）
+extraVolumes:
+  - name: audit-archive
+    persistentVolumeClaim:
+      claimName: yunanexus-audit-archive
+extraVolumeMounts:
+  - name: audit-archive
+    mountPath: /app/data
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

@@ -1,0 +1,121 @@
+# YunaNexus 通用服务 Chart · 默认值
+#
+# 用法（每个服务一个 Release，用 -f values/<service>.yaml 覆盖差异）：
+#   helm upgrade --install yunanexus-auth deploy/helm/yunanexus \
+#     -f deploy/helm/yunanexus/values/auth.yaml \
+#     -n yunanexus --create-namespace
+#
+# 金丝雀（灰度）见 values.yaml 的 canary 段与 templates/NOTES.txt、docs/canary-rollback.md。
+
+# ---------- 镜像 ----------
+image:
+  # 完整镜像 = <repositoryPrefix>/<Release 名>，例如 yunanexus/yunanexus-auth
+  repositoryPrefix: yunanexus
+  # 空则回退到 .Chart.AppVersion
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# ---------- 副本与发布策略 ----------
+replicaCount: 2
+revisionHistoryLimit: 5
+# 优雅停机：不小于 spring.lifecycle.timeout-per-shutdown-phase（30s）
+terminationGracePeriodSeconds: 45
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0     # 滚动期间始终保留全部旧副本可用（零中断）
+
+# ---------- 运行时 ----------
+timezone: Asia/Shanghai
+javaOpts: "-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Shanghai"
+springProfilesActive: prd
+
+# ---------- 端口（业务端口 + 管理端口，与 docs/deployment.md 端口规划一致） ----------
+service:
+  type: ClusterIP
+  port: 8080
+  managementPort: 8081
+
+# ---------- 配置与密钥 ----------
+# 非敏感环境变量（写入 ConfigMap，以 envFrom 注入）
+env: {}
+# 已存在的 Secret 名（推荐 External Secrets / SealedSecret 预创建）→ envFrom secretRef
+existingSecret: ""
+
+# ---------- 资源 ----------
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# ---------- 探针（走管理端口，Spring Boot Actuator probes） ----------
+probes:
+  enabled: true
+  startup:
+    path: /actuator/health/readiness
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 40
+  readiness:
+    path: /actuator/health/readiness
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  liveness:
+    path: /actuator/health/liveness
+    initialDelaySeconds: 30
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# ---------- 调度 ----------
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+# ---------- 额外卷（如 file 服务挂载持久化存储 / audit 冷备目录） ----------
+extraVolumes: []
+extraVolumeMounts: []
+
+# ---------- 金丝雀（灰度） ----------
+# 原生比例灰度：stable 与 canary 两套 Deployment 共享同一个 Service（按副本数近似分流），
+# 无需服务网格/Ingress 注解。回滚只需将 canary.enabled 置 false（或 helm rollback）。
+canary:
+  enabled: false
+  # 金丝雀副本数（相对稳定版副本数即为灰度比例，如 1/(2+1)≈33%）
+  replicaCount: 1
+  # 金丝雀镜像标签（新版本），空则与稳定版一致
+  tag: ""
+  # 金丝雀额外/覆盖环境变量（通常用于打开新特性开关）
+  env: {}
+
+# ---------- 自动扩缩容（仅作用于稳定版 Deployment） ----------
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+# ---------- 干扰预算 ----------
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# ---------- Prometheus Operator ServiceMonitor ----------
+serviceMonitor:
+  enabled: false
+  interval: 15s
+  path: /actuator/prometheus
+  labels: {}
+
+# ---------- 备注 ----------
+podAnnotations: {}
+podLabels: {}

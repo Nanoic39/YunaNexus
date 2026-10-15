@@ -1,0 +1,15 @@
+# YunaNexus · Grafana 看板自动加载（roadmap 阶段 9.5）
+# 将 /var/lib/grafana/dashboards 下的 JSON 自动导入到「YunaNexus」文件夹。
+apiVersion: 1
+
+providers:
+  - name: yunanexus
+    orgId: 1
+    folder: YunaNexus
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

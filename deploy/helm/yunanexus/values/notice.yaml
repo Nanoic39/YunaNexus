@@ -1,0 +1,29 @@
+# yunanexus-notice · 通知服务（站内信 + 邮件 + RocketMQ 异步投递）
+# helm upgrade --install yunanexus-notice deploy/helm/yunanexus -f deploy/helm/yunanexus/values/notice.yaml -n yunanexus
+#
+# ⚠️ 邮件通道为真实投递，需在 Secret/Nacos 中配置 spring.mail.*；未配置时仅站内信可用。
+
+replicaCount: 2
+service:
+  port: 8500
+  managementPort: 8501
+
+env:
+  DB_HOST: mysql.yunanexus.svc.cluster.local
+  DB_PORT: "3306"
+  DB_USERNAME: root
+  DB_NAME: yunanexus_notice
+  NACOS_ADDR: nacos.yunanexus.svc.cluster.local:8848
+  # 无 MQ 环境时可置 false，通知仅落库为「待发送」
+  NOTICE_ROCKETMQ_ENABLED: "true"
+  ROCKETMQ_NAMESERVER: rocketmq-nameserver.yunanexus.svc.cluster.local:9876
+  NOTICE_MAIL_FROM: notify@example.com
+  NOTICE_MAIL_FROM_NAME: YunaNexus
+
+# 预创建 Secret，至少包含：DB_PASSWORD、NACOS_USERNAME、NACOS_PASSWORD、
+#   可选邮件凭据：SPRING_MAIL_HOST、SPRING_MAIL_USERNAME、SPRING_MAIL_PASSWORD
+existingSecret: yunanexus-notice-secret
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

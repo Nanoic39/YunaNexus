@@ -1,0 +1,27 @@
+# yunanexus-gateway · 网关（对外流量入口，建议配合 Ingress/LB）
+# helm upgrade --install yunanexus-gateway deploy/helm/yunanexus -f deploy/helm/yunanexus/values/gateway.yaml -n yunanexus
+
+replicaCount: 3
+service:
+  port: 8010
+  managementPort: 8081
+
+env:
+  REDIS_HOST: redis.yunanexus.svc.cluster.local
+  REDIS_PORT: "6379"
+  NACOS_ADDR: nacos.yunanexus.svc.cluster.local:8848
+  GATEWAY_CORS_ALLOWED_ORIGINS: https://app.example.com
+
+# 预创建 Secret，至少包含：REDIS_PASSWORD、NACOS_USERNAME、NACOS_PASSWORD、
+#   JWT_ACTIVE_KID、JWT_PUBLIC_KEY_V1、EXTERNAL_ID_AES_KEY_V1、EXTERNAL_ID_HMAC_KEY_V1
+existingSecret: yunanexus-gateway-secret
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 65
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2

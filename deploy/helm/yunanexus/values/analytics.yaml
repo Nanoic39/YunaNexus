@@ -1,0 +1,27 @@
+# yunanexus-analytics · 埋点分析服务（事件上报 + RocketMQ + ClickHouse）
+# helm upgrade --install yunanexus-analytics deploy/helm/yunanexus -f deploy/helm/yunanexus/values/analytics.yaml -n yunanexus
+#
+# ⚠️ 无业务数据库；事件经 RocketMQ 投递，消费者写入 ClickHouse（阶段 10.2 落地）。
+
+replicaCount: 2
+service:
+  port: 8700
+  managementPort: 8701
+
+env:
+  NACOS_ADDR: nacos.yunanexus.svc.cluster.local:8848
+  # 无 MQ 环境时可置 false，事件仅记录日志
+  ANALYTICS_MQ_ENABLED: "true"
+  ROCKETMQ_NAMESERVER: rocketmq-nameserver.yunanexus.svc.cluster.local:9876
+  # ClickHouse 写入开关；未就绪时保持 false
+  ANALYTICS_CLICKHOUSE_ENABLED: "false"
+  ANALYTICS_CLICKHOUSE_URL: jdbc:clickhouse://clickhouse.yunanexus.svc.cluster.local:8123/yunanexus_analytics
+  ANALYTICS_CLICKHOUSE_USERNAME: default
+
+# 预创建 Secret，至少包含：NACOS_USERNAME、NACOS_PASSWORD、
+#   可选 ClickHouse 凭据：ANALYTICS_CLICKHOUSE_PASSWORD
+existingSecret: yunanexus-analytics-secret
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

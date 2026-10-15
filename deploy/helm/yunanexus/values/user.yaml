@@ -1,0 +1,25 @@
+# yunanexus-user · 用户中心（分库）
+# helm upgrade --install yunanexus-user deploy/helm/yunanexus -f deploy/helm/yunanexus/values/user.yaml -n yunanexus
+
+replicaCount: 2
+service:
+  port: 8200
+  managementPort: 8201
+
+env:
+  DB_HOST: mysql.yunanexus.svc.cluster.local
+  DB_PORT: "3306"
+  DB_USERNAME: root
+  NACOS_ADDR: nacos.yunanexus.svc.cluster.local:8848
+  USER_DB_PREFIX: yunanexus_user_
+  USER_SHARD_LOGICAL_COUNT: "16"
+  USER_SHARD_PHYSICAL_COUNT: "2"
+  # 手机号能力开关：默认关闭（无 SMS 能力）；接入短信通道后置 true 重开，代码零改动
+  USER_MOBILE_ENABLED: "false"
+
+# 预创建 Secret，至少包含：DB_PASSWORD、NACOS_USERNAME、NACOS_PASSWORD
+existingSecret: yunanexus-user-secret
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

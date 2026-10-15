@@ -1,0 +1,53 @@
+{{- if .Values.canary.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-canary
+  labels:
+    {{- include "yunanexus.labels" . | nindent 4 }}
+    yunanexus.io/track: canary
+spec:
+  replicas: {{ .Values.canary.replicaCount }}
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "yunanexus.trackSelectorLabels" (dict "root" $ "track" "canary") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "yunanexus.trackSelectorLabels" (dict "root" $ "track" "canary") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+        {{- include "yunanexus.container" (dict "root" $ "track" "canary" "tag" .Values.canary.tag "extraEnv" .Values.canary.env) | nindent 8 }}
+      {{- with .Values.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

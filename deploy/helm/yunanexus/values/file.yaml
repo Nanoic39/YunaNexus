@@ -1,0 +1,36 @@
+# yunanexus-file · 文件服务（分库 + 本地存储）
+# helm upgrade --install yunanexus-file deploy/helm/yunanexus -f deploy/helm/yunanexus/values/file.yaml -n yunanexus
+#
+# ⚠️ 生产建议改用对象存储（S3/MinIO）；若沿用本地存储，需预先创建 PVC（见下方 extraVolumes）。
+
+replicaCount: 2
+service:
+  port: 8400
+  managementPort: 8401
+
+env:
+  DB_HOST: mysql.yunanexus.svc.cluster.local
+  DB_PORT: "3306"
+  DB_USERNAME: root
+  NACOS_ADDR: nacos.yunanexus.svc.cluster.local:8848
+  FILE_DB_PREFIX: yunanexus_file_
+  FILE_SHARD_LOGICAL_COUNT: "16"
+  FILE_SHARD_PHYSICAL_COUNT: "2"
+  FILE_STORAGE_TYPE: local
+  FILE_STORAGE_BASE_DIR: /app/data/file-storage
+
+# 预创建 Secret，至少包含：DB_PASSWORD、NACOS_USERNAME、NACOS_PASSWORD
+existingSecret: yunanexus-file-secret
+
+# 本地存储需持久化：预创建 PVC（ReadWriteMany，或每副本独立 PVC），名称示例 yunanexus-file-data
+extraVolumes:
+  - name: file-data
+    persistentVolumeClaim:
+      claimName: yunanexus-file-data
+extraVolumeMounts:
+  - name: file-data
+    mountPath: /app/data
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

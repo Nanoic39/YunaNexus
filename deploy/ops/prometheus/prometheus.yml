@@ -1,0 +1,42 @@
+# YunaNexus · Prometheus 抓取配置（roadmap 阶段 9.5）
+#
+# 抓取目标：各服务 Actuator 暴露的 /actuator/prometheus（管理端口 management.server.port）。
+# 目标地址使用 docker compose 服务名；若在宿主机直连本地服务，改回 127.0.0.1:<管理端口>。
+#
+# 端口对照（见 docs/deployment.md 端口规划）：
+#   meta:8001  auth:8101  user:8201  permission:8301  file:8401  notice:8501  audit:8601  analytics:8701  gateway:8081
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alert-rules.yml
+
+# 告警需要 Alertmanager；本地联调可先不启用（Grafana 内查看 firing 状态即可）。
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: [ "alertmanager:9093" ]
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: [ "localhost:9090" ]
+
+  # 全部业务服务使用同一 metrics_path，指标自带 application 标签区分服务
+  - job_name: yunanexus-services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - yunanexus-meta:8001
+          - yunanexus-auth:8101
+          - yunanexus-user:8201
+          - yunanexus-permission:8301
+          - yunanexus-file:8401
+          - yunanexus-notice:8501
+          - yunanexus-audit:8601
+          - yunanexus-analytics:8701
+          - yunanexus-gateway:8081
+        labels:
+          env: docker

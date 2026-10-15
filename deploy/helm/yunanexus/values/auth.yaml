@@ -1,0 +1,30 @@
+# yunanexus-auth · 认证中心
+# helm upgrade --install yunanexus-auth deploy/helm/yunanexus -f deploy/helm/yunanexus/values/auth.yaml -n yunanexus
+#
+# ⚠️ auth 在缺少 JWT RS256 密钥与外部 ID 密钥时会拒绝启动。
+
+replicaCount: 2
+service:
+  port: 8100
+  managementPort: 8101
+
+env:
+  DB_HOST: mysql.yunanexus.svc.cluster.local
+  DB_PORT: "3306"
+  DB_USERNAME: root
+  DB_NAME: yunanexus_auth
+  REDIS_HOST: redis.yunanexus.svc.cluster.local
+  REDIS_PORT: "6379"
+  NACOS_ADDR: nacos.yunanexus.svc.cluster.local:8848
+  AUTH_CORS_ALLOWED_ORIGINS: https://app.example.com
+  # 手机号能力开关：默认关闭（无 SMS 能力）；接入短信通道后置 true 重开，代码零改动
+  AUTH_MOBILE_ENABLED: "false"
+
+# 预创建 Secret，至少包含：
+#   DB_PASSWORD、REDIS_PASSWORD、NACOS_USERNAME、NACOS_PASSWORD、
+#   JWT_ACTIVE_KID、JWT_PUBLIC_KEY_V1、JWT_PRIVATE_KEY_V1、EXTERNAL_ID_AES_KEY_V1、EXTERNAL_ID_HMAC_KEY_V1、AUTH_ADMIN_TOKEN
+existingSecret: yunanexus-auth-secret
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

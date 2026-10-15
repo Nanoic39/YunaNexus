@@ -1,0 +1,34 @@
+name: Deployment manifest validation
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  deployment-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112
+        with:
+          version: v3.16.3
+      - run: helm lint deploy/helm/yunanexus
+      - name: Render service charts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in deploy/helm/yunanexus/values/*.yaml; do
+            helm template "yunanexus-$(basename "$file" .yaml)" deploy/helm/yunanexus -f "$file" --namespace yunanexus >/dev/null
+          done
+      - name: Validate local compose
+        run: docker compose -f deploy/docker-compose.yml --env-file deploy/.env.example config >/dev/null
+      - name: Validate production compose without host secret files
+        env:
+          MYSQL_ROOT_PASSWORD: ci-validation-only
+          NACOS_AUTH_TOKEN: ci-validation-only
+          NACOS_AUTH_IDENTITY_VALUE: ci-validation-only
+        run: docker compose -f deploy/production/compose.yaml config --no-env-resolution >/dev/null

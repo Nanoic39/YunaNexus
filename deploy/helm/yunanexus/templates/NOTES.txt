@@ -1,0 +1,43 @@
+YunaNexus · {{ .Release.Name }} 已部署。
+
+命名空间：{{ .Release.Namespace }}
+镜像：{{ .Values.image.repositoryPrefix }}/{{ .Release.Name }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+副本（稳定版）：{{ .Values.replicaCount }}
+{{- if .Values.canary.enabled }}
+金丝雀：已开启，副本 {{ .Values.canary.replicaCount }}，标签 {{ .Values.canary.tag | default "(同稳定版)" }}
+{{- else }}
+金丝雀：未开启
+{{- end }}
+
+查看状态：
+  kubectl -n {{ .Release.Namespace }} get deploy,pod -l app.kubernetes.io/instance={{ .Release.Name }} -o wide
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ .Release.Name }}
+
+==================== 金丝雀（灰度）发布 ====================
+# 1) 部署新版本并对 1 个副本灰度（比例 ≈ canary/(stable+canary)）
+helm upgrade {{ .Release.Name }} deploy/helm/yunanexus \
+  -f deploy/helm/yunanexus/values/{{ .Release.Name | replace "yunanexus-" "" }}.yaml \
+  --set canary.enabled=true \
+  --set canary.tag=v2.0.0 \
+  -n {{ .Release.Namespace }}
+
+# 2) 观测：按 track 区分新旧版本实例的错误率/延迟（Prometheus）
+#    sum(rate(http_server_requests_seconds_count{application="{{ .Release.Name }}"}[5m])) by (track)
+#    也可直接看 Pod：kubectl -n {{ .Release.Namespace }} get pod -l yunanexus.io/track=canary
+
+# 3) 扩大灰度：调大 canary.replicaCount（如 --set canary.replicaCount=3）
+
+# 4) 灰度通过 → 全量：把稳定版镜像切到新版本并关闭金丝雀
+helm upgrade {{ .Release.Name }} deploy/helm/yunanexus \
+  --set image.tag=v2.0.0 --set canary.enabled=false -n {{ .Release.Namespace }}
+
+==================== 回滚 ====================
+# 仅回滚金丝雀（推荐，秒级）：关闭金丝雀，流量回到旧稳定版
+helm upgrade {{ .Release.Name }} deploy/helm/yunanexus --set canary.enabled=false -n {{ .Release.Namespace }}
+
+# 回滚整个 Release 到上一版本
+helm history {{ .Release.Name }} -n {{ .Release.Namespace }}
+helm rollback {{ .Release.Name }} <REVISION> -n {{ .Release.Namespace }}
+
+# 回滚 Deployment 自身（保留 ReplicaSet 历史）
+kubectl -n {{ .Release.Namespace }} rollout undo deploy/{{ .Release.Name }}
