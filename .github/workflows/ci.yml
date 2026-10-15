@@ -31,4 +31,11 @@ jobs:
           MYSQL_ROOT_PASSWORD: ci-validation-only
           NACOS_AUTH_TOKEN: ci-validation-only
           NACOS_AUTH_IDENTITY_VALUE: ci-validation-only
-        run: docker compose -f deploy/production/compose.yaml config --no-env-resolution >/dev/null
+        run: |
+          # Host-only env files contain no CI input; create empty placeholders for portable validation.
+          sudo mkdir -p /YunaNexus/platform/secrets
+          for service in meta auth gateway user permission file notice audit analytics; do
+            sudo touch "/YunaNexus/platform/secrets/$service.env"
+          done
+          docker compose version
+          docker compose -f deploy/production/compose.yaml config >/dev/null

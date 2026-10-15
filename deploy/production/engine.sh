@@ -6,6 +6,16 @@ mountpoint -q /YunaNexus || { echo 'Data disk is not mounted'; exit 1; }
 export HOME="$ROOT/runtime/home" TMPDIR="$ROOT/tmp" XDG_CACHE_HOME="$ROOT/cache" XDG_CONFIG_HOME="$ROOT/config"
 mkdir -p "$HOME" "$TMPDIR" "$ROOT/runtime" "$ROOT/logs"
 export DOCKER_HOST="unix://$ROOT/runtime/docker.sock" DOCKER_CONFIG="$ROOT/runtime/docker-client"
+# Keep a bounded emergency swap on the data disk; do not modify /etc/fstab.
+if [ ! -f "$ROOT/runtime/swap.img" ]; then
+  fallocate -l 2G "$ROOT/runtime/swap.img"
+  chmod 600 "$ROOT/runtime/swap.img"
+  mkswap "$ROOT/runtime/swap.img" >/dev/null
+fi
+if ! swapon --show=NAME --noheadings | grep -Fxq "$ROOT/runtime/swap.img"; then
+  swapon "$ROOT/runtime/swap.img"
+fi
+
 # Secondary engine must not overwrite the host Docker firewall chains.
 # Allow forwarding only between project containers; published ports use docker-proxy.
 iptables -C FORWARD -s 172.29.10.0/24 -d 172.29.10.0/24 -m comment --comment YunaNexus-project-only -j ACCEPT 2>/dev/null || \

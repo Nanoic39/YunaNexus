@@ -29,9 +29,11 @@
 
 所有项目持久文件、临时文件和日志都在数据盘。复用主机现有 Docker 可执行文件，
 另起独立引擎，使用项目内 data-root、exec-root、containerd root/state 和 Unix socket，
-不接管现有 Docker，也不更改其他业务。启动前必须确认 `/YunaNexus` 已挂载。
+不接管现有 Docker，也不更改其他业务。独立引擎关闭自动 iptables 管理，
+仅添加本项目网段内部通信的明确规则，避免覆盖主机 Docker 的规则。启动前必须确认 `/YunaNexus` 已挂载。
 不写入系统启动单元或创建启动链接；服务器重启后需手动启动。
 
+低内存场景预留固定 2 GiB 的项目内 swap.img，不修改系统 fstab。
 容器可见的 /tmp 为限大小 tmpfs，占用内存而非根分区。Linux 自身内核状态及既有系统服务日志
 仍由宿主机管理；本项目进程日志直接写入数据盘，不接入 systemd journal。
 

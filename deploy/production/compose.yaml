@@ -126,7 +126,7 @@ services:
     pids_limit: 256
     security_opt: *id002
     image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
-    mem_limit: 288m
+    mem_limit: 384m
     user: 10001:10001
     read_only: true
     cap_drop:
@@ -167,7 +167,7 @@ services:
     pids_limit: 256
     security_opt: *id002
     image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
-    mem_limit: 288m
+    mem_limit: 384m
     user: 10001:10001
     read_only: true
     cap_drop:
@@ -208,7 +208,7 @@ services:
     pids_limit: 256
     security_opt: *id002
     image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
-    mem_limit: 288m
+    mem_limit: 384m
     user: 10001:10001
     read_only: true
     cap_drop:
@@ -249,7 +249,7 @@ services:
     pids_limit: 256
     security_opt: *id002
     image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
-    mem_limit: 288m
+    mem_limit: 384m
     user: 10001:10001
     read_only: true
     cap_drop:
@@ -290,7 +290,7 @@ services:
     pids_limit: 256
     security_opt: *id002
     image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
-    mem_limit: 288m
+    mem_limit: 384m
     user: 10001:10001
     read_only: true
     cap_drop:
@@ -331,7 +331,7 @@ services:
     pids_limit: 256
     security_opt: *id002
     image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
-    mem_limit: 288m
+    mem_limit: 384m
     user: 10001:10001
     read_only: true
     cap_drop:
@@ -372,7 +372,7 @@ services:
     pids_limit: 256
     security_opt: *id002
     image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
-    mem_limit: 288m
+    mem_limit: 384m
     user: 10001:10001
     read_only: true
     cap_drop:
@@ -413,7 +413,7 @@ services:
     pids_limit: 256
     security_opt: *id002
     image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
-    mem_limit: 288m
+    mem_limit: 384m
     user: 10001:10001
     read_only: true
     cap_drop:
@@ -454,7 +454,7 @@ services:
     pids_limit: 256
     security_opt: *id002
     image: m.daocloud.io/docker.io/library/eclipse-temurin@sha256:a94532aaca0997d728c6f88927f2209d383a185fbbf7398c8dc41bf4ffd21118
-    mem_limit: 288m
+    mem_limit: 384m
     user: 10001:10001
     read_only: true
     cap_drop:
