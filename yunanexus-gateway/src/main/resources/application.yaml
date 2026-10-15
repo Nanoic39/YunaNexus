@@ -1,0 +1,190 @@
+server:
+  # Nacos 3.x 控制台默认占用 8080，网关默认改用 8010（可用 GATEWAY_PORT 覆盖）
+  port: ${GATEWAY_PORT:8010}
+  shutdown: graceful
+
+spring:
+  application:
+    name: yunanexus-gateway
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 3000
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  config:
+    # 可选导入 Nacos 配置中心（数据 ID = yunanexus-gateway.yaml）；optional 保证 Nacos 不可用/未发布配置时不影响启动
+    import: optional:nacos:${spring.application.name}.yaml
+  cloud:
+    nacos:
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        metadata:
+          management.port: ${management.server.port}
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        fail-fast: ${NACOS_FAIL_FAST:false}
+      config:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+    gateway:
+      server:
+        webflux:
+          # 路由规则：本地默认值，生产可经 Nacos 配置中心（yunanexus-gateway.yaml）动态覆盖。
+          # 注意：Spring Cloud Gateway 5.x（gateway-server-webflux）配置前缀为 spring.cloud.gateway.server.webflux。
+          routes:
+            - id: yunanexus-status
+              uri: lb://yunanexus-notice
+              predicates:
+                - Path=/api/v1/status,/api/v1/status/**
+            - id: yunanexus-auth
+              uri: lb://yunanexus-auth
+              predicates:
+                - Path=/api/v1/auth/**
+            - id: yunanexus-user
+              uri: lb://yunanexus-user
+              predicates:
+                - Path=/api/v1/user/**
+            - id: yunanexus-meta
+              uri: lb://yunanexus-meta
+              predicates:
+                - Path=/api/v1/segment/**
+            - id: yunanexus-file
+              uri: lb://yunanexus-file
+              predicates:
+                - Path=/api/v1/file/**
+            - id: yunanexus-notice
+              uri: lb://yunanexus-notice
+              predicates:
+                - Path=/api/v1/notice/**
+            - id: yunanexus-permission
+              uri: lb://yunanexus-permission
+              predicates:
+                - Path=/api/v1/permission/**
+            - id: yunanexus-audit
+              uri: lb://yunanexus-audit
+              predicates:
+                - Path=/api/v1/audit/**
+            # 行为分析查询（漏斗/留存/分群/画像，需登录态）；埋点上报 /api/v1/track 走独立域名、绕过网关
+            - id: yunanexus-analytics
+              uri: lb://yunanexus-analytics
+              predicates:
+                - Path=/api/v1/analytics/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      # 灰度标识：金丝雀实例带 YUNANEXUS_TRACK=canary，便于按 track 区分新旧版本指标
+      track: ${YUNANEXUS_TRACK:stable}
+  server:
+    port: 8081
+
+yunanexus:
+  gateway:
+    issuer: ${AUTH_JWT_ISSUER:yunanexus}
+    # 会话/撤销 Redis 键前缀，须与认证中心一致
+    redis-key-prefix: ${AUTH_REDIS_KEY_PREFIX:auth}
+    # JWT RS256 验签公钥（kid 版本化）。仅需公钥，私钥不出认证中心；密钥从环境变量/Secret 注入。
+    # 可预置多个版本（如 v1/v2）以支持平滑轮换：未注入公钥的版本视为「尚未启用」，启动时跳过；
+    # 至少需注入一个版本公钥，否则启动拒绝（failfast）。详见 docs/jwt-operations.md。
+    jwt:
+      keys:
+        - kid: v1
+          public-key-base64: ${JWT_PUBLIC_KEY_V1:}
+        - kid: v2
+          public-key-base64: ${JWT_PUBLIC_KEY_V2:}
+    # 外部 ID 解码密钥（版本化），须与认证中心一致；从环境变量/Secret 注入。
+    external-id:
+      keys:
+        - version: 1
+          aes-key-base64: ${EXTERNAL_ID_AES_KEY_V1:}
+          hmac-key-base64: ${EXTERNAL_ID_HMAC_KEY_V1:}
+    # 免 JWT 鉴权路径（认证中心自身负责这些端点的鉴权/CSRF）
+    permit-paths:
+      - /api/v1/status
+      - /api/v1/status/*
+      - /api/v1/auth/login
+      - /api/v1/auth/register
+      - /api/v1/auth/refresh
+      - /api/v1/auth/csrf
+      - /api/v1/auth/captcha
+      - /api/v1/auth/sso/**
+      - /api/v1/auth/unlock-appeal
+      - /api/v1/auth/admin/**
+      # 权限中心管理端（由权限中心 AdminTokenFilter 校验管理员密钥，不经 JWT）
+      - /api/v1/permission/admin/**
+      # 门户内容公开读（匿名可访问）；管理端 /api/v1/notice/portal/admin/** 仍需登录态
+      - /api/v1/notice/portal/admin/**
+      - /api/v1/notice/portal/content
+      - /api/v1/notice/portal/page
+      - /actuator/**
+    # CORS 来源白名单（逗号分隔，禁止 *）；为空表示不启用跨域
+    cors-allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:}
+    # 网关鉴权（调用权限中心内部 check 接口）；默认开启，开启后须配置 check-url 才真正拦截（未配置时 fail-open 直通并告警）
+    permission:
+      enabled: ${GATEWAY_PERMISSION_ENABLED:true}
+      check-url: ${PERMISSION_CHECK_URL:}
+      timeout-millis: ${PERMISSION_CHECK_TIMEOUT_MILLIS:2000}
+      # 免权限判定路径（仍需 JWT 登录态，仅跳过资源鉴权）：/me 为「登录后取当前用户身份/权限/菜单」，
+      # 每次登录必调，若不豁免将因尚无权限而自举失败（403）。
+      permit-paths:
+        - /api/v1/permission/me
+    # Sentinel 网关限流（默认开启）；按路由 id 维度配置 QPS 阈值，覆盖全部路由
+    rate-limit:
+      enabled: ${GATEWAY_RATE_LIMIT_ENABLED:true}
+      rules:
+        - resource: yunanexus-status
+          count: 100
+          interval-seconds: 1
+          burst: 0
+        - resource: yunanexus-auth
+          count: 1000
+          interval-seconds: 1
+          burst: 0
+        - resource: yunanexus-user
+          count: 1000
+          interval-seconds: 1
+          burst: 0
+        - resource: yunanexus-meta
+          count: 1000
+          interval-seconds: 1
+          burst: 0
+        - resource: yunanexus-file
+          count: 1000
+          interval-seconds: 1
+          burst: 0
+        - resource: yunanexus-notice
+          count: 1000
+          interval-seconds: 1
+          burst: 0
+        - resource: yunanexus-permission
+          count: 1000
+          interval-seconds: 1
+          burst: 0
+        - resource: yunanexus-audit
+          count: 1000
+          interval-seconds: 1
+          burst: 0
+        - resource: yunanexus-analytics
+          count: 1000
+          interval-seconds: 1
+          burst: 0
