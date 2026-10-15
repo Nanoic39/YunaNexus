@@ -131,4 +131,49 @@ class AdminAuthenticationFilterTest {
         JsonNode node = objectMapper.readTree(response.getContentAsString());
         return node.get("code").asInt();
     }
+
+    @Test
+    void authenticatedRootRoleIsCheckedByServer() throws Exception {
+        var identity = new AuthenticatedIdentity("external", "web", "session", 42L);
+        SecurityContextHolder.getContext().setAuthentication(
+            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(identity,null,java.util.List.of()));
+        var checker = mock(java.util.function.LongPredicate.class);
+        when(checker.test(42L)).thenReturn(true);
+        var roleFilter = new AdminAuthenticationFilter(properties,new SecurityErrorWriter(objectMapper),checker);
+        var chain=mock(FilterChain.class);
+        var request=new MockHttpServletRequest("GET",ADMIN_PATH);
+        var response=new MockHttpServletResponse();
+        roleFilter.doFilter(request,response,chain);
+        verify(chain).doFilter(request,response);
+        assertTrue(SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")));
+    }
+
+    @Test
+    void authenticatedOrdinaryUserIsForbiddenEvenWithForgedRoleHeader() throws Exception {
+        var identity = new AuthenticatedIdentity("external", "web", "session", 42L);
+        SecurityContextHolder.getContext().setAuthentication(
+            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(identity,null,java.util.List.of()));
+        var roleFilter=new AdminAuthenticationFilter(properties,new SecurityErrorWriter(objectMapper),id -> false);
+        var chain=mock(FilterChain.class);
+        var request=new MockHttpServletRequest("GET",ADMIN_PATH);
+        request.addHeader("X-Role","admin");
+        var response=new MockHttpServletResponse();
+        roleFilter.doFilter(request,response,chain);
+        assertEquals(403,response.getStatus());
+        verifyNoInteractions(chain);
+    }
+
+    @Test
+    void roleServiceFailureDoesNotGrantAdministration() throws Exception {
+        var identity = new AuthenticatedIdentity("external", "web", "session", 42L);
+        SecurityContextHolder.getContext().setAuthentication(
+            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(identity,null,java.util.List.of()));
+        var roleFilter=new AdminAuthenticationFilter(properties,new SecurityErrorWriter(objectMapper),id -> {throw new IllegalStateException();});
+        var chain=mock(FilterChain.class);
+        var response=new MockHttpServletResponse();
+        roleFilter.doFilter(new MockHttpServletRequest("GET",ADMIN_PATH),response,chain);
+        assertEquals(503,response.getStatus());
+        verifyNoInteractions(chain);
+    }
 }

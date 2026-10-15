@@ -17,10 +17,18 @@ import java.security.MessageDigest;
 /** 门户管理接口独立校验管理员密钥，避免只有普通登录态即可修改门户。@author yunanexus */
 @Component
 public class PortalAdminAuthenticationFilter extends OncePerRequestFilter {
+    private final cc.nanoic.yunanexus.common.web.security.AdminBearerVerifier bearerVerifier;
     private final NoticeProperties properties;
     private final ObjectMapper mapper;
 
     public PortalAdminAuthenticationFilter(NoticeProperties properties, ObjectMapper mapper) {
+        this(properties, mapper, new cc.nanoic.yunanexus.common.web.security.AdminBearerVerifier(""));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public PortalAdminAuthenticationFilter(NoticeProperties properties, ObjectMapper mapper,
+                                            cc.nanoic.yunanexus.common.web.security.AdminBearerVerifier bearerVerifier) {
+        this.bearerVerifier = bearerVerifier;
         this.properties = properties;
         this.mapper = mapper;
     }
@@ -35,6 +43,19 @@ public class PortalAdminAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
+        String authorization=request.getHeader("Authorization");
+        if (authorization != null) {
+            int status=bearerVerifier.verify(authorization);
+            if (status != 200) {
+                response.setStatus(status);
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write(mapper.writeValueAsString(Result.error(status,
+                    status==503 ? "管理权限校验不可用" : status==403 ? "无管理权限" : "未认证")));
+                return;
+            }
+            chain.doFilter(request,response);
+            return;
+        }
         String expected = properties.getAdmin().getToken();
         String actual = request.getHeader("X-Admin-Token");
         if (expected == null || expected.isBlank() || actual == null || !MessageDigest.isEqual(

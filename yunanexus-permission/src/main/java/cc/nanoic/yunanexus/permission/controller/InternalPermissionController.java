@@ -34,6 +34,14 @@ import java.util.List;
 @RestController
 @RequestMapping("/internal/permission")
 public class InternalPermissionController {
+    @Resource
+    private cc.nanoic.yunanexus.permission.mapper.PermRoleMapper roleMapper;
+
+    @GetMapping("/root-admin")
+    public Result<Boolean> rootAdmin(@RequestParam("userId") long userId) {
+        return Result.success(userId > 0 && roleMapper.countRootAdmin(userId) > 0);
+    }
+
 
     @Resource
     private AuthorizationService authorizationService;

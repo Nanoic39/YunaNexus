@@ -34,10 +34,17 @@ public class AdminAuthenticationFilter extends OncePerRequestFilter {
     /** 管理后台路径前缀 */
     public static final String ADMIN_PATH_PREFIX = "/api/v1/auth/admin";
 
+    private final java.util.function.LongPredicate rootRoleCheck;
     private final AdminProperties adminProperties;
     private final SecurityErrorWriter securityErrorWriter;
 
     public AdminAuthenticationFilter(AdminProperties adminProperties, SecurityErrorWriter securityErrorWriter) {
+        this(adminProperties, securityErrorWriter, userId -> false);
+    }
+
+    public AdminAuthenticationFilter(AdminProperties adminProperties, SecurityErrorWriter securityErrorWriter,
+                                      java.util.function.LongPredicate rootRoleCheck) {
+        this.rootRoleCheck = rootRoleCheck;
         this.adminProperties = adminProperties;
         this.securityErrorWriter = securityErrorWriter;
     }
@@ -52,6 +59,22 @@ public class AdminAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof AuthenticatedIdentity identity) {
+            try {
+                if (!rootRoleCheck.test(identity.userId())) {
+                    securityErrorWriter.write(response, 403, "无管理权限");
+                    return;
+                }
+            } catch (RuntimeException e) {
+                securityErrorWriter.write(response, 503, "管理权限校验不可用");
+                return;
+            }
+            SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                identity, null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+            filterChain.doFilter(request, response);
+            return;
+        }
         String configured = adminProperties.getToken();
         if (configured == null || configured.isBlank()) {
             securityErrorWriter.write(response, 403, ErrorCode.ADMIN_DISABLED.getCode(), "管理后台未启用");

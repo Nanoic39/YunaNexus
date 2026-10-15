@@ -45,6 +45,7 @@ public class SecurityConfig {
             SecurityProperties securityProperties,
             AdminProperties adminProperties,
             AuthenticationManager authenticationManager,
+            org.springframework.beans.factory.ObjectProvider<cc.nanoic.yunanexus.auth.client.RootAdminClient> roleClients,
             @Qualifier("authSecurityErrorWriter") SecurityErrorWriter securityErrorWriter) throws Exception {
 
         // CSRF 配置
@@ -61,7 +62,13 @@ public class SecurityConfig {
         XorCsrfTokenRequestAttributeHandler csrfHandler = new XorCsrfTokenRequestAttributeHandler();
 
         JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(authenticationManager, securityErrorWriter);
-        AdminAuthenticationFilter adminFilter = new AdminAuthenticationFilter(adminProperties, securityErrorWriter);
+        AdminAuthenticationFilter adminFilter = new AdminAuthenticationFilter(adminProperties, securityErrorWriter, userId -> {
+            var client=roleClients.getIfAvailable();
+            if (client==null) throw new IllegalStateException("Role verification unavailable");
+            var result=client.check(userId);
+            if (result==null || result.getCode()!=200) throw new IllegalStateException("Role verification unavailable");
+            return Boolean.TRUE.equals(result.getData());
+        });
 
         http
             .csrf(csrf -> csrf
@@ -97,6 +104,7 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/internal/auth/admin/check").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/captcha").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
@@ -108,8 +116,8 @@ public class SecurityConfig {
                 .requestMatchers(AdminAuthenticationFilter.ADMIN_PATH_PREFIX + "/**").hasRole("ADMIN")
                 .anyRequest().denyAll()
             )
-            .addFilterBefore(adminFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(jwtFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(adminFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

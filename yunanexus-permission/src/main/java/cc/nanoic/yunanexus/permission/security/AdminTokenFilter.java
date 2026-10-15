@@ -35,10 +35,18 @@ public class AdminTokenFilter extends OncePerRequestFilter {
     /** 管理后台路径前缀 */
     public static final String ADMIN_PATH_PREFIX = "/api/v1/permission/admin";
 
+    private final cc.nanoic.yunanexus.common.web.security.AdminBearerVerifier bearerVerifier;
     private final AdminProperties adminProperties;
     private final ObjectMapper objectMapper;
 
     public AdminTokenFilter(AdminProperties adminProperties, ObjectMapper objectMapper) {
+        this(adminProperties, objectMapper, new cc.nanoic.yunanexus.common.web.security.AdminBearerVerifier(""));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AdminTokenFilter(AdminProperties adminProperties, ObjectMapper objectMapper,
+                            cc.nanoic.yunanexus.common.web.security.AdminBearerVerifier bearerVerifier) {
+        this.bearerVerifier = bearerVerifier;
         this.adminProperties = adminProperties;
         this.objectMapper = objectMapper;
     }
@@ -53,6 +61,19 @@ public class AdminTokenFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        String authorization=request.getHeader("Authorization");
+        if (authorization != null) {
+            int status=bearerVerifier.verify(authorization);
+            if (status != 200) {
+                response.setStatus(status);
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write(objectMapper.writeValueAsString(Result.error(status,
+                    status==503 ? "管理权限校验不可用" : status==403 ? "无管理权限" : "未认证")));
+                return;
+            }
+            filterChain.doFilter(request,response);
+            return;
+        }
         String configured = adminProperties.getToken();
         if (configured == null || configured.isBlank()) {
             writeError(response, 403, ErrorCode.ADMIN_DISABLED);
