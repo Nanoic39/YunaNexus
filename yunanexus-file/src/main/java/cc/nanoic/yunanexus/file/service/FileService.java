@@ -86,6 +86,9 @@ public interface FileService {
      */
     int cleanupExpiredChunkUploads();
 
+    /** 分片会话只允许创建者读写或放弃。 */
+    void requireChunkOwner(String uploadId, long userId);
+
     /**
      * 删除文件（逻辑删除元数据 + 物理删除存储内容，须在数据范围内可见）。
      *

@@ -114,7 +114,7 @@ public class FileController {
                                     @RequestParam("index") int index,
                                     @RequestParam("chunk") MultipartFile chunk,
                                     @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
-        requireUserId(userId);
+        fileService.requireChunkOwner(uploadId, requireUserId(userId));
         fileService.uploadChunk(uploadId, index, chunk);
         return Result.success();
     }
@@ -125,7 +125,7 @@ public class FileController {
     @GetMapping("/chunk/status")
     public Result<ChunkUploadStatus> chunkStatus(@RequestParam("uploadId") String uploadId,
                                                  @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
-        requireUserId(userId);
+        fileService.requireChunkOwner(uploadId, requireUserId(userId));
         return Result.success(fileService.chunkStatus(uploadId));
     }
 
@@ -144,7 +144,7 @@ public class FileController {
     @PostMapping("/chunk/abort")
     public Result<Void> chunkAbort(@RequestParam("uploadId") String uploadId,
                                    @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
-        requireUserId(userId);
+        fileService.requireChunkOwner(uploadId, requireUserId(userId));
         fileService.abortChunkUpload(uploadId);
         return Result.success();
     }

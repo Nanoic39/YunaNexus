@@ -68,3 +68,13 @@ CREATE TABLE IF NOT EXISTS `file_meta` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件元数据表';
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- 个人工作空间（2026-10-15）
+USE yunanexus_file_0;
+CREATE TABLE IF NOT EXISTS file_share (
+ share_id CHAR(43) PRIMARY KEY, user_id BIGINT NOT NULL, file_id BIGINT NOT NULL,
+ file_name VARCHAR(255) NOT NULL, code_hash CHAR(64) NULL,
+ created_at DATETIME NOT NULL, expires_at DATETIME NOT NULL, revoked TINYINT NOT NULL DEFAULT 0,
+ failed_attempts INT NOT NULL DEFAULT 0, failure_window DATETIME NULL,
+ INDEX idx_owner(user_id,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

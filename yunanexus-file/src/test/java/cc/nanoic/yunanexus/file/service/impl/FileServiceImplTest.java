@@ -313,7 +313,7 @@ class FileServiceImplTest {
         when(metaIdClient.nextId("file")).thenReturn(Result.success(16L));
         when(shardRouter.route(16L)).thenReturn(0);
         when(permissionClient.userDept(USER_ID)).thenReturn(Result.success(3L));
-        when(fileMetaMapper.selectBySha256AndSize("sha", 5L)).thenReturn(normalMeta(16L, 99L, 1L));
+        when(fileMetaMapper.selectBySha256AndSize("sha", 5L)).thenReturn(normalMeta(16L, USER_ID, 1L));
         when(fileMetaMapper.insert(any(FileMeta.class))).thenReturn(1);
         when(fileMetaMapper.selectByFileId(16L)).thenReturn(normalMeta(16L, USER_ID, 3L));
 
@@ -323,6 +323,26 @@ class FileServiceImplTest {
         assertNull(result.uploadId());
         assertNotNull(result.file());
         verify(fileStorage, never()).storeChunkSession(anyString(), any());
+    }
+
+    @Test
+    void fingerprintAloneCannotCopyAnotherUsersContent() {
+        ChunkInitRequest request = new ChunkInitRequest();
+        request.setFileName("a.txt"); request.setTotalChunks(2); request.setTotalSize(5L); request.setSha256("sha");
+        when(metaIdClient.nextId("file")).thenReturn(Result.success(16L));
+        when(shardRouter.route(16L)).thenReturn(0);
+        when(fileMetaMapper.selectBySha256AndSize("sha",5L)).thenReturn(normalMeta(16L,99L,1L));
+        ChunkInitResult result=service.initChunkUpload(request,USER_ID);
+        assertFalse(result.instantUpload());
+        verify(fileMetaMapper,never()).insert(any(FileMeta.class));
+    }
+
+    @Test
+    void chunkSessionsAreOnlyAccessibleToTheirCreator() {
+        var session=session("up1",2,LocalDateTime.now());
+        when(fileStorage.loadChunkSession("up1")).thenReturn(sessionBytes(session));
+        service.requireChunkOwner("up1",session.getUserId());
+        assertThrows(BizException.class,()->service.requireChunkOwner("up1",session.getUserId()+1));
     }
 
     @Test

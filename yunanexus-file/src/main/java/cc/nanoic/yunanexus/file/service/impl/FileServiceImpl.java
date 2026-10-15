@@ -187,7 +187,7 @@ public class FileServiceImpl implements FileService {
         // 秒传：客户端提供内容指纹且命中已有文件时，直接复用存储、落一条新元数据
         if (request.getSha256() != null && !request.getSha256().isBlank() && request.getTotalSize() > 0) {
             FileMeta existing = findBySha256AcrossShards(request.getSha256(), request.getTotalSize());
-            if (existing != null) {
+            if (existing != null && Long.valueOf(userId).equals(existing.getCreateBy())) {
                 FileMeta meta = buildMeta(fileId, shardIndex, fileName, ext, request.getContentType(),
                         existing.getSize(), existing.getStoragePath(), existing.getSha256(), userId, deptId);
                 FileMeta persisted = persistMeta(meta);
@@ -316,6 +316,12 @@ public class FileServiceImpl implements FileService {
         return removed;
     }
 
+    @Override
+    public void requireChunkOwner(String uploadId,long userId) {
+        if(!Long.valueOf(userId).equals(loadSession(uploadId).getUserId()))
+            throw new BizException(ErrorCode.FILE_ACCESS_DENIED);
+    }
+
     // ---------- 校验与工具 ----------
 
     /** 校验单次上传参数（空文件 / 大小上限 / 扩展名白名单）。 */
@@ -323,6 +329,9 @@ public class FileServiceImpl implements FileService {
         if (file == null || file.isEmpty()) {
             throw new BizException(ErrorCode.FILE_EMPTY);
         }
+        String name=file.getOriginalFilename();
+        if(name!=null && (name.length()>255 || name.codePoints().anyMatch(Character::isISOControl)))
+            throw new BizException(ErrorCode.BAD_REQUEST,"文件名无效或过长");
         long maxSize = properties.getUpload().getMaxSize();
         if (maxSize > 0 && file.getSize() > maxSize) {
             throw new BizException(ErrorCode.FILE_SIZE_EXCEED,

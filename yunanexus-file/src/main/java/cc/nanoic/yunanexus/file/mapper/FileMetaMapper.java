@@ -63,4 +63,10 @@ public interface FileMetaMapper extends BaseMapper<FileMeta> {
     @DataScope(deptColumn = "dept_id", createByColumn = "create_by")
     @Select("SELECT * FROM file_meta WHERE status = 1 ORDER BY id DESC")
     List<FileMeta> selectVisible();
+
+    @Select("SELECT * FROM file_meta WHERE status=1 AND create_by=#{userId} AND file_name LIKE CONCAT('%',#{search},'%') ORDER BY file_id DESC LIMIT #{limit}")
+    List<FileMeta> selectOwned(@Param("userId") long userId, @Param("search") String search, @Param("limit") int limit);
+
+    @Select("SELECT COUNT(*) FROM file_meta WHERE status=1 AND create_by=#{userId} AND file_name LIKE CONCAT('%',#{search},'%')")
+    long countOwned(@Param("userId") long userId, @Param("search") String search);
 }
