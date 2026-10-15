@@ -509,7 +509,7 @@ services:
     volumes:
     - /YunaNexus/platform/config/nginx.conf:/etc/nginx/nginx.conf:ro
     - /YunaNexus/platform/secrets/tls:/etc/nginx/tls:ro
-    - /YunaNexus/platform/releases/frontend:/srv:ro
+    - /YunaNexus/platform/releases/frontend:/srv/releases:ro
     - /YunaNexus/platform/data/acme-webroot:/srv/acme:ro
     depends_on:
     - gateway
