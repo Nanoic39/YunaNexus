@@ -15,7 +15,8 @@ YunaNexus 是一个面向生产设计、持续开发中的微服务中控平台�
 | 全局唯一 ID | `yunanexus-meta` | 调用接口获取 ID / 网关自动注入 |
 | 用户资料 | `yunanexus-user` | 调用接口查询 |
 | 权限判定 | `yunanexus-permission` | 调用鉴权接口 |
-| 文件存储 | `yunanexus-file` | 调用接口上传/下载 |
+| 文件存储与个人分享 | `yunanexus-file` | 本人文件管理、头像上传、有效期与提取码分享 |
+| 个人 API Key 与应用授权 | `yunanexus-auth` | 最小权限脚本密钥、已授权平台查询与撤销 |
 | 操作审计 | `yunanexus-audit` | 异步上报日志 |
 | 门户内容与运行状态 | `yunanexus-notice` | 发布门户内容、查询单服务和平台状态 |
 | 行为分析 | `yunanexus-analytics` | 事件上报与查询（持续完善） |
@@ -173,3 +174,31 @@ bash /YunaNexus/platform/ops/start.sh
 管理台采用统一账号与服务端 `admin` 角色校验，注册仅自动授予 `web` 门户授权。
 跨端登录使用一次性授权码与 PKCE，管理密钥仅保留为服务器运维应急。
 完整目录布局、容量约束、首次部署和回滚方式见 [生产部署说明](deploy/production/README.md)。
+
+---
+
+## 个人工作空间
+
+用户门户接入本人文件、头像、应用授权与脚本密钥，身份均由服务端验证。
+
+| 接口 | 能力 |
+| :--- | :--- |
+| `GET /api/v1/file/me` | 按文件名搜索、分页查询本人文件 |
+| `POST /api/v1/file/me/upload` | 上传文件，单个最大 20MB |
+| `POST /api/v1/file/me/avatar` | JPEG/PNG 头像，最大 5MB、1600 万像素，服务端重新编码为 512×512 JPEG |
+| `GET /api/v1/file/me/{fileId}/download` | 本人文件下载 |
+| `POST /api/v1/file/me/{fileId}/delete` | 删除本人文件，已有分享随文件失效 |
+| `GET/POST /api/v1/file/me/shares` | 列出或创建本人文件分享，有效期 1~30 天，可设置提取码 |
+| `POST /api/v1/file/me/shares/{shareId}/revoke` | 撤销分享 |
+| `POST /api/v1/file/public/share/info`、`download` | 通过请求体提交分享标识与提取码，检查有效性后读取 |
+| `GET /api/v1/auth/account/applications` | 查询个人已授权应用 |
+| `POST /api/v1/auth/account/applications/{clientCode}/revoke` | 撤销平台授权与对应会话；门户 `web` 保留基础授权 |
+| `GET/POST /api/v1/auth/account/api-keys` | 列出或创建密钥，明文仅创建时展示一次 |
+| `POST /api/v1/auth/account/api-keys/{id}/revoke` | 立即撤销个人密钥 |
+
+个人文件不继承部门或管理员数据范围。分享标识放在前端 URL fragment，提取码使用带盐 PBKDF2 摘要；连续 5 次失败后限制 15 分钟。
+密钥使用 `Authorization: Bearer ynk_…`，只保存 SHA-256 摘要，每次调用验证账号、授权、过期与撤销状态。
+支持 `profile:read`、`files:read`、`files:write`，不能访问管理接口、管理密钥、创建分享或修改授权。
+每账号最多 20 个有效密钥、有效期最长 90 天。历史密钥保留至到期后 30 天，最多 100 条近期记录；分享最多 200 条近期记录，到期后 30 天在新建分享时清理。
+
+已有部署先应用 [`20261015-personal-workspace.sql`](misc/data/migrations/20261015-personal-workspace.sql)，再更新应用。

@@ -177,3 +177,11 @@ python3 /YunaNexus/platform/ops/configure-integration.py --admin-user nanoic --c
 本人资料 `/api/v1/user/profile`、标签 `/api/v1/user/tags` 与徽章 `/api/v1/user/badges`
 跳过通用资源权限判定，但仍须验证有效 JWT，并由用户服务根据网关注入的用户 ID 读取本人资源。
 这些路径不属于匿名接口，不授予普通账号任何管理权限。
+
+## 个人工作空间增量部署
+
+将 `misc/data/migrations/20261015-personal-workspace.sql` 与 `configure-workspace.py` 放入
+`/YunaNexus/platform/ops/`，先执行 `python3 /YunaNexus/platform/ops/configure-workspace.py`。
+脚本仅新增认证库的个人密钥表、文件物理库 0 的分享索引，并配置私网密钥验证地址与本人接口权限例外。
+随后发布后端、更新 Nginx 配置并发布前端。头像预览需要 CSP 的 `img-src blob:`；Nginx 请求体上限 21MB 为 20MB 文件预留 multipart 开销。
+所有文件下载和分享响应禁止缓存，入口不记录查询参数，分享标识只出现在前端 fragment 与 POST 请求体。

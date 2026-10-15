@@ -42,7 +42,14 @@ for name in ['permission','notice']:
  path.write_text(json.dumps(config,indent=2)+'\n');path.chmod(0o644)
 path=R/'config/gateway.yaml';config=json.loads(path.read_text())
 paths=config['yunanexus']['gateway']['permission'].setdefault('permit-paths',[])
-for item in ['/api/v1/notice/inbox','/api/v1/notice/inbox/*','/api/v1/notice/read/*','/api/v1/user/profile','/api/v1/user/tags','/api/v1/user/badges']:
+for item in ['/api/v1/notice/inbox','/api/v1/notice/inbox/*','/api/v1/notice/read/*','/api/v1/user/profile','/api/v1/user/tags','/api/v1/user/badges','/api/v1/file/me','/api/v1/file/me/**','/api/v1/auth/account/**']:
  if item not in paths:paths.append(item)
 path.write_text(json.dumps(config,indent=2)+'\n');path.chmod(0o644)
 print('Admin role bound; internal verification, own inbox and fixed SSO callback configured')
+
+# API keys validate against the private authentication service.
+p=R/'config'/'gateway.yaml'
+config=json.loads(p.read_text())
+config['yunanexus']['gateway']['api-key-verification-url']='http://auth:8100/internal/auth/api-key/verify'
+p.write_text(json.dumps(config,ensure_ascii=False,indent=2)+'\n')
+
