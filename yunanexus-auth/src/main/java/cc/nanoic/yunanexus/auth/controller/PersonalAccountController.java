@@ -27,7 +27,7 @@ public class PersonalAccountController {
         return Result.success(grants.listOwned(id).stream().map(g->{var c=clients.selectByClientCode(g.getClientCode());return new Grant(g.getClientCode(),c==null?g.getClientCode():c.getClientName(),c==null?null:c.getRedirectUri(),g.getStatus(),g.getAuthorizedAt(),"web".equals(g.getClientCode()));}).toList());
     }
     @PostMapping("/applications/{clientCode}/revoke")
-    public Result<Void> revoke(@AuthenticationPrincipal AuthenticatedIdentity identity,@PathVariable String clientCode){
+    public Result<Void> revoke(@AuthenticationPrincipal AuthenticatedIdentity identity,@PathVariable("clientCode") String clientCode){
         long id=user(identity);
         if("web".equals(clientCode)) throw new BizException(ErrorCode.BAD_REQUEST,"门户基础授权不可撤销，请使用退出所有设备管理门户会话");
         if(grants.updateStatus(id,clientCode,0)==0) throw new BizException(ErrorCode.BAD_REQUEST,"授权不存在");
@@ -41,5 +41,5 @@ public class PersonalAccountController {
     @PostMapping("/api-keys")
     public Result<PersonalApiKeyService.Created> create(@AuthenticationPrincipal AuthenticatedIdentity identity,@RequestBody CreateKey body){return Result.success(keys.create(user(identity),body.name(),body.scopes(),body.days()));}
     @PostMapping("/api-keys/{id}/revoke")
-    public Result<Void> revokeKey(@AuthenticationPrincipal AuthenticatedIdentity identity,@PathVariable String id){keys.revoke(user(identity),id);return Result.success();}
+    public Result<Void> revokeKey(@AuthenticationPrincipal AuthenticatedIdentity identity,@PathVariable("id") String id){keys.revoke(user(identity),id);return Result.success();}
 }

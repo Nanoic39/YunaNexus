@@ -25,7 +25,7 @@ public class FileShareController {
         return Result.success(shares.create(PersonalFileController.user(id),body.fileId(),body.days(),body.code()));
     }
     @PostMapping("/me/shares/{shareId}/revoke")
-    public Result<Void> revoke(@RequestHeader(value="X-User-Id",required=false) Long id,@PathVariable String shareId){shares.revoke(PersonalFileController.user(id),shareId);return Result.success();}
+    public Result<Void> revoke(@RequestHeader(value="X-User-Id",required=false) Long id,@PathVariable("shareId") String shareId){shares.revoke(PersonalFileController.user(id),shareId);return Result.success();}
     public record Info(String fileName,Long size){}
     @PostMapping("/public/share/info")
     public Result<Info> info(@RequestBody Redeem body){var s=shares.redeem(body.shareId(),body.code());var f=files.requireOwned(s.getFileId(),s.getUserId());return Result.success(new Info(f.getFileName(),f.getSize()));}

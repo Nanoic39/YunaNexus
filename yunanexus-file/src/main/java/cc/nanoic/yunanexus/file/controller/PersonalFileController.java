@@ -27,23 +27,23 @@ public class PersonalFileController {
     static long user(Long id) { if(id==null || id<=0) throw new BizException(ErrorCode.UNAUTHORIZED);return id; }
     @GetMapping
     public Result<PageResult<FileView>> list(@RequestHeader(value="X-User-Id",required=false) Long id,
-        @RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int size,@RequestParam(defaultValue="") String search) {
+        @RequestParam(value="page",defaultValue="1") int page,@RequestParam(value="size",defaultValue="20") int size,@RequestParam(value="search",defaultValue="") String search) {
         return Result.success(personal.list(user(id),page,size,search.trim()));
     }
     @PostMapping("/upload")
-    public Result<FileView> upload(@RequestHeader(value="X-User-Id",required=false) Long id,@RequestParam MultipartFile file) {
+    public Result<FileView> upload(@RequestHeader(value="X-User-Id",required=false) Long id,@RequestParam("file") MultipartFile file) {
         return Result.success(files.upload(file,user(id)));
     }
     @PostMapping("/avatar")
-    public Result<FileView> avatar(@RequestHeader(value="X-User-Id",required=false) Long id,@RequestParam MultipartFile file) {
+    public Result<FileView> avatar(@RequestHeader(value="X-User-Id",required=false) Long id,@RequestParam("file") MultipartFile file) {
         return Result.success(avatars.upload(file,user(id)));
     }
     @GetMapping("/{fileId}/download")
-    public ResponseEntity<InputStreamResource> download(@RequestHeader(value="X-User-Id",required=false) Long id,@PathVariable long fileId) {
+    public ResponseEntity<InputStreamResource> download(@RequestHeader(value="X-User-Id",required=false) Long id,@PathVariable("fileId") long fileId) {
         return attachment(personal.download(fileId,user(id)));
     }
     @PostMapping("/{fileId}/delete")
-    public Result<Void> delete(@RequestHeader(value="X-User-Id",required=false) Long id,@PathVariable long fileId) {
+    public Result<Void> delete(@RequestHeader(value="X-User-Id",required=false) Long id,@PathVariable("fileId") long fileId) {
         personal.delete(fileId,user(id));return Result.success();
     }
     static ResponseEntity<InputStreamResource> attachment(FileRange file) {
