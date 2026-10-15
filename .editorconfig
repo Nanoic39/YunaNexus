@@ -1,0 +1,37 @@
+# YunaNexus · EditorConfig
+# 统一 Windows（开发）与 Linux（测试/生产）两端编辑器/IDE 的基础格式，避免无关 diff。
+# 说明：行尾策略以 .gitattributes 为准，此处保持一致。
+# https://editorconfig.org
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{yml,yaml,json,jsonc}]
+indent_size = 2
+
+[*.{md,markdown}]
+# Markdown 行尾空格有意义（换行），不裁剪
+trim_trailing_whitespace = false
+
+[*.{ps1,psm1,cmd,bat}]
+# Windows 专用脚本保持 CRLF
+end_of_line = crlf
+
+[*.sh]
+end_of_line = lf
+
+[Makefile]
+indent_style = tab
+
+[*.sql]
+indent_size = 2
+
+[*.{xml,pom}]
+indent_size = 4

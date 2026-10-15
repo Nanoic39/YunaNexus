@@ -1,21 +1,311 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>cc.nanoic.yunanexus</groupId>
-    <artifactId>YunaNexus</artifactId>
+    <artifactId>YunaNexusServer</artifactId>
+    <version>1.0.0.0.0</version>
     <packaging>pom</packaging>
+
     <modules>
-        <module>YunaNexusCore</module>
+        <!-- 模块导入 -->
+        <module>yunanexus-common</module>
+        <module>yunanexus-meta</module>
+        <module>yunanexus-auth</module>
+        <module>yunanexus-gateway</module>
+        <module>yunanexus-user</module>
+        <module>yunanexus-permission</module>
+        <module>yunanexus-file</module>
+        <module>yunanexus-notice</module>
+        <module>yunanexus-audit</module>
+        <module>yunanexus-analytics</module>
     </modules>
-    <version>1.0.0</version>
 
     <properties>
+        <!-- plugin params -->
         <maven.compiler.source>22</maven.compiler.source>
         <maven.compiler.target>22</maven.compiler.target>
+        <maven.build.timestamp.format>yyyyMMddHHmmss</maven.build.timestamp.format>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- plugin versions -->
+        <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
+        <maven-release-plugin.version>3.0.1</maven-release-plugin.version>
+        <maven-shade-plugin.version>3.2.4</maven-shade-plugin.version>
+
+        <!-- dependency version -->
+        <hutool.version>5.8.26</hutool.version>
+        <lombok.version>1.18.44</lombok.version>
+        <springboot.starter.web.version>4.0.7</springboot.starter.web.version>
+        <mybatis.plus.version>3.5.15</mybatis.plus.version>
+        <jsqlparser.version>4.6</jsqlparser.version>
+        <mysql.version>9.7.0</mysql.version>
+        <jjwt.version>0.12.5</jjwt.version>
+        <spring.security.crypto.version>7.0.6</spring.security.crypto.version>
+        <redisson.version>4.3.1</redisson.version>
+        <rocketmq.client.version>5.1.4</rocketmq.client.version>
+        <springboot.starter.actuator.version>4.0.7</springboot.starter.actuator.version>
+        <micrometer.registry.prometheus.version>1.16.6</micrometer.registry.prometheus.version>
+        <junit.jupiter.version>5.10.2</junit.jupiter.version>
+        <mockito.version>5.20.0</mockito.version>
+        <maven.surefire.plugin.version>3.2.2</maven.surefire.plugin.version>
+        <spring-boot.version>4.0.7</spring-boot.version>
+        <spring-cloud.version>2025.1.0</spring-cloud.version>
+        <spring-cloud-alibaba.version>2025.1.0.0</spring-cloud-alibaba.version>
     </properties>
+
+
+    <!-- 依赖声明 -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- 版本基线 BOM（顺序敏感：Spring Boot 在前，保证 4.0.7 覆盖 Cloud 自带的 4.0.0） -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring-cloud-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
+            </dependency>
+
+            <dependency>
+                <!-- 设置为可选依赖，防止被common引入 -->
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-web</artifactId>
+                <version>${springboot.starter.web.version}</version>
+                <optional>true</optional>
+            </dependency>
+
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
+                <version>${mybatis.plus.version}</version>
+                <optional>true</optional>
+            </dependency>
+
+            <dependency>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>${mysql.version}</version>
+            </dependency>
+
+            <!-- SQL 解析（数据权限拦截器改写 SQL 用） -->
+            <dependency>
+                <groupId>com.github.jsqlparser</groupId>
+                <artifactId>jsqlparser</artifactId>
+                <version>${jsqlparser.version}</version>
+            </dependency>
+
+            <!-- JWT（jjwt 0.12.x，kid 版本化签名，ADR-015） -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+
+            <!-- BCrypt 密码哈希（仅引 crypto，不引整套 Security） -->
+            <dependency>
+                <groupId>org.springframework.security</groupId>
+                <artifactId>spring-security-crypto</artifactId>
+                <version>${spring.security.crypto.version}</version>
+            </dependency>
+
+            <!-- Redisson 分布式锁（注册防重，ADR-016） -->
+            <dependency>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson</artifactId>
+                <version>${redisson.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-mail</artifactId>
+                <version>${spring-boot.version}</version>
+                <optional>true</optional>
+            </dependency>
+
+            <!-- RocketMQ 原生客户端（不使用 rocketmq-spring-boot-starter：其仅适配 Spring Boot 3 且依赖 Jackson 2，与 Spring Boot 4 / Jackson 3 不兼容） -->
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-client</artifactId>
+                <version>${rocketmq.client.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.slf4j</groupId>
+                        <artifactId>slf4j-api</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-actuator</artifactId>
+                <version>${springboot.starter.actuator.version}</version>
+                <optional>true</optional>
+            </dependency>
+
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-registry-prometheus</artifactId>
+                <version>${micrometer.registry.prometheus.version}</version>
+                <optional>true</optional>
+            </dependency>
+
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${junit.jupiter.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-junit-jupiter</artifactId>
+                <version>${mockito.version}</version>
+                <scope>test</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- 环境配置 -->
+    <profiles>
+        <profile>
+            <id>local</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+        </profile>
+        <profile>
+            <id>dev</id>
+        </profile>
+        <profile>
+            <id>sit</id>
+        </profile>
+        <profile>
+            <id>prd</id>
+            <build>
+                <resources>
+                    <resource>
+                        <directory>src/main/resources</directory>
+                        <excludes>
+                            <exclude>application-local.yaml</exclude>
+                            <exclude>application-local.yml</exclude>
+                            <exclude>application-local.yaml.example</exclude>
+                            <exclude>**/*.pem</exclude>
+                            <exclude>**/*.key</exclude>
+                        </excludes>
+                    </resource>
+                </resources>
+            </build>
+        </profile>
+    </profiles>
+
+    <!-- 通用插件 -->
+    <build>
+        <!-- 插件版本统一管理（根 pom 未继承 spring-boot-starter-parent，需显式声明版本） -->
+        <pluginManagement>
+            <plugins>
+                <!-- Spring Boot 可执行 jar 打包（repackage）。
+                     各业务服务模块引用本插件后，mvn package 产出可直接 java -jar 的 fat jar；
+                     同时使 mvn spring-boot:run 可用（Docker 镜像构建依赖，见 deploy/docker/Dockerfile）。 -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                    <executions>
+                        <execution>
+                            <id>repackage</id>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
+        <plugins>
+            <!-- 源码打包插件，在 install 阶段 为 jar 打源码包 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>${maven-source-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- 单元测试执行插件（版本固定，保证各环境一致执行 JUnit5） -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven.surefire.plugin.version}</version>
+            </plugin>
+
+            <!-- 正式版发布插件 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>${maven-release-plugin.version}</version>
+                <configuration>
+                    <!-- 是否子模块和父工程使用同一个版本 -->
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                    <!-- 执行 prepare 之前执行的命令 -->
+                    <preparationGoals>clean verify</preparationGoals>
+                    <!-- tag 标签名称格式 -->
+                    <tagNameFormat>release_${project.artifactId}-@{project.version}_${maven.build.timestamp}</tagNameFormat>
+                    <!-- 是否自动 push 代码到 git -->
+                    <pushChanges>true</pushChanges>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- git 仓库配置，和 maven-release-plugin 插件配合使用 -->
+    <scm>
+        <developerConnection>scm:git@github.com:Nanoic39/YunaNexus.git</developerConnection>
+    </scm>
 
 </project>

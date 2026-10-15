@@ -1,0 +1,38 @@
+# Docker 构建上下文裁剪（deploy/docker/Dockerfile 以仓库根目录为 context）
+.git/
+.gitignore
+.gitea/
+.github/
+.idea/
+.vscode/
+**/target/
+**/*.iml
+# RocketMQ 本地 store（体积大且被运行进程锁定，绝不进镜像）
+.rocketmq/
+# 本地运行产生的数据/日志/冷备
+**/data/
+logs/
+**/logs/
+# 文档与建库脚本不参与镜像构建
+docs/
+misc/
+deploy/
+*.md
+.e2e-hello.txt
+
+# Production secret boundary: local credentials must never enter build layers.
+**/application-local.yaml
+**/application-local.yml
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.jks
+**/id_rsa*
+**/id_ed25519*
+**/secrets/
+**/*.hprof
+**/hs_err_pid*
+**/replay_pid*

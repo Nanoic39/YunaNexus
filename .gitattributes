@@ -1,8 +1,55 @@
-* text=auto
+# YunaNexus · Git 行尾与文本属性统一
+#
+# 背景：开发环境为 Windows、测试/生产为 Linux。若不统一行尾，同一个文件在两端
+# 检出后会因 CRLF/LF 差异产生「整文件变更」，且 .sh 带 CRLF 在容器内会报
+# `bad interpreter: /usr/bin/env bash^M`。
+#
+# 约定：
+#   - 仓库内文本一律以 LF 存储（text=auto + eol=lf）；
+#   - Windows 专用脚本（.ps1/.cmd/.bat）检出为 CRLF，避免老版 PowerShell/cmd 解析问题；
+#   - Unix shell 脚本强制 LF；
+#   - 二进制文件禁止行尾转换。
+
+# 默认：自动识别文本，检出为 LF
+* text=auto eol=lf
+
+# ---------- Windows 专用脚本：CRLF ----------
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# ---------- Unix 脚本：必须 LF ----------
 *.sh text eol=lf
-*.yml text eol=lf
-*.yaml text eol=lf
-Dockerfile text eol=lf
-Jenkinsfile text eol=lf
-.env.example text eol=lf
-*.conf text eol=lf
+
+# ---------- 二进制：不转换 ----------
+*.jar binary
+*.war binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text eol=lf
+*.pdf binary
+*.gz binary
+*.tgz binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.xlsx binary
+*.docx binary
+*.pptx binary
+
+# ---------- 文本类型标注（提升 diff / 语言识别） ----------
+*.java text diff=java
+*.xml text
+*.yml text
+*.yaml text
+*.json text
+*.properties text
+*.sql text
+*.md text
+Dockerfile text

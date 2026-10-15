@@ -1,92 +1,52 @@
-target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+.idea
+target
+log.base_IS_UNDEFINED/
+logs/
 
-### 本地部署配置（含敏感信息，勿提交）###
+*.flattened-pom.xml
+
 **/application-local.yaml
 
-### IntelliJ IDEA ###
-.idea/
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
-*.iws
-*.iml
-*.ipr
-# 默认忽略的文件
-.idea/shelf/
-.idea/workspace.xml
-# 基于编辑器的 HTTP 客户端请求
-.idea/httpRequests/
-# Datasource local storage ignored files
-.idea/dataSources/
-.idea/dataSources.local.xml
-
-
-### Eclipse ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
-.vscode/
-
-### Mac OS ###
-.DS_Store
-
-### 针对本项目补充 ###
-**/说明文件/
-**/application-*
-**/application-prod.*
-# 密钥文件(由YunaNexusCommonSecurity自动生成)
-**/SecretKey/
-# Postman文件
-postman/
-.postman/
-**/.venv
-**/test/**
-
-### 前端项目 ###
-**/node_modules
-**/.pnpm-store
-**/.nuxt
-**/.output
-**/dist
+# 本地联调密钥/密码（由 deploy/.env.example 复制而来），禁止入库
+deploy/.env
+# SkyWalking Java agent（体积大，本地按需下载）
+deploy/ops/skywalking/agent/
+# Production secrets and runtime artifacts
+.env
+.env.*
+!.env.example
 **/.env
 **/.env.*
 !**/.env.example
-!**/application-example.yaml
-**/.DS_Store
-**/coverage
-**/*.log
+**/application-prd.local.yaml
+**/application-prd.local.yml
+**/secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+.rocketmq/
+.e2e-hello.txt
+*.hprof
+hs_err_pid*
+replay_pid*
+# Local conversation captures are not project documentation.
+docs/local-command*.md
 
-### 文件存储 ###
-/storage
+# Generated deployment artifacts and diagnostics
+deploy/production/*.tar.gz
+deploy/production/*.log
+deploy/production/__pycache__/
 
-### 本地调试脚本 ###
-ScriptsDebug/
+release/
+deploy/production/docker-compose-*
+deploy/production/compose-release.json
 
-# Mock 数据（从 .example.ts 复制生成）
-**/mock/*.ts
-!**/mock/*.example.ts
+# Ad-hoc request notes are not public project documentation.
+docs/问题.txt
 
-mvnw
-mvnw.cmd
-.mvn/**
-
+# Service runtime data is never source code.
+**/data/
+!misc/data/
+!misc/data/**
