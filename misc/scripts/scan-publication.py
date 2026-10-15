@@ -16,7 +16,7 @@ for name in sorted(files):
  if (name.startswith('yunanexus-') and '/data/' in name) or path.name in forbidden or any(x in path.parts for x in ['.idea','.rocketmq','node_modules','target','secrets']):
   findings.append((name,0,'private-or-generated-file'));continue
  data=path.read_bytes()
- if path.name.endswith(('.tar.gz','.hprof','.log')):findings.append((name,0,'generated-artifact'));continue
+ if path.name.endswith(('.tar.gz','.tar.xz','.hprof','.log')):findings.append((name,0,'generated-artifact'));continue
  if len(data)>5*1024*1024:findings.append((name,0,'oversize-file'));continue
  if b'\x00' in data:continue
  # Test fixtures and secret-generation programs may name markers but must not contain a real key block.
