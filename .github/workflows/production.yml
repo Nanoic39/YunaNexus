@@ -53,5 +53,5 @@ jobs:
       - name: Publish validated deployment package
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_backend: backend
+          RELEASE_KIND: backend
         run: python3 scripts/publish-release.py
