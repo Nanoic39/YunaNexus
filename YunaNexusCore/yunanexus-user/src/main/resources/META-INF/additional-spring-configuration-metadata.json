@@ -1,9 +1,0 @@
-{
-    "properties": [
-        {
-            "name": "custom.time.time-zone",
-            "type": "java.lang.String",
-            "description": "自定义数据，用于规范时区."
-        }
-    ]
-}
