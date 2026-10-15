@@ -13,7 +13,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path('/YunaNexus/platform')
-BASE = 'http://103.39.66.135:3000'
+BASE = 'http://103.39.66.135:3001'
 CALLBACK = 'http://103.39.66.135:3001/sso/callback'
 ADMIN_PATHS = ['/api/v1/auth/admin/users', '/api/v1/permission/admin/roles',
                '/api/v1/notice/portal/admin/site']
