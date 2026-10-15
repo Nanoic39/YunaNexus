@@ -173,3 +173,7 @@ python3 /YunaNexus/platform/ops/configure-integration.py --admin-user nanoic --c
 
 管理服务验证失败或权限服务不可用时拒绝请求；普通用户不能凭浏览器角色字段访问管理接口。
 站内信详情按接收人验证归属。生产验证码返回 PNG，原始验证码不返回客户端；验证码校验后立即失效。
+
+本人资料 `/api/v1/user/profile`、标签 `/api/v1/user/tags` 与徽章 `/api/v1/user/badges`
+跳过通用资源权限判定，但仍须验证有效 JWT，并由用户服务根据网关注入的用户 ID 读取本人资源。
+这些路径不属于匿名接口，不授予普通账号任何管理权限。

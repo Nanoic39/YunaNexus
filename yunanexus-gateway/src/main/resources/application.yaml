@@ -150,6 +150,9 @@ yunanexus:
         - /api/v1/notice/inbox
         - /api/v1/notice/inbox/*
         - /api/v1/notice/read/*
+        - /api/v1/user/profile
+        - /api/v1/user/tags
+        - /api/v1/user/badges
       enabled: ${GATEWAY_PERMISSION_ENABLED:true}
       check-url: ${PERMISSION_CHECK_URL:}
       timeout-millis: ${PERMISSION_CHECK_TIMEOUT_MILLIS:2000}

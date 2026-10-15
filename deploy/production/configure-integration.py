@@ -42,7 +42,7 @@ for name in ['permission','notice']:
  path.write_text(json.dumps(config,indent=2)+'\n');path.chmod(0o644)
 path=R/'config/gateway.yaml';config=json.loads(path.read_text())
 paths=config['yunanexus']['gateway']['permission'].setdefault('permit-paths',[])
-for item in ['/api/v1/notice/inbox','/api/v1/notice/inbox/*','/api/v1/notice/read/*']:
+for item in ['/api/v1/notice/inbox','/api/v1/notice/inbox/*','/api/v1/notice/read/*','/api/v1/user/profile','/api/v1/user/tags','/api/v1/user/badges']:
  if item not in paths:paths.append(item)
 path.write_text(json.dumps(config,indent=2)+'\n');path.chmod(0o644)
 print('Admin role bound; internal verification, own inbox and fixed SSO callback configured')
