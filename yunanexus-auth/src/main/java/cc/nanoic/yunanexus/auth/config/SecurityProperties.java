@@ -19,6 +19,25 @@ public class SecurityProperties implements EnvironmentAware, InitializingBean {
 
     private String publicOrigin = "https://auth.example.invalid";
     private boolean allowLocalHttp = false;
+    /** 临时 HTTP 联调开关，默认关闭，仍限制为配置的同主机 origin。 */
+    private boolean allowInsecureHttp = false;
+    public boolean isAllowInsecureHttp() { return allowInsecureHttp; }
+    public void setAllowInsecureHttp(boolean value) { this.allowInsecureHttp = value; }
+
+    public boolean isTemporaryHttpOrigin(URI uri) {
+        if (!allowInsecureHttp || uri == null || !"http".equalsIgnoreCase(uri.getScheme())) return false;
+        URI configured = URI.create(publicOrigin);
+        return "http".equalsIgnoreCase(configured.getScheme())
+            && configured.getHost() != null && configured.getHost().equalsIgnoreCase(uri.getHost())
+            && (sameOrigin(configured, uri) || corsAllowedOrigins.stream()
+                .map(URI::create).anyMatch(origin -> sameOrigin(origin, uri)));
+    }
+
+    private boolean sameOrigin(URI left, URI right) {
+        return left.getScheme() != null && left.getScheme().equalsIgnoreCase(right.getScheme())
+            && left.getHost() != null && left.getHost().equalsIgnoreCase(right.getHost())
+            && left.getPort() == right.getPort();
+    }
     private int codeTtlSeconds = 60;
     private List<String> corsAllowedOrigins = new ArrayList<>();
 
@@ -133,7 +152,7 @@ public class SecurityProperties implements EnvironmentAware, InitializingBean {
 
         if (!isHttps) {
             boolean isLoopback = "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
-            if (!allowLocalHttp || !isLocalProfile || !isLoopback) {
+            if ((!allowLocalHttp || !isLocalProfile || !isLoopback) && !isTemporaryHttpOrigin(origin)) {
                 throw new IllegalStateException(
                     "yunanexus.auth.security.public-origin 在生产环境必须使用 HTTPS；本地 HTTP 仅允许 localhost/127.0.0.1 且 allow-local-http=true 且仅激活 local profile"
                 );
@@ -146,7 +165,11 @@ public class SecurityProperties implements EnvironmentAware, InitializingBean {
         }
 
         // 4. 派生 cookie 配置
-        if (allowLocalHttp && isLocalProfile && !isHttps && isLoopback(host)) {
+        if (isTemporaryHttpOrigin(origin)) {
+            ssoCookieName = "YunaSSO_HTTP";
+            csrfCookieName = "YunaCsrf_HTTP";
+            secureCookie = false;
+        } else if (allowLocalHttp && isLocalProfile && !isHttps && isLoopback(host)) {
             ssoCookieName = "YunaSSO_LOCAL";
             csrfCookieName = "YunaCsrf_LOCAL";
             secureCookie = false;
@@ -199,7 +222,7 @@ public class SecurityProperties implements EnvironmentAware, InitializingBean {
         }
         if (scheme != null && scheme.equalsIgnoreCase("http")) {
             boolean isLoopback = "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
-            if (!allowLocalHttp || !isLocalProfile || !isLoopback) {
+            if ((!allowLocalHttp || !isLocalProfile || !isLoopback) && !isTemporaryHttpOrigin(uri)) {
                 throw new IllegalStateException("yunanexus.auth.security.cors-allowed-origins 不允许生产环境 HTTP origin");
             }
         }

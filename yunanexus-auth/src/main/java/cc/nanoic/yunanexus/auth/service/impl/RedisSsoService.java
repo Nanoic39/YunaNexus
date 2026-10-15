@@ -512,7 +512,7 @@ public class RedisSsoService implements SsoService {
         }
         if ("http".equals(scheme)) {
             boolean isLoopback = "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
-            if (!securityProperties.isSecureCookie() || !isLoopback) {
+            if ((!securityProperties.isAllowLocalHttp() || !isLoopback) && !securityProperties.isTemporaryHttpOrigin(uri)) {
                 throw new BizException(ErrorCode.BAD_REQUEST, "redirectUri 不允许非回环 HTTP");
             }
         }

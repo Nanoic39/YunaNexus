@@ -252,4 +252,27 @@ class SecurityPropertiesTest {
         p.validate(envWithProfiles("prod"));
         assertTrue(p.getCorsAllowedOrigins().isEmpty());
     }
+
+    @Test
+    void temporaryHttpRequiresExplicitSwitchAndKeepsCookieCsrf() {
+        SecurityProperties p = props();
+        p.setPublicOrigin("http://103.39.66.135:3000");
+        p.setCorsAllowedOrigins(List.of("http://103.39.66.135:3000", "http://103.39.66.135:3001"));
+        assertThrows(IllegalStateException.class, () -> p.validate(envWithProfiles("prd")));
+        p.setAllowInsecureHttp(true);
+        p.validate(envWithProfiles("prd"));
+        assertFalse(p.isSecureCookie());
+        assertEquals("YunaCsrf_HTTP", p.getCsrfCookieName());
+        assertEquals("YunaSSO_HTTP", p.getSsoCookieName());
+        assertFalse(p.isTemporaryHttpOrigin(java.net.URI.create("http://103.39.66.135:9999")));
+    }
+
+    @Test
+    void temporaryHttpCannotAllowAnotherHostEvenWhenListed() {
+        SecurityProperties p = props();
+        p.setPublicOrigin("http://103.39.66.135:3000");
+        p.setAllowInsecureHttp(true);
+        p.setCorsAllowedOrigins(List.of("http://other.example:3000"));
+        assertThrows(IllegalStateException.class, () -> p.validate(envWithProfiles("prd")));
+    }
 }
