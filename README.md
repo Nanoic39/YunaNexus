@@ -170,4 +170,6 @@ bash /YunaNexus/platform/ops/start.sh
 
 生产密钥仅存放于服务器 `secrets/`，不会打进 Jar 或前端静态文件。
 数据库、Redis、Nacos、RocketMQ、业务端口及 Actuator 不映射公网端口。
-完整目录布局、容量约束、首次部署、IP 证书和回滚方式见 [生产部署说明](deploy/production/README.md)。
+管理台采用统一账号与服务端 `admin` 角色校验，注册仅自动授予 `web` 门户授权。
+跨端登录使用一次性授权码与 PKCE，管理密钥仅保留为服务器运维应急。
+完整目录布局、容量约束、首次部署和回滚方式见 [生产部署说明](deploy/production/README.md)。

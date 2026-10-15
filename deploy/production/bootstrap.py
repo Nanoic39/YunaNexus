@@ -45,7 +45,8 @@ for name in ['meta','auth','gateway','user','permission','file','notice','audit'
  # JSON is valid YAML and avoids a runtime YAML dependency.
  if name in ['auth','meta','notice','permission']:config['spring']['datasource']={'hikari':{'minimum-idle':1,'maximum-pool-size':4}}
  if name=='auth':config['yunanexus']={'auth':{'security':{'public-origin':'http://103.39.66.135:3000','allow-local-http':False,'allow-insecure-http':True,'cors-allowed-origins':['http://103.39.66.135:3000','http://103.39.66.135:3001']}}}
- if name=='gateway':config['yunanexus']={'gateway':{'permission':{'enabled':True,'check-url':'http://permission:8300/internal/permission/check','permit-paths':['/api/v1/permission/me','/api/v1/auth/me','/api/v1/auth/logout','/api/v1/auth/logout-all']}}}
+ if name in ['permission','notice']:config.setdefault('yunanexus',{})['admin']={'verification-url':'http://auth:8100/internal/auth/admin/check'}
+ if name=='gateway':config['yunanexus']={'gateway':{'permission':{'enabled':True,'check-url':'http://permission:8300/internal/permission/check','permit-paths':['/api/v1/permission/me','/api/v1/auth/me','/api/v1/auth/logout','/api/v1/auth/logout-all','/api/v1/notice/inbox','/api/v1/notice/inbox/*','/api/v1/notice/read/*']}}}
  write('config/'+name+'.yaml',json.dumps(config),0o644)
 for source in (ROOT/'ops/sql').glob('*.sql'):shutil.copy2(source,ROOT/'data/sqlinit'/source.name)
 write('data/sqlinit/zz-users.sql','\n'.join(init)+'\n',0o640)
