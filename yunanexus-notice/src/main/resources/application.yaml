@@ -1,0 +1,105 @@
+server:
+  port: 8500
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: yunanexus-notice
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:yunanexus_notice}?serverTimezone=Asia/Shanghai&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    hikari:
+      pool-name: notice-hikari
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 3000
+      validation-timeout: 1000
+      max-lifetime: 1800000
+      idle-timeout: 600000
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  config:
+    # 可选导入 Nacos 配置中心（数据 ID = yunanexus-notice.yaml）；optional 保证 Nacos 不可用/未发布配置时不影响启动
+    import: optional:nacos:${spring.application.name}.yaml
+  cloud:
+    nacos:
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        metadata:
+          management.port: ${management.server.port}
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        fail-fast: ${NACOS_FAIL_FAST:false}
+      config:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+  # 邮件通道为真实投递：需在环境变量 / Nacos 配置 spring.mail.host 等，否则不创建 JavaMailSender，
+  # EmailSender 运行时报「邮件通道未配置」，站内信不受影响。
+  # spring:
+  #   mail:
+  #     host: smtp.example.com
+  #     port: 465
+  #     username: xxx@example.com
+  #     password: xxx
+  #     properties:
+  #       mail.smtp.auth: true
+  #       mail.smtp.ssl.enable: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      # 灰度标识：金丝雀实例带 YUNANEXUS_TRACK=canary，便于按 track 区分新旧版本指标
+      track: ${YUNANEXUS_TRACK:stable}
+  server:
+    port: 8501
+
+yunanexus:
+  notice:
+    admin:
+      token: ${NOTICE_ADMIN_TOKEN:}
+    rocketmq:
+      # 关闭时通知仅落库为「待发送」，不投递消息（便于本地无 MQ 环境启动）
+      enabled: ${NOTICE_ROCKETMQ_ENABLED:true}
+      name-server: ${ROCKETMQ_NAMESERVER:localhost:9876}
+      producer-group: yunanexus-notice-producer
+      consumer-group: yunanexus-notice-consumer
+      topic: YUNA_NOTICE_TOPIC
+      tag: notice
+      # 默认延迟等级（RocketMQ 固定 18 级：1s 5s 10s 30s 1m...），<=0 表示立即投递
+      delay-level: ${NOTICE_ROCKETMQ_DELAY_LEVEL:3}
+      send-timeout-millis: 3000
+    mail:
+      # 发件人地址（缺省由 spring.mail 默认 from 决定）
+      from: ${NOTICE_MAIL_FROM:}
+      from-name: ${NOTICE_MAIL_FROM_NAME:YunaNexus}
