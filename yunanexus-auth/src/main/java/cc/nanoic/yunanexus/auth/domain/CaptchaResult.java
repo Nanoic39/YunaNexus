@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
  * 验证码签发结果。<p>
  *
  * {@code code} 仅本地开发调试时回显（{@code yunanexus.auth.captcha.dev-return-code=true}），
- * 生产环境恒为 null，验证码通过短信/邮件通道下发。
+ * 生产环境恒为 null，通过图形验证码展示。
  *
  * @author yunanexus
  */
@@ -22,4 +22,11 @@ public class CaptchaResult {
 
     /** 验证码（仅开发环境回显，生产恒为 null） */
     private String code;
+
+    /** PNG 图形，生产不返回明文验证码。 */
+    private String imageDataUrl;
+
+    public CaptchaResult(String captchaId, String code) {
+        this(captchaId, code, null);
+    }
 }

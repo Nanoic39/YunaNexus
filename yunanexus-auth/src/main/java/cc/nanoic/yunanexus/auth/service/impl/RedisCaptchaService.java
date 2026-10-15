@@ -15,7 +15,7 @@ import java.util.UUID;
  * 验证码服务实现（Redis）。<p>
  *
  * 验证码 6 位数字、默认有效期 5 分钟、一次性消费（校验即删除，防重放）。
- * 生产环境验证码通过短信/邮件通道下发，本地开发可通过配置回显（见
+ * 生产环境通过 PNG 图形展示验证码，本地开发可通过配置回显（见
  * {@link CaptchaProperties#isDevReturnCode()}）。<p>
  *
  * <b>下发通道（阶段 3.7 后的通知中心接入）</b>：当前实现仅生成与校验，发送逻辑
@@ -44,7 +44,7 @@ public class RedisCaptchaService implements CaptchaService {
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         redisTemplate.opsForValue().set(key(captchaId), code, Duration.ofSeconds(properties.getTtlSeconds()));
         // 验证码不落日志（防泄露）
-        return new CaptchaResult(captchaId, properties.isDevReturnCode() ? code : null);
+        return new CaptchaResult(captchaId, properties.isDevReturnCode() ? code : null, CaptchaImage.render(code));
     }
 
     @Override
@@ -53,12 +53,11 @@ public class RedisCaptchaService implements CaptchaService {
             return false;
         }
         String key = key(captchaId);
-        String expected = redisTemplate.opsForValue().get(key);
+        String expected = redisTemplate.opsForValue().getAndDelete(key);
         if (expected == null) {
             return false;
         }
         // 一次性消费：无论对错都删除，防暴力尝试重放
-        redisTemplate.delete(key);
         return expected.equals(code);
     }
 
