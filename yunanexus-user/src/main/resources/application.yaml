@@ -1,0 +1,83 @@
+server:
+  port: 8200
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: yunanexus-user
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  config:
+    # 可选导入 Nacos 配置中心（数据 ID = yunanexus-user.yaml）；optional 保证 Nacos 不可用/未发布配置时不影响启动
+    import: optional:nacos:${spring.application.name}.yaml
+  cloud:
+    nacos:
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        metadata:
+          management.port: ${management.server.port}
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        fail-fast: ${NACOS_FAIL_FAST:false}
+      config:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  health:
+    # 分库数据源无请求上下文时无法路由，默认 db 健康指示器不适用；改由 ShardDataSourceHealthIndicator 逐库探活
+    db:
+      enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      # 灰度标识：金丝雀实例带 YUNANEXUS_TRACK=canary，便于按 track 区分新旧版本指标
+      track: ${YUNANEXUS_TRACK:stable}
+  server:
+    port: 8201
+
+yunanexus:
+  user:
+    # 手机号功能开关（资料自助绑定/换绑手机号）：默认关闭。
+    # 当前无 SMS 能力无法校验手机号归属，暂不开放；后续接入短信通道后置 true 重开，代码零改动。
+    mobile-enabled: ${USER_MOBILE_ENABLED:false}
+    shard:
+      # 逻辑分片总数（1~16，须与认证中心 yunanexus.auth.shard.shard-count 一致）
+      logical-count: ${USER_SHARD_LOGICAL_COUNT:16}
+      # 物理库数量（逻辑分片按 shardIndex % physical-count 映射到物理库）
+      physical-count: ${USER_SHARD_PHYSICAL_COUNT:2}
+    datasource:
+      host: ${DB_HOST:localhost}
+      port: ${DB_PORT:3306}
+      # 物理库名前缀（实际库名 = 前缀 + 物理库索引）
+      database-prefix: ${USER_DB_PREFIX:yunanexus_user_}
+      username: ${DB_USERNAME:root}
+      password: ${DB_PASSWORD:}
