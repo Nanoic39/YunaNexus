@@ -40,4 +40,6 @@ public interface AuthPlatformMapper extends BaseMapper<AuthPlatform> {
      */
     @Update("UPDATE auth_platform SET status = #{status} WHERE user_id = #{userId} AND client_code = #{clientCode}")
     int updateStatus(@Param("userId") long userId, @Param("clientCode") String clientCode, @Param("status") int status);
+    @Select("SELECT * FROM auth_platform WHERE user_id=#{userId} ORDER BY authorized_at DESC")
+    java.util.List<AuthPlatform> listOwned(long userId);
 }

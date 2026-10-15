@@ -61,7 +61,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public Result<Void> handleNotReadable(HttpMessageNotReadableException e) {
-        log.warn("Request body not readable: {}", e.getMessage());
+        log.warn("Request body not readable; payload omitted to protect credentials");
         return Result.error(ErrorCode.BAD_REQUEST.getCode(), "请求体格式错误");
     }
 

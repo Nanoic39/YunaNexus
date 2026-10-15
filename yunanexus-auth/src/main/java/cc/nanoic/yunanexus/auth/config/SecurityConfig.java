@@ -74,7 +74,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf
                 .csrfTokenRepository(csrfTokenRepository)
                 .csrfTokenRequestHandler(csrfHandler)
-                .ignoringRequestMatchers("/api/v1/auth/sso/token", AdminAuthenticationFilter.ADMIN_PATH_PREFIX + "/**")
+                .ignoringRequestMatchers("/internal/auth/api-key/verify", "/api/v1/auth/sso/token", AdminAuthenticationFilter.ADMIN_PATH_PREFIX + "/**")
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .formLogin(form -> form.disable())
@@ -113,6 +113,8 @@ public class SecurityConfig {
                     "/api/v1/auth/sso/token", "/api/v1/auth/sso/authorize").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout", "/api/v1/auth/logout-all").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
+                .requestMatchers("/api/v1/auth/account/**").authenticated()
+                .requestMatchers(HttpMethod.POST,"/internal/auth/api-key/verify").permitAll()
                 .requestMatchers(AdminAuthenticationFilter.ADMIN_PATH_PREFIX + "/**").hasRole("ADMIN")
                 .anyRequest().denyAll()
             )

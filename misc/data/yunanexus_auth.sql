@@ -147,3 +147,12 @@ CREATE TABLE IF NOT EXISTS `auth_register_outbox` (
     KEY `idx_status_next_retry` (`status`, `next_retry_time`),
     KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='注册本地消息表(outbox，ADR-021)';
+-- 个人工作空间（2026-10-15）
+USE yunanexus_auth;
+CREATE TABLE IF NOT EXISTS auth_personal_api_key (
+ id VARCHAR(32) PRIMARY KEY, user_id BIGINT NOT NULL, name VARCHAR(64) NOT NULL,
+ token_prefix VARCHAR(16) NOT NULL, token_hash CHAR(64) NOT NULL UNIQUE,
+ scopes VARCHAR(256) NOT NULL, created_at DATETIME NOT NULL, expires_at DATETIME NOT NULL,
+ last_used_at DATETIME NULL, revoked TINYINT NOT NULL DEFAULT 0,
+ INDEX idx_owner(user_id,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

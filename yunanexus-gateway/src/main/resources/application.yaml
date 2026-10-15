@@ -122,6 +122,8 @@ yunanexus:
     permit-paths:
       - /api/v1/status
       - /api/v1/status/*
+      - /api/v1/file/public/share/info
+      - /api/v1/file/public/share/download
       - /api/v1/auth/login
       - /api/v1/auth/register
       - /api/v1/auth/refresh
@@ -150,6 +152,9 @@ yunanexus:
         - /api/v1/notice/inbox
         - /api/v1/notice/inbox/*
         - /api/v1/notice/read/*
+        - /api/v1/file/me
+        - /api/v1/file/me/**
+        - /api/v1/auth/account/**
         - /api/v1/user/profile
         - /api/v1/user/tags
         - /api/v1/user/badges

@@ -32,6 +32,9 @@ import reactor.core.publisher.Mono;
 @Component
 public class JwtAuthFilter implements GlobalFilter, Ordered {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private cc.nanoic.yunanexus.gateway.security.PersonalApiKeyChecker personalApiKeyChecker;
+
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtVerifier jwtVerifier;
@@ -62,6 +65,19 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
                 })
                 .build();
         ServerWebExchange sanitizedExchange = exchange.mutate().request(sanitized).build();
+
+        String incoming=sanitized.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        if(incoming!=null && incoming.startsWith("Bearer ynk_")) {
+            if(personalApiKeyChecker==null) return errorWriter.write(exchange,503,GatewayErrorCodes.SERVICE_UNAVAILABLE,"密钥验证不可用");
+            return personalApiKeyChecker.verify(incoming.substring(7),sanitized.getMethod().name(),sanitized.getPath().value())
+                .onErrorResume(e->errorWriter.write(exchange,401,GatewayErrorCodes.UNAUTHORIZED,"密钥无效、已失效或无此接口权限").then(Mono.empty()))
+                .flatMap(identity->{
+                    ServerHttpRequest request=sanitized.mutate()
+                        .header(properties.getUserIdHeader(),Long.toString(identity.userId()))
+                        .header(properties.getShardHeader(),Integer.toString(identity.shardIndex())).build();
+                    return chain.filter(sanitizedExchange.mutate().request(request).build());
+                });
+        }
 
         if (isPermitted(sanitized.getPath().value())) {
             return chain.filter(sanitizedExchange);
