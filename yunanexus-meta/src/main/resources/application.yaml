@@ -1,0 +1,87 @@
+server:
+  port: 8000
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: yunanexus-meta
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:yunanexus_meta}?serverTimezone=Asia/Shanghai&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    hikari:
+      pool-name: meta-hikari
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 3000
+      validation-timeout: 1000
+      max-lifetime: 1800000
+      idle-timeout: 600000
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  config:
+    # 可选导入 Nacos 配置中心（数据 ID = yunanexus-meta.yaml）；optional 保证 Nacos 不可用/未发布配置时不影响启动
+    import: optional:nacos:${spring.application.name}.yaml
+  cloud:
+    nacos:
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        metadata:
+          management.port: ${management.server.port}
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        # 与 optional 配置导入一致：Nacos 不可用时不阻断启动（Nacos 恢复后自动重连并注册）；生产可用 NACOS_FAIL_FAST=true 收紧
+        fail-fast: ${NACOS_FAIL_FAST:false}
+      config:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      # 灰度标识：金丝雀实例带 YUNANEXUS_TRACK=canary，便于按 track 区分新旧版本指标
+      track: ${YUNANEXUS_TRACK:stable}
+  server:
+    port: 8001
+
+yunanexus:
+  segment:
+    min-step: 1000
+    max-step: 10000
+    default-step: 2000
+    preload-threshold: 0.8
+    target-buffer-seconds: 900
+    step-smooth-factor: 0.5
+    load-retry-times: 3
+    async-loader-threads: 4
+    max-consecutive-async-failures: 5
