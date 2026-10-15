@@ -1,0 +1,148 @@
+server:
+  port: 8100
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: yunanexus-auth
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:yunanexus_auth}?serverTimezone=Asia/Shanghai&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    hikari:
+      pool-name: auth-hikari
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 3000
+      validation-timeout: 1000
+      max-lifetime: 1800000
+      idle-timeout: 600000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 3000
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  config:
+    # 可选导入 Nacos 配置中心（数据 ID = yunanexus-auth.yaml）；optional 保证 Nacos 不可用/未发布配置时不影响启动
+    import: optional:nacos:${spring.application.name}.yaml
+  cloud:
+    nacos:
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        metadata:
+          management.port: ${management.server.port}
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        # 与 optional 配置导入一致：Nacos 不可用时不阻断启动（Nacos 恢复后自动重连并注册）；生产可用 NACOS_FAIL_FAST=true 收紧
+        fail-fast: ${NACOS_FAIL_FAST:false}
+      config:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      # 灰度标识：金丝雀实例带 YUNANEXUS_TRACK=canary，便于按 track 区分新旧版本指标
+      track: ${YUNANEXUS_TRACK:stable}
+  server:
+    port: 8101
+
+yunanexus:
+  auth:
+    security:
+      public-origin: ${AUTH_PUBLIC_ORIGIN:https://auth.example.invalid}
+      allow-local-http: ${AUTH_ALLOW_LOCAL_HTTP:false}
+      cors-allowed-origins: ${AUTH_CORS_ALLOWED_ORIGINS:}
+      code-ttl-seconds: ${AUTH_SSO_CODE_TTL:60}
+    # Redis 会话键前缀（生产可经 Nacos / 环境变量覆盖）
+    redis-key-prefix: ${AUTH_REDIS_KEY_PREFIX:auth}
+    # 登录失败锁定阈值（生产可经 Nacos / 环境变量覆盖）
+    captcha-threshold: ${AUTH_CAPTCHA_THRESHOLD:3}
+    lock-threshold: ${AUTH_LOCK_THRESHOLD:7}
+    lock-minutes: ${AUTH_LOCK_MINUTES:30}
+    # 手机号功能开关（手机号作为登录凭证 / 注册携带手机号）：默认关闭。
+    # 当前无 SMS 能力无法校验手机号归属，暂不开放；后续接入短信通道后置 true 重开，代码零改动。
+    mobile-enabled: ${AUTH_MOBILE_ENABLED:false}
+    access-token-ttl-seconds: ${AUTH_ACCESS_TTL:1800}
+    refresh-token-ttl-seconds: ${AUTH_REFRESH_TTL:604800}
+    issuer: ${AUTH_JWT_ISSUER:yunanexus}
+    signing-key-rotation-days: ${AUTH_SIGNING_KEY_ROTATION_DAYS:90}
+    session-ttl-seconds: ${AUTH_SESSION_TTL:604800}
+    captcha:
+      ttl-seconds: ${AUTH_CAPTCHA_TTL:300}
+      dev-return-code: ${AUTH_CAPTCHA_DEV_RETURN:false}
+    shard:
+      # 逻辑分片总数（1~16，与外部 ID 4 bit 分片位对齐）
+      shard-count: ${AUTH_SHARD_COUNT:16}
+    outbox:
+      # 认证库只读对账：独立开关，首次一分钟后执行，此后每日执行
+      reconciliation-enabled: ${AUTH_OUTBOX_RECONCILIATION_ENABLED:false}
+      reconciliation-overdue-seconds: ${AUTH_OUTBOX_RECONCILIATION_OVERDUE_SECONDS:86400}
+      reconciliation-initial-delay-ms: ${AUTH_OUTBOX_RECONCILIATION_INITIAL_DELAY_MS:60000}
+      reconciliation-delay-ms: ${AUTH_OUTBOX_RECONCILIATION_DELAY_MS:86400000}
+      # 注册 outbox 补偿任务：用户中心已接入，默认开启；如需临时关闭可经环境变量 / Nacos 置 false
+      enabled: ${AUTH_OUTBOX_ENABLED:true}
+      batch-size: ${AUTH_OUTBOX_BATCH_SIZE:100}
+      max-retry: ${AUTH_OUTBOX_MAX_RETRY:8}
+      initial-backoff-seconds: ${AUTH_OUTBOX_INITIAL_BACKOFF:30}
+      max-backoff-seconds: ${AUTH_OUTBOX_MAX_BACKOFF:3600}
+    admin:
+      # 管理后台密钥（roadmap 3.9）：为空表示未启用，/api/v1/auth/admin/** 一律拒绝访问。
+      # 生产环境经环境变量 / Nacos / Secret 注入，禁止硬编码。
+      token: ${AUTH_ADMIN_TOKEN:}
+      header-name: ${AUTH_ADMIN_HEADER:X-Admin-Token}
+    jwt:
+      # JWT RS256 签名密钥（kid 版本化，ADR-015）。密钥从环境变量/Secret 注入，禁止硬编码。
+      # active-kid 指向当前签发密钥；历史 keys 只保留公钥用于验签。
+      # 缺失或无效的 active 公私钥将导致启动拒绝（failfast），不会降级为 HMAC。
+      # 可预置多个版本（如 v1/v2）以支持平滑轮换：未注入公私钥的版本视为「尚未启用」，启动时跳过。
+      # 轮换时先分发新版本公钥、改 active-kid，再滚动重启；详见 docs/jwt-operations.md。
+      active-kid: ${JWT_ACTIVE_KID:v1}
+      keys:
+        - kid: v1
+          public-key-base64: ${JWT_PUBLIC_KEY_V1:}
+          private-key-base64: ${JWT_PRIVATE_KEY_V1:}
+        - kid: v2
+          public-key-base64: ${JWT_PUBLIC_KEY_V2:}
+          private-key-base64: ${JWT_PRIVATE_KEY_V2:}
+    external-id:
+      # 外部 ID 编解码密钥（版本化，ADR-002/014）。密钥从环境变量/Secret 注入，禁止硬编码。
+      # 本地开发在 application-local.yaml 中提供 dev 密钥（见 application-local.yaml.example）。
+      keys:
+        - version: 1
+          aes-key-base64: ${EXTERNAL_ID_AES_KEY_V1:}
+          hmac-key-base64: ${EXTERNAL_ID_HMAC_KEY_V1:}
