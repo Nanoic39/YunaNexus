@@ -1305,3 +1305,17 @@ GET /api/v1/audit/logs?userId=&service=&startTime=&endTime=&page=1&size=20
 - 仅变更展示名称和更新时间；内容、存储路径、SHA256、文件 ID 和分享链接保持不变。
 - 分享列表按分片批量读取当前名称；已删除文件的历史分享保留原名称用于识别。分享下载和详情始终读取当前文件名。
 - 个人 API Key / OAuth 应用需要 `files:write`；`files:read` 不允许重命名。接口不新增任何管理员能力，也不需要数据库迁移。
+
+
+## 管理授权边界与外部 OAuth 用户确认
+
+- `GET /api/v1/permission/admin/roles/delegation`：返回当前操作者的 `unrestricted`、有效 `permissionIds` 与允许的 `dataScopes`。前端禁选仅用于交互，后端对每次角色修改、权限/菜单/部门绑定及用户角色分配实时校验。普通管理员不能授予本人未持有的权限，不能编辑已超出本人权限的角色；系统保留角色沿用超级管理员保护。
+- `GET /api/v1/auth/admin/users` 新增可选 `roleId`、`permissionId`，与关键字、状态取交集，在后端筛选后分页。角色与权限均按启用状态判断；两个条件可以来自用户不同的启用角色。匹配超过 10000 人明确要求缩小范围，不返回截断列表。
+- 管理端 `/users/{userId}/kick` 拒绝所有操作者踢出超级管理员；普通管理员不得踢出自己或同级管理员；权限查询失败时不撤销会话或纪元。
+- 认证用户视图 UTC 日期时间现在明确返回 `Z` 后缀，浏览器按本地时区显示；不修改数据库历史时间。登录真实 IP 只从配置的受信代理读取 `X-Real-IP`，其他来源忽略转发头。
+- 外部浏览器授权入口 `/oauth/authorize`，参数为 `client_id`、`redirect_uri`、`state`、`code_challenge`、`code_challenge_method=S256`。
+- 门户用户 `GET /api/v1/auth/account/oauth-consent?clientCode=...&redirectUri=...`：查看有效应用和批准范围；`POST` 同路径接收 `AuthorizeRequest`，明确同意后绑定本人授权并返回 `{redirectUrl}`。只接受已验证的 `web` 身份。
+- 用户拒绝时向已校验的登记回调返回 `error=access_denied&state=...`；无效应用或回调不跳转。应用审核本身不再替所有者授予个人访问；修改应用会撤销旧授权，必须重新同意。
+- 带当前门户 Bearer 的 SSO 授权按该身份签发短期一次性授权码，避免误用其他账号的残留 SSO Cookie；授权码交换仍禁止 Cookie/Bearer。
+
+完整中文指南及机密客户端后端示例见 [OAuth 外部应用接入](oauth-integration-zh.md)。当前协议不是 OIDC，也不提供标准 SDK 自动发现。

@@ -79,6 +79,7 @@ YunaNexusServer/
 | [开发路线图](docs/roadmap.md) | 分阶段开发计划、进度状态、验收标准 |
 | [开发规范](docs/standards.md) | 命名/响应/异常/错误码/包结构/提交规范 |
 | [数据库设计](docs/database.md) | 数据库命名规范、表结构约定、数据保留 |
+| [OAuth 外部应用接入](docs/oauth-integration-zh.md) | 中文流程、PKCE、真实地址、权限范围与后端示例 |
 | [API 契约](docs/api-contract.md) | OpenAPI 3.0 接口契约（请求/响应/错误码） |
 | [用户行为分析](docs/analytics.md) | 无侵入采集 SDK + ClickHouse 画像分析 |
 | [生产部署与 CI/CD](deploy/production/README.md) | 数据盘隔离、生产环境、发布与回滚 |
