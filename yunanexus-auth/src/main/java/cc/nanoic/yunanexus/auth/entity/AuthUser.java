@@ -18,6 +18,7 @@ public class AuthUser {
     private String mobileCountry;
     private String mobile;
     private String password;
+    private Integer passwordResetRequired;
     private Integer status;
     private LocalDateTime lockedUntil;
     private String lockReason;

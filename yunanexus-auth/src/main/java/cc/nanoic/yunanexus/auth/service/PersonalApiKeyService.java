@@ -15,6 +15,7 @@ import java.util.*;
 public class PersonalApiKeyService {
     private final PersonalApiKeyMapper mapper;
     private final AuthUserMapper users;
+    @org.springframework.beans.factory.annotation.Autowired private AuthenticationService authentication;
     private final AuthPlatformMapper grants;
     private final AuthClientMapper clients;
     private static final Set<String> SCOPES=Set.of("profile:read","files:read","files:write");
@@ -31,6 +32,8 @@ public class PersonalApiKeyService {
         if(name==null || name.isBlank() || name.trim().length()>64 || days<1 || days>90 || scopes==null || scopes.isEmpty() || scopes.size()>3 || !SCOPES.containsAll(scopes))
             throw new BizException(ErrorCode.BAD_REQUEST,"名称、权限或有效期无效（1~90 天）");
         if(mapper.lockOwner(userId)==null) throw denied();
+        var context=org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if(authentication!=null && context!=null && context.getPrincipal() instanceof cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity i)authentication.requireSession(i.sid());
         mapper.prune(userId);
         var history=mapper.list(userId);
         if(history.size()>=100 || history.stream().filter(k->Integer.valueOf(0).equals(k.getRevoked()) && k.getExpiresAt().isAfter(LocalDateTime.now())).count()>=20)
@@ -48,7 +51,7 @@ public class PersonalApiKeyService {
         PersonalApiKey key=mapper.find(hash(token));
         if(key==null || !key.getExpiresAt().isAfter(LocalDateTime.now()) || !Integer.valueOf(0).equals(key.getRevoked()) || !allows(Set.of(key.getScopes().split(",")),method,path)) throw denied();
         var user=users.selectByUserId(key.getUserId());var grant=grants.selectByUserIdAndClient(key.getUserId(),"web");var client=clients.selectByClientCode("web");
-        if(user==null || !Integer.valueOf(1).equals(user.getStatus()) || (user.getLockedUntil()!=null && user.getLockedUntil().isAfter(LocalDateTime.now()))
+        if(user==null || Integer.valueOf(1).equals(user.getPasswordResetRequired()) || !Integer.valueOf(1).equals(user.getStatus()) || (user.getLockedUntil()!=null && user.getLockedUntil().isAfter(LocalDateTime.now()))
            || grant==null || !Integer.valueOf(1).equals(grant.getStatus()) || client==null || !Integer.valueOf(1).equals(client.getStatus())) throw denied();
         mapper.used(key.getId());return new Verified(user.getUserId(),user.getShardIndex());
     }

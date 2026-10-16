@@ -130,6 +130,7 @@ yunanexus:
       - /api/v1/auth/csrf
       - /api/v1/auth/captcha
       - /api/v1/auth/sso/**
+      - /api/v1/auth/password-reset/**
       - /api/v1/auth/unlock-appeal
       - /api/v1/auth/admin/**
       # 权限中心管理端（由权限中心 AdminTokenFilter 校验管理员密钥，不经 JWT）

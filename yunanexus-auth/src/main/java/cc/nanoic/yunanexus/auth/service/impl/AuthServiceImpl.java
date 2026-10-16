@@ -106,6 +106,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResult login(LoginRequest request, String ip) {
+        if(request.getClientCode()!=null&&request.getClientCode().startsWith("oauth_"))throw new BizException(ErrorCode.BAD_REQUEST,"接入应用请使用SSO授权码流程");
         AuthClient client = requireEnabledClient(request.getClientCode());
 
         AuthUser user = findByCredential(request.getUsername());
@@ -158,6 +159,7 @@ public class AuthServiceImpl implements AuthService {
             throw new BizException(ErrorCode.TOKEN_REVOKED);
         }
 
+        if (Integer.valueOf(1).equals(user.getPasswordResetRequired())) throw new BizException(ErrorCode.BAD_REQUEST,"请先通过邮箱重置流程设置新密码");
         loginAttemptService.reset(user.getUsername());
         authUserMapper.resetFailCountOnLoginSuccess(user.getUsername(), now(), ip);
 

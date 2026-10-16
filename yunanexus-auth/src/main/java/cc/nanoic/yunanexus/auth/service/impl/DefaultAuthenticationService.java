@@ -180,6 +180,7 @@ public class DefaultAuthenticationService implements AuthenticationService {
     }
 
     private void checkUserStatus(AuthUser user) {
+        if(Integer.valueOf(1).equals(user.getPasswordResetRequired()))throw new BizException(ErrorCode.TOKEN_REVOKED);
         if (user.getStatus() == null) {
             throw new BizException(ErrorCode.USER_DISABLED);
         }
