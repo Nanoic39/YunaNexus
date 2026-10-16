@@ -1,16 +1,5 @@
 package cc.nanoic.yunanexus.permission.service.impl;
 
-import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
-import cc.nanoic.yunanexus.common.web.exception.BizException;
-import cc.nanoic.yunanexus.permission.domain.RoleSaveRequest;
-import cc.nanoic.yunanexus.permission.entity.PermRole;
-import cc.nanoic.yunanexus.permission.mapper.PermRoleDeptMapper;
-import cc.nanoic.yunanexus.permission.mapper.PermRoleMapper;
-import cc.nanoic.yunanexus.permission.mapper.PermRolePermissionMapper;
-import cc.nanoic.yunanexus.permission.mapper.PermUserRoleMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -19,6 +8,18 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
+import cc.nanoic.yunanexus.common.web.exception.BizException;
+import cc.nanoic.yunanexus.permission.domain.RoleSaveRequest;
+import cc.nanoic.yunanexus.permission.entity.PermRole;
+import cc.nanoic.yunanexus.permission.mapper.PermRoleDeptMapper;
+import cc.nanoic.yunanexus.permission.mapper.PermRoleMapper;
+import cc.nanoic.yunanexus.permission.mapper.PermRolePermissionMapper;
+import cc.nanoic.yunanexus.permission.mapper.PermUserRoleMapper;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * {@link RoleServiceImpl} 单元测试。
@@ -39,7 +40,13 @@ class RoleServiceImplTest {
         userRoleMapper = mock(PermUserRoleMapper.class);
         rolePermissionMapper = mock(PermRolePermissionMapper.class);
         roleDeptMapper = mock(PermRoleDeptMapper.class);
-        service = new RoleServiceImpl(roleMapper, userRoleMapper, rolePermissionMapper, roleDeptMapper);
+        service =
+                new RoleServiceImpl(
+                        roleMapper,
+                        userRoleMapper,
+                        rolePermissionMapper,
+                        roleDeptMapper,
+                        mock(cc.nanoic.yunanexus.permission.security.RoleDelegationGuard.class));
     }
 
     private RoleSaveRequest request(String code) {
@@ -78,7 +85,8 @@ class RoleServiceImplTest {
     void 更新角色不存在抛出业务异常() {
         when(roleMapper.selectById(1L)).thenReturn(null);
 
-        BizException ex = assertThrows(BizException.class, () -> service.update(1L, request("editor")));
+        BizException ex =
+                assertThrows(BizException.class, () -> service.update(1L, request("editor")));
         assertEquals(ErrorCode.ROLE_NOT_FOUND.getCode(), ex.getCode());
     }
 
@@ -123,12 +131,24 @@ class RoleServiceImplTest {
         BizException ex = assertThrows(BizException.class, () -> service.getById(99L));
         assertEquals(ErrorCode.ROLE_NOT_FOUND.getCode(), ex.getCode());
     }
-    @Test void 系统默认角色不可创建修改删除() {
-        for(String code:java.util.List.of("admin","super_admin","user")){
-            assertEquals(403,assertThrows(BizException.class,()->service.create(request(code))).getCode());
-            var role=new PermRole();role.setId(99L);role.setRoleCode(code);when(roleMapper.selectById(99L)).thenReturn(role);
-            assertEquals(403,assertThrows(BizException.class,()->service.update(99L,request(code))).getCode());
-            assertEquals(403,assertThrows(BizException.class,()->service.delete(99L)).getCode());
+
+    @Test
+    void 系统默认角色不可创建修改删除() {
+        for (String code : java.util.List.of("admin", "super_admin", "user")) {
+            assertEquals(
+                    403,
+                    assertThrows(BizException.class, () -> service.create(request(code)))
+                            .getCode());
+            var role = new PermRole();
+            role.setId(99L);
+            role.setRoleCode(code);
+            when(roleMapper.selectById(99L)).thenReturn(role);
+            assertEquals(
+                    403,
+                    assertThrows(BizException.class, () -> service.update(99L, request(code)))
+                            .getCode());
+            assertEquals(
+                    403, assertThrows(BizException.class, () -> service.delete(99L)).getCode());
         }
     }
 }

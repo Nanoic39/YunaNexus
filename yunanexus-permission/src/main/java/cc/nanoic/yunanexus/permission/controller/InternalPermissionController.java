@@ -12,8 +12,10 @@ import cc.nanoic.yunanexus.permission.service.BindingService;
 import cc.nanoic.yunanexus.permission.service.DataScopeService;
 import cc.nanoic.yunanexus.permission.service.FieldRuleService;
 import cc.nanoic.yunanexus.permission.service.MenuService;
+
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,57 +26,109 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 鉴权判定内部接口（roadmap 6.8 / Phase A / Phase C）。<p>
+ * 鉴权判定内部接口（roadmap 6.8 / Phase A / Phase C）。
  *
- * 仅供服务间调用（网关 / 各服务），不对外暴露：网关未配置 {@code /internal/**} 路由，
- * 生产环境应通过网络策略限制访问来源。
+ * <p>仅供服务间调用（网关 / 各服务），不对外暴露：网关未配置 {@code /internal/**} 路由， 生产环境应通过网络策略限制访问来源。
  *
  * @author yunanexus
  */
 @RestController
 @RequestMapping("/internal/permission")
 public class InternalPermissionController {
-    @Resource
-    private cc.nanoic.yunanexus.permission.mapper.PermRoleMapper roleMapper;
+    @Resource private cc.nanoic.yunanexus.permission.mapper.PermRoleMapper roleMapper;
 
     @GetMapping("/root-admin")
     public Result<Boolean> rootAdmin(@RequestParam("userId") long userId) {
         return Result.success(userId > 0 && roleMapper.countRootAdmin(userId) > 0);
     }
 
-
     @GetMapping("/super-admin")
-    public Result<Boolean> superAdmin(@RequestParam("userId") long userId) {return Result.success(userId>0&&roleMapper.countSuperAdmin(userId)>0);}
+    public Result<Boolean> superAdmin(@RequestParam("userId") long userId) {
+        return Result.success(userId > 0 && roleMapper.countSuperAdmin(userId) > 0);
+    }
+
     @Resource private org.springframework.jdbc.core.JdbcTemplate db;
+
+    /** Both filters are applied before auth-service pagination; never silently truncate. */
+    @GetMapping("/user-filter")
+    public Result<List<Long>> filterUsers(
+            @RequestParam(value = "roleId", required = false) Long roleId,
+            @RequestParam(value = "permissionId", required = false) Long permissionId) {
+        if ((roleId == null && permissionId == null)
+                || (roleId != null && roleId <= 0)
+                || (permissionId != null && permissionId <= 0))
+            throw new cc.nanoic.yunanexus.common.web.exception.BizException(
+                    cc.nanoic.yunanexus.common.web.constant.ErrorCode.BAD_REQUEST, "筛选参数无效");
+        List<Long> ids =
+                db.queryForList(
+                        """
+SELECT DISTINCT ur.user_id FROM perm_user_role ur JOIN perm_role r ON r.id=ur.role_id AND r.status=1
+WHERE (? IS NULL OR EXISTS(SELECT 1 FROM perm_user_role x JOIN perm_role xr ON xr.id=x.role_id AND xr.status=1 WHERE x.user_id=ur.user_id AND x.role_id=?))
+AND (? IS NULL OR EXISTS(SELECT 1 FROM perm_user_role x JOIN perm_role xr ON xr.id=x.role_id AND xr.status=1 JOIN perm_role_permission rp ON rp.role_id=x.role_id JOIN perm_permission p ON p.id=rp.permission_id AND p.status=1 WHERE x.user_id=ur.user_id AND p.id=?))
+ORDER BY ur.user_id LIMIT 10001
+""",
+                        Long.class,
+                        roleId,
+                        roleId,
+                        permissionId,
+                        permissionId);
+        return Result.success(ids);
+    }
+
     @GetMapping("/has-code")
-    public Result<Boolean> hasCode(@RequestParam("userId") long userId,@RequestParam("code") String code){return Result.success(userId>0&&code!=null&&code.length()<=128&&db.queryForObject("SELECT COUNT(*) FROM perm_user_role ur JOIN perm_role r ON r.id=ur.role_id JOIN perm_role_permission rp ON rp.role_id=r.id JOIN perm_permission p ON p.id=rp.permission_id WHERE ur.user_id=? AND r.status=1 AND p.status=1 AND BINARY p.perm_code=?",Integer.class,userId,code)>0);}
+    public Result<Boolean> hasCode(
+            @RequestParam("userId") long userId, @RequestParam("code") String code) {
+        return Result.success(
+                userId > 0
+                        && code != null
+                        && code.length() <= 128
+                        && db.queryForObject(
+                                        "SELECT COUNT(*) FROM perm_user_role ur JOIN perm_role r ON"
+                                            + " r.id=ur.role_id JOIN perm_role_permission rp ON"
+                                            + " rp.role_id=r.id JOIN perm_permission p ON"
+                                            + " p.id=rp.permission_id WHERE ur.user_id=? AND"
+                                            + " r.status=1 AND p.status=1 AND BINARY p.perm_code=?",
+                                        Integer.class,
+                                        userId,
+                                        code)
+                                > 0);
+    }
+
     @PostMapping("/default-role")
     public Result<Void> bindDefault(@RequestParam("userId") long userId) {
-        if(userId<=0)throw new IllegalArgumentException("Invalid user");
-        if(db.queryForObject("SELECT COUNT(*) FROM perm_role WHERE role_code='user' AND status=1",Integer.class)!=1)throw new IllegalStateException("Default role unavailable");
-        db.update("INSERT IGNORE INTO perm_user_role(user_id,role_id) SELECT ?,id FROM perm_role WHERE role_code='user' AND status=1",userId);
+        if (userId <= 0) throw new IllegalArgumentException("Invalid user");
+        if (db.queryForObject(
+                        "SELECT COUNT(*) FROM perm_role WHERE role_code='user' AND status=1",
+                        Integer.class)
+                != 1) throw new IllegalStateException("Default role unavailable");
+        db.update(
+                "INSERT IGNORE INTO perm_user_role(user_id,role_id) SELECT ?,id FROM perm_role"
+                    + " WHERE role_code='user' AND status=1",
+                userId);
         return Result.success();
     }
-    @Resource
-    private AuthorizationService authorizationService;
 
-    @Resource
-    private DataScopeService dataScopeService;
+    @Resource private AuthorizationService authorizationService;
 
-    @Resource
-    private FieldRuleService fieldRuleService;
+    @Resource private DataScopeService dataScopeService;
 
-    @Resource
-    private MenuService menuService;
+    @Resource private FieldRuleService fieldRuleService;
 
-    @Resource
-    private BindingService bindingService;
+    @Resource private MenuService menuService;
+
+    @Resource private BindingService bindingService;
 
     @PostMapping("/check")
-    public Result<PermissionCheckResponse> check(@Valid @RequestBody PermissionCheckRequest request) {
-        boolean allowed = authorizationService.check(
-                request.getUserId(), request.getResource(), request.getAction(),
-                request.getResourceType(), request.getResourceId(), request.getContext());
+    public Result<PermissionCheckResponse> check(
+            @Valid @RequestBody PermissionCheckRequest request) {
+        boolean allowed =
+                authorizationService.check(
+                        request.getUserId(),
+                        request.getResource(),
+                        request.getAction(),
+                        request.getResourceType(),
+                        request.getResourceId(),
+                        request.getContext());
         return Result.success(PermissionCheckResponse.of(allowed));
     }
 
@@ -90,8 +144,9 @@ public class InternalPermissionController {
 
     @PostMapping("/field-check")
     public Result<FieldCheckResponse> fieldCheck(@Valid @RequestBody FieldCheckRequest request) {
-        return Result.success(fieldRuleService.resolve(
-                request.getUserId(), request.getResourceType(), request.getAccess()));
+        return Result.success(
+                fieldRuleService.resolve(
+                        request.getUserId(), request.getResourceType(), request.getAccess()));
     }
 
     @GetMapping("/menus")

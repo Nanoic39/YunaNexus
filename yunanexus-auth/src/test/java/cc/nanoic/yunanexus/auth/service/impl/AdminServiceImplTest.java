@@ -1,5 +1,9 @@
 package cc.nanoic.yunanexus.auth.service.impl;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import cc.nanoic.yunanexus.auth.domain.AppealView;
 import cc.nanoic.yunanexus.auth.domain.UserView;
 import cc.nanoic.yunanexus.auth.entity.AuthUnlockAppeal;
@@ -12,6 +16,7 @@ import cc.nanoic.yunanexus.auth.service.SessionService;
 import cc.nanoic.yunanexus.common.core.model.PageResult;
 import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
 import cc.nanoic.yunanexus.common.web.exception.BizException;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -21,14 +26,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
 /**
- * 认证中心管理后台服务单元测试。<p>
+ * 认证中心管理后台服务单元测试。
  *
- * 覆盖申诉分页与审核幂等、用户列表过滤与分页、启用/禁用/解锁/踢下线的状态与副作用。
+ * <p>覆盖申诉分页与审核幂等、用户列表过滤与分页、启用/禁用/解锁/踢下线的状态与副作用。
  *
  * @author yunanexus
  */
@@ -50,8 +51,39 @@ class AdminServiceImplTest {
         loginAttemptService = mock(LoginAttemptService.class);
         sessionService = mock(SessionService.class);
         accountEpochService = mock(AccountEpochService.class);
-        service = new AdminServiceImpl(appealMapper, userMapper, loginAttemptService,
-                sessionService, accountEpochService, Clock.fixed(NOW, ZoneOffset.UTC));
+        service =
+                new AdminServiceImpl(
+                        appealMapper,
+                        userMapper,
+                        loginAttemptService,
+                        sessionService,
+                        accountEpochService,
+                        Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    @Test
+    void roleAndPermissionFiltersApplyBeforePagination() {
+        var roles = mock(cc.nanoic.yunanexus.auth.client.RootAdminClient.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "rootRoles", roles);
+        when(roles.filterUsers(2L, 3L))
+                .thenReturn(cc.nanoic.yunanexus.common.core.model.Result.success(List.of(7L, 8L)));
+        when(userMapper.countFiltered("ali", 1, List.of(7L, 8L))).thenReturn(1L);
+        when(userMapper.selectFiltered("ali", 1, List.of(7L, 8L), 0, 10))
+                .thenReturn(List.of(user(7L, "alice", 1)));
+        var page = service.listUsers(" ali ", 1, 1, 10, 2L, 3L);
+        assertEquals(1, page.getTotal());
+        assertEquals(7L, page.getRecords().get(0).getUserId());
+        verify(userMapper, never()).selectPage(any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void emptyPermissionMatchDoesNotReturnAllUsers() {
+        var roles = mock(cc.nanoic.yunanexus.auth.client.RootAdminClient.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "rootRoles", roles);
+        when(roles.filterUsers(2L, null))
+                .thenReturn(cc.nanoic.yunanexus.common.core.model.Result.success(List.of()));
+        assertEquals(0, service.listUsers(null, null, 1, 20, 2L, null).getTotal());
+        verifyNoInteractions(userMapper);
     }
 
     // ---------- 申诉分页与查询 ----------
@@ -112,8 +144,13 @@ class AdminServiceImplTest {
 
         service.approveAppeal(5L, "admin-1", "ok");
 
-        verify(appealMapper).audit(eq(5L), eq(1), eq("admin-1"), eq("ok"),
-                eq(LocalDateTime.ofInstant(NOW, ZoneOffset.UTC)));
+        verify(appealMapper)
+                .audit(
+                        eq(5L),
+                        eq(1),
+                        eq("admin-1"),
+                        eq("ok"),
+                        eq(LocalDateTime.ofInstant(NOW, ZoneOffset.UTC)));
         verify(userMapper).updateStatusAndLock(42L, 1, null, null);
         verify(loginAttemptService).reset("alice");
     }
@@ -133,7 +170,8 @@ class AdminServiceImplTest {
     void 审核非待处理申诉抛已处理() {
         when(appealMapper.selectById(5L)).thenReturn(appeal(5L, 42L, 1));
 
-        BizException ex = assertThrows(BizException.class, () -> service.approveAppeal(5L, "a", null));
+        BizException ex =
+                assertThrows(BizException.class, () -> service.approveAppeal(5L, "a", null));
 
         assertEquals(ErrorCode.APPEAL_ALREADY_AUDITED.getCode(), ex.getCode());
         verify(appealMapper, never()).audit(anyLong(), anyInt(), any(), any(), any());
@@ -144,7 +182,8 @@ class AdminServiceImplTest {
         when(appealMapper.selectById(5L)).thenReturn(appeal(5L, 42L, 0));
         when(appealMapper.audit(eq(5L), eq(1), anyString(), any(), any())).thenReturn(0);
 
-        BizException ex = assertThrows(BizException.class, () -> service.approveAppeal(5L, "a", null));
+        BizException ex =
+                assertThrows(BizException.class, () -> service.approveAppeal(5L, "a", null));
 
         assertEquals(ErrorCode.APPEAL_ALREADY_AUDITED.getCode(), ex.getCode());
         verify(userMapper, never()).updateStatusAndLock(anyLong(), anyInt(), any(), any());
@@ -227,6 +266,18 @@ class AdminServiceImplTest {
 
     @Test
     void 踢下线撤销全部会话与纪元() {
+        var roles = mock(cc.nanoic.yunanexus.auth.client.RootAdminClient.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "rootRoles", roles);
+        when(roles.superCheck(7L))
+                .thenReturn(cc.nanoic.yunanexus.common.core.model.Result.success(false));
+        var context = org.springframework.security.core.context.SecurityContextHolder.getContext();
+        context.setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "admin",
+                        null,
+                        List.of(
+                                new org.springframework.security.core.authority
+                                        .SimpleGrantedAuthority("ROLE_ADMIN"))));
         when(userMapper.selectByUserId(7L)).thenReturn(user(7L, "alice", 1));
         when(sessionService.kickAll(7L)).thenReturn(3);
 
@@ -234,6 +285,7 @@ class AdminServiceImplTest {
 
         verify(sessionService).kickAll(7L);
         verify(accountEpochService).revoke(7L);
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -262,11 +314,24 @@ class AdminServiceImplTest {
         user.setStatus(status);
         return user;
     }
-    @Test void 管理员不能禁用自己() {
-        var context=org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(new cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity("ext","web","sid",7L),null));
+
+    @Test
+    void 管理员不能禁用自己() {
+        var context =
+                org.springframework.security.core.context.SecurityContextHolder
+                        .createEmptyContext();
+        context.setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        new cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity(
+                                "ext", "web", "sid", 7L),
+                        null));
         org.springframework.security.core.context.SecurityContextHolder.setContext(context);
-        try {assertEquals(403,assertThrows(BizException.class,()->service.disableUser(7L)).getCode());verifyNoInteractions(userMapper);}
-        finally {org.springframework.security.core.context.SecurityContextHolder.clearContext();}
+        try {
+            assertEquals(
+                    403, assertThrows(BizException.class, () -> service.disableUser(7L)).getCode());
+            verifyNoInteractions(userMapper);
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
     }
 }

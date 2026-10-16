@@ -4,8 +4,10 @@ import cc.nanoic.yunanexus.common.core.model.Result;
 import cc.nanoic.yunanexus.permission.domain.RoleSaveRequest;
 import cc.nanoic.yunanexus.permission.entity.PermRole;
 import cc.nanoic.yunanexus.permission.service.RoleService;
+
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,9 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 角色管理接口（管理后台，roadmap 6.3）。<p>
+ * 角色管理接口（管理后台，roadmap 6.3）。
  *
- * 路径前缀 {@code /api/v1/permission/admin/**} 由 {@code AdminTokenFilter} 校验管理员密钥。
+ * <p>路径前缀 {@code /api/v1/permission/admin/**} 由 {@code AdminTokenFilter} 校验管理员密钥。
  *
  * @author yunanexus
  */
@@ -27,8 +29,14 @@ import java.util.List;
 @RequestMapping("/api/v1/permission/admin/roles")
 public class RoleController {
 
-    @Resource
-    private RoleService roleService;
+    @Resource private RoleService roleService;
+
+    @Resource private cc.nanoic.yunanexus.permission.security.RoleDelegationGuard delegation;
+
+    @GetMapping("/delegation")
+    public Result<java.util.Map<String, Object>> delegation() {
+        return Result.success(delegation.capabilities());
+    }
 
     @GetMapping
     public Result<List<PermRole>> list() {
@@ -46,8 +54,8 @@ public class RoleController {
     }
 
     @PostMapping("/{id}")
-    public Result<PermRole> update(@PathVariable("id") long id,
-                                   @Valid @RequestBody RoleSaveRequest request) {
+    public Result<PermRole> update(
+            @PathVariable("id") long id, @Valid @RequestBody RoleSaveRequest request) {
         return Result.success(roleService.update(id, request));
     }
 

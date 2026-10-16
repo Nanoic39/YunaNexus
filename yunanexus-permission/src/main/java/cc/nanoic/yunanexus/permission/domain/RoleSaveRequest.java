@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+
 import lombok.Data;
 
 /**
@@ -36,5 +37,7 @@ public class RoleSaveRequest {
     private Integer dataScope;
 
     /** 状态：1-启用 0-禁用（为空时新增默认启用） */
+    @Min(value = 0, message = "status 取值为 0 或 1")
+    @Max(value = 1, message = "status 取值为 0 或 1")
     private Integer status;
 }

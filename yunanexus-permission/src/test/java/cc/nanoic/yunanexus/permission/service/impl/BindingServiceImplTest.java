@@ -1,5 +1,14 @@
 package cc.nanoic.yunanexus.permission.service.impl;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
 import cc.nanoic.yunanexus.common.web.exception.BizException;
 import cc.nanoic.yunanexus.permission.entity.PermRole;
@@ -14,19 +23,11 @@ import cc.nanoic.yunanexus.permission.mapper.PermRoleMenuMapper;
 import cc.nanoic.yunanexus.permission.mapper.PermRolePermissionMapper;
 import cc.nanoic.yunanexus.permission.mapper.PermUserDeptMapper;
 import cc.nanoic.yunanexus.permission.mapper.PermUserRoleMapper;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
  * {@link BindingServiceImpl} 单元测试。
@@ -57,8 +58,25 @@ class BindingServiceImplTest {
         deptMapper = mock(PermDeptMapper.class);
         roleMenuMapper = mock(PermRoleMenuMapper.class);
         menuMapper = mock(PermMenuMapper.class);
-        service = new BindingServiceImpl(userRoleMapper, rolePermissionMapper, roleMapper, permissionMapper,
-                userDeptMapper, roleDeptMapper, deptMapper, roleMenuMapper, menuMapper);
+        service =
+                new BindingServiceImpl(
+                        userRoleMapper,
+                        rolePermissionMapper,
+                        roleMapper,
+                        permissionMapper,
+                        userDeptMapper,
+                        roleDeptMapper,
+                        deptMapper,
+                        roleMenuMapper,
+                        menuMapper);
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                service,
+                "delegation",
+                mock(cc.nanoic.yunanexus.permission.security.RoleDelegationGuard.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                service,
+                "privileged",
+                mock(cc.nanoic.yunanexus.permission.security.PrivilegedRoleGuard.class));
     }
 
     @Test
@@ -75,8 +93,9 @@ class BindingServiceImplTest {
     void 设置用户角色存在无效角色时拒绝() {
         when(roleMapper.selectCount(any())).thenReturn(1L);
 
-        BizException ex = assertThrows(BizException.class,
-                () -> service.setUserRoles(1001L, List.of(1L, 2L)));
+        BizException ex =
+                assertThrows(
+                        BizException.class, () -> service.setUserRoles(1001L, List.of(1L, 2L)));
         assertEquals(ErrorCode.ROLE_NOT_FOUND.getCode(), ex.getCode());
         verify(userRoleMapper, never()).insert(any(PermUserRole.class));
     }
@@ -93,8 +112,9 @@ class BindingServiceImplTest {
     void 设置角色权限时角色不存在抛出业务异常() {
         when(roleMapper.selectById(1L)).thenReturn(null);
 
-        BizException ex = assertThrows(BizException.class,
-                () -> service.setRolePermissions(1L, List.of(10L)));
+        BizException ex =
+                assertThrows(
+                        BizException.class, () -> service.setRolePermissions(1L, List.of(10L)));
         assertEquals(ErrorCode.ROLE_NOT_FOUND.getCode(), ex.getCode());
     }
 
@@ -105,8 +125,10 @@ class BindingServiceImplTest {
         when(roleMapper.selectById(1L)).thenReturn(role);
         when(permissionMapper.selectCount(any())).thenReturn(1L);
 
-        BizException ex = assertThrows(BizException.class,
-                () -> service.setRolePermissions(1L, List.of(10L, 11L)));
+        BizException ex =
+                assertThrows(
+                        BizException.class,
+                        () -> service.setRolePermissions(1L, List.of(10L, 11L)));
         assertEquals(ErrorCode.PERMISSION_NOT_FOUND.getCode(), ex.getCode());
         verify(rolePermissionMapper, never()).insert(any(PermRolePermission.class));
     }

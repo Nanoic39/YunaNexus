@@ -12,7 +12,9 @@ import cc.nanoic.yunanexus.permission.mapper.PermRoleMapper;
 import cc.nanoic.yunanexus.permission.mapper.PermRolePermissionMapper;
 import cc.nanoic.yunanexus.permission.mapper.PermUserRoleMapper;
 import cc.nanoic.yunanexus.permission.service.RoleService;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,15 +29,19 @@ import java.util.List;
 @Service
 public class RoleServiceImpl implements RoleService {
 
+    private final cc.nanoic.yunanexus.permission.security.RoleDelegationGuard delegation;
     private final PermRoleMapper roleMapper;
     private final PermUserRoleMapper userRoleMapper;
     private final PermRolePermissionMapper rolePermissionMapper;
     private final PermRoleDeptMapper roleDeptMapper;
 
-    public RoleServiceImpl(PermRoleMapper roleMapper,
-                           PermUserRoleMapper userRoleMapper,
-                           PermRolePermissionMapper rolePermissionMapper,
-                           PermRoleDeptMapper roleDeptMapper) {
+    public RoleServiceImpl(
+            PermRoleMapper roleMapper,
+            PermUserRoleMapper userRoleMapper,
+            PermRolePermissionMapper rolePermissionMapper,
+            PermRoleDeptMapper roleDeptMapper,
+            cc.nanoic.yunanexus.permission.security.RoleDelegationGuard delegation) {
+        this.delegation = delegation;
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
         this.rolePermissionMapper = rolePermissionMapper;
@@ -44,7 +50,9 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public PermRole create(RoleSaveRequest request) {
-        if(java.util.Set.of("user","admin","super_admin").contains(request.getRoleCode()))throw new BizException(ErrorCode.FORBIDDEN,"保留角色不可创建");
+        delegation.scope(request.getDataScope());
+        if (java.util.Set.of("user", "admin", "super_admin").contains(request.getRoleCode()))
+            throw new BizException(ErrorCode.FORBIDDEN, "保留角色不可创建");
         if (existsByCode(request.getRoleCode())) {
             throw new BizException(ErrorCode.ROLE_CODE_EXISTS);
         }
@@ -52,7 +60,8 @@ public class RoleServiceImpl implements RoleService {
         role.setRoleCode(request.getRoleCode());
         role.setRoleName(request.getRoleName());
         role.setDescription(request.getDescription());
-        role.setDataScope(request.getDataScope() == null ? PermRole.DATA_SCOPE_SELF : request.getDataScope());
+        role.setDataScope(
+                request.getDataScope() == null ? PermRole.DATA_SCOPE_SELF : request.getDataScope());
         role.setStatus(request.getStatus() == null ? PermRole.STATUS_ENABLED : request.getStatus());
         try {
             roleMapper.insert(role);
@@ -64,8 +73,14 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public PermRole update(long id, RoleSaveRequest request) {
+        delegation.manage(id);
+        delegation.scope(request.getDataScope());
+        if (Integer.valueOf(5).equals(request.getDataScope()))
+            delegation.departments(roleDeptMapper.selectDeptIdsByRoleId(id));
         PermRole role = requireRole(id);
-        if(role.getRoleCode()!=null && java.util.Set.of("user","admin","super_admin").contains(role.getRoleCode()))throw new BizException(ErrorCode.FORBIDDEN,"系统默认角色不可修改或删除");
+        if (role.getRoleCode() != null
+                && java.util.Set.of("user", "admin", "super_admin").contains(role.getRoleCode()))
+            throw new BizException(ErrorCode.FORBIDDEN, "系统默认角色不可修改或删除");
         role.setRoleName(request.getRoleName());
         role.setDescription(request.getDescription());
         if (request.getDataScope() != null) {
@@ -81,11 +96,17 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(long id) {
-        var role=requireRole(id);
-        if(role.getRoleCode()!=null && java.util.Set.of("user","admin","super_admin").contains(role.getRoleCode()))throw new BizException(ErrorCode.FORBIDDEN,"系统默认角色不可删除");
-        userRoleMapper.delete(new LambdaQueryWrapper<PermUserRole>().eq(PermUserRole::getRoleId, id));
-        rolePermissionMapper.delete(new LambdaQueryWrapper<PermRolePermission>().eq(PermRolePermission::getRoleId, id));
-        roleDeptMapper.delete(new LambdaQueryWrapper<PermRoleDept>().eq(PermRoleDept::getRoleId, id));
+        delegation.manage(id);
+        var role = requireRole(id);
+        if (role.getRoleCode() != null
+                && java.util.Set.of("user", "admin", "super_admin").contains(role.getRoleCode()))
+            throw new BizException(ErrorCode.FORBIDDEN, "系统默认角色不可删除");
+        userRoleMapper.delete(
+                new LambdaQueryWrapper<PermUserRole>().eq(PermUserRole::getRoleId, id));
+        rolePermissionMapper.delete(
+                new LambdaQueryWrapper<PermRolePermission>().eq(PermRolePermission::getRoleId, id));
+        roleDeptMapper.delete(
+                new LambdaQueryWrapper<PermRoleDept>().eq(PermRoleDept::getRoleId, id));
         roleMapper.deleteById(id);
     }
 
@@ -96,12 +117,14 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public List<PermRole> list() {
-        return roleMapper.selectList(new LambdaQueryWrapper<PermRole>().orderByAsc(PermRole::getId));
+        return roleMapper.selectList(
+                new LambdaQueryWrapper<PermRole>().orderByAsc(PermRole::getId));
     }
 
     private boolean existsByCode(String roleCode) {
-        return roleMapper.selectCount(new LambdaQueryWrapper<PermRole>()
-                .eq(PermRole::getRoleCode, roleCode)) > 0;
+        return roleMapper.selectCount(
+                        new LambdaQueryWrapper<PermRole>().eq(PermRole::getRoleCode, roleCode))
+                > 0;
     }
 
     private PermRole requireRole(long id) {
