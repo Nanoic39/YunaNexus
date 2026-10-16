@@ -66,7 +66,7 @@ public class PasswordRecoveryService {
     private static final DefaultRedisScript<Long> LIMIT =
             new DefaultRedisScript<>(
                     "local n=redis.call('INCR',KEYS[1]);if n==1 then"
-                        + " redis.call('EXPIRE',KEYS[1],ARGV[1]) end;return n",
+                            + " redis.call('EXPIRE',KEYS[1],ARGV[1]) end;return n",
                     Long.class);
     private static final DefaultRedisScript<String> VERIFY =
             new DefaultRedisScript<>(
@@ -80,7 +80,7 @@ public class PasswordRecoveryService {
     private static final DefaultRedisScript<String> TAKE =
             new DefaultRedisScript<>(
                     "local v=redis.call('GET',KEYS[1]);if v then redis.call('DEL',KEYS[1])"
-                        + " end;return v",
+                            + " end;return v",
                     String.class);
 
     private void limit(String key, int max, int seconds) {
@@ -156,7 +156,7 @@ public class PasswordRecoveryService {
         if (attempts != null) attempts.reset(user.getUsername());
         db.update(
                 "INSERT INTO auth_password_reset_record(user_id,username,event)"
-                    + " VALUES(?,?,'EMAIL_VERIFIED_RESET')",
+                        + " VALUES(?,?,'EMAIL_VERIFIED_RESET')",
                 uid,
                 user.getUsername());
         byte[] bytes = new byte[32];
@@ -189,7 +189,7 @@ public class PasswordRecoveryService {
         var rows =
                 db.queryForList(
                         "SELECT username,password_reset_required FROM auth_user WHERE user_id=? FOR"
-                            + " UPDATE",
+                                + " UPDATE",
                         uid);
         if (rows.isEmpty()
                 || ((Number) rows.getFirst().get("password_reset_required")).intValue() != 1)
@@ -214,15 +214,15 @@ public class PasswordRecoveryService {
         int n =
                 db.update(
                         "UPDATE auth_user SET"
-                            + " password=?,password_reset_required=0,password_update_time=NOW()"
-                            + " WHERE user_id=? AND password=?",
+                                + " password=?,password_reset_required=0,password_update_time=NOW()"
+                                + " WHERE user_id=? AND password=?",
                         encoder.encode(password),
                         uid,
                         u.getPassword());
         if (n != 1) throw bad("密码已变更，请重新验证");
         db.update(
                 "INSERT INTO auth_password_reset_record(user_id,username,event)"
-                    + " VALUES(?,?,'USER_CHANGED_PASSWORD')",
+                        + " VALUES(?,?,'USER_CHANGED_PASSWORD')",
                 uid,
                 u.getUsername());
     }
@@ -231,8 +231,8 @@ public class PasswordRecoveryService {
         invalidate(uid);
         db.update(
                 "UPDATE auth_user SET"
-                    + " password=?,password_reset_required=0,password_update_time=NOW() WHERE"
-                    + " user_id=?",
+                        + " password=?,password_reset_required=0,password_update_time=NOW() WHERE"
+                        + " user_id=?",
                 encoder.encode(password),
                 uid);
         db.update(
@@ -242,28 +242,55 @@ public class PasswordRecoveryService {
                 event);
     }
 
-    public void requestEmail(long uid,String address,String oldPassword){
-        String email=email(address);limit("auth:email-bind:limit:"+uid,3,3600);
-        var u=users.selectByUserId(uid);
-        if(u==null||oldPassword==null||oldPassword.length()>64||!encoder.matches(oldPassword,u.getPassword()))throw bad("当前密码不正确");
-        if(u.getEmail()!=null&&email.equalsIgnoreCase(u.getEmail()))throw bad("此邮箱已绑定");
-        var existing=users.selectByEmail(email);if(existing!=null&&existing.getUserId()!=uid)throw bad("邮箱不可用");
-        String key="auth:email-bind:"+uid;
-        if(!Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(key+":cooldown","1",Duration.ofSeconds(60))))throw bad("请60秒后再发送验证码");
-        String code=String.format(Locale.ROOT,"%06d",new SecureRandom().nextInt(1000000));
-        redis.opsForValue().set(key,OAuthApplicationService.hash(email+"|"+code)+"|"+uid,Duration.ofMinutes(10));redis.delete(key+":attempts");
-        try {var result=mail.send(new PasswordMailClient.Mail(email,code,"BIND"));if(result==null||result.getCode()!=200)throw new IllegalStateException();}
-        catch(Exception e){redis.delete(key);throw bad("邮件投递失败，请稍后重试");}
+    public void requestEmail(long uid, String address, String oldPassword) {
+        String email = email(address);
+        limit("auth:email-bind:limit:" + uid, 3, 3600);
+        var u = users.selectByUserId(uid);
+        if (u == null
+                || oldPassword == null
+                || oldPassword.length() > 64
+                || !encoder.matches(oldPassword, u.getPassword())) throw bad("当前密码不正确");
+        if (u.getEmail() != null && email.equalsIgnoreCase(u.getEmail())) throw bad("此邮箱已绑定");
+        var existing = users.selectByEmail(email);
+        if (existing != null && existing.getUserId() != uid) throw bad("邮箱不可用");
+        String key = "auth:email-bind:" + uid;
+        if (!Boolean.TRUE.equals(
+                redis.opsForValue().setIfAbsent(key + ":cooldown", "1", Duration.ofSeconds(60))))
+            throw bad("请60秒后再发送验证码");
+        String code = String.format(Locale.ROOT, "%06d", new SecureRandom().nextInt(1000000));
+        redis.opsForValue()
+                .set(
+                        key,
+                        OAuthApplicationService.hash(email + "|" + code) + "|" + uid,
+                        Duration.ofMinutes(10));
+        redis.delete(key + ":attempts");
+        try {
+            var result = mail.send(new PasswordMailClient.Mail(email, code, "BIND"));
+            if (result == null || result.getCode() != 200) throw new IllegalStateException();
+        } catch (Exception e) {
+            redis.delete(key);
+            throw bad("邮件投递失败，请稍后重试");
+        }
     }
+
     @Transactional
-    public void bindEmail(long uid,String address,String code){
-        String email=email(address),key="auth:email-bind:"+uid;
-        if(code==null||!code.matches("[0-9]{6}"))throw bad("验证码无效或已过期");
-        String result=redis.execute(VERIFY,List.of(key,key+":attempts"),OAuthApplicationService.hash(email+"|"+code));
-        if(!Long.toString(uid).equals(result))throw bad("验证码无效或已过期");
-        db.queryForObject("SELECT user_id FROM auth_user WHERE user_id=? FOR UPDATE",Long.class,uid);
-        try {if(db.update("UPDATE auth_user SET email=? WHERE user_id=?",email,uid)!=1)throw bad("账号不存在");}
-        catch(org.springframework.dao.DuplicateKeyException e){throw bad("邮箱不可用");}
+    public void bindEmail(long uid, String address, String code) {
+        String email = email(address), key = "auth:email-bind:" + uid;
+        if (code == null || !code.matches("[0-9]{6}")) throw bad("验证码无效或已过期");
+        String result =
+                redis.execute(
+                        VERIFY,
+                        List.of(key, key + ":attempts"),
+                        OAuthApplicationService.hash(email + "|" + code));
+        if (!Long.toString(uid).equals(result)) throw bad("验证码无效或已过期");
+        db.queryForObject(
+                "SELECT user_id FROM auth_user WHERE user_id=? FOR UPDATE", Long.class, uid);
+        try {
+            if (db.update("UPDATE auth_user SET email=? WHERE user_id=?", email, uid) != 1)
+                throw bad("账号不存在");
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            throw bad("邮箱不可用");
+        }
     }
 
     public Map<String, Object> security(long uid) {
@@ -279,7 +306,7 @@ public class PasswordRecoveryService {
     public List<Map<String, Object>> records() {
         return db.queryForList(
                 "SELECT id,user_id AS userId,username,event,create_time AS createTime FROM"
-                    + " auth_password_reset_record ORDER BY id DESC LIMIT 1000");
+                        + " auth_password_reset_record ORDER BY id DESC LIMIT 1000");
     }
 
     private static BizException bad(String message) {

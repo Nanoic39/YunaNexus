@@ -55,7 +55,12 @@ class PasswordRecoveryServiceTest {
         var sessions = mock(SessionService.class);
         var encoder = mock(PasswordEncoder.class);
         var redis = mock(StringRedisTemplate.class);
-        doReturn(1L).when(redis).execute(any(org.springframework.data.redis.core.script.RedisScript.class),anyList(),eq("60"));
+        doReturn(1L)
+                .when(redis)
+                .execute(
+                        any(org.springframework.data.redis.core.script.RedisScript.class),
+                        anyList(),
+                        eq("60"));
         var service =
                 new PasswordRecoveryService(
                         users,
@@ -66,7 +71,57 @@ class PasswordRecoveryServiceTest {
                         sessions,
                         mock(PasswordMailClient.class));
         assertThrows(BizException.class, () -> service.change(7L, "wrong", "a-safe-new-password"));
-        verify(encoder).matches("wrong","stored-bcrypt");
+        verify(encoder).matches("wrong", "stored-bcrypt");
         verifyNoInteractions(db, epochs, sessions);
+    }
+
+    @Test
+    void invalidEmailBindingCodeNeverChangesAccount() {
+        var users = mock(AuthUserMapper.class);
+        var db = mock(JdbcTemplate.class);
+        var encoder = mock(PasswordEncoder.class);
+        var mail = mock(PasswordMailClient.class);
+        var service =
+                new PasswordRecoveryService(
+                        users,
+                        mock(StringRedisTemplate.class),
+                        db,
+                        encoder,
+                        mock(AccountEpochService.class),
+                        mock(SessionService.class),
+                        mail);
+        assertThrows(BizException.class, () -> service.bindEmail(7L, "new@example.com", "000000"));
+        verifyNoInteractions(users, db, encoder, mail);
+    }
+
+    @Test
+    void wrongCurrentPasswordCannotSendEmailBindingCode() {
+        var users = mock(AuthUserMapper.class);
+        var u = new AuthUser();
+        u.setPassword("stored-bcrypt");
+        when(users.selectByUserId(7L)).thenReturn(u);
+        var redis = mock(StringRedisTemplate.class);
+        doReturn(1L)
+                .when(redis)
+                .execute(
+                        any(org.springframework.data.redis.core.script.RedisScript.class),
+                        anyList(),
+                        eq("3600"));
+        var mail = mock(PasswordMailClient.class);
+        var db = mock(JdbcTemplate.class);
+        var encoder = mock(PasswordEncoder.class);
+        var service =
+                new PasswordRecoveryService(
+                        users,
+                        redis,
+                        db,
+                        encoder,
+                        mock(AccountEpochService.class),
+                        mock(SessionService.class),
+                        mail);
+        assertThrows(
+                BizException.class, () -> service.requestEmail(7L, "new@example.com", "wrong"));
+        verify(encoder).matches("wrong", "stored-bcrypt");
+        verifyNoInteractions(mail, db);
     }
 }

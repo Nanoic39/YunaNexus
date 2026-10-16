@@ -49,11 +49,29 @@ public class PasswordRecoveryController {
         return Result.success();
     }
 
-    public record EmailRequest(String email,String oldPassword){}
-    public record EmailVerify(String email,String code){}
-    private long owner(AuthenticatedIdentity i){if(i==null||!"web".equals(i.clientCode()))throw new BizException(ErrorCode.FORBIDDEN);return i.userId();}
-    @PostMapping("/api/v1/auth/account/email/request") public Result<?> requestEmail(@AuthenticationPrincipal AuthenticatedIdentity i,@RequestBody EmailRequest b){passwords.requestEmail(owner(i),b.email(),b.oldPassword());return Result.success();}
-    @PostMapping("/api/v1/auth/account/email/verify") public Result<?> verifyEmail(@AuthenticationPrincipal AuthenticatedIdentity i,@RequestBody EmailVerify b){passwords.bindEmail(owner(i),b.email(),b.code());return Result.success();}
+    public record EmailRequest(String email, String oldPassword) {}
+
+    public record EmailVerify(String email, String code) {}
+
+    private long owner(AuthenticatedIdentity i) {
+        if (i == null || !"web".equals(i.clientCode())) throw new BizException(ErrorCode.FORBIDDEN);
+        return i.userId();
+    }
+
+    @PostMapping("/api/v1/auth/account/email/request")
+    public Result<?> requestEmail(
+            @AuthenticationPrincipal AuthenticatedIdentity i, @RequestBody EmailRequest b) {
+        passwords.requestEmail(owner(i), b.email(), b.oldPassword());
+        return Result.success();
+    }
+
+    @PostMapping("/api/v1/auth/account/email/verify")
+    public Result<?> verifyEmail(
+            @AuthenticationPrincipal AuthenticatedIdentity i, @RequestBody EmailVerify b) {
+        passwords.bindEmail(owner(i), b.email(), b.code());
+        return Result.success();
+    }
+
     @GetMapping("/api/v1/auth/account/security")
     public Result<?> security(@AuthenticationPrincipal AuthenticatedIdentity i) {
         if (i == null || !"web".equals(i.clientCode())) throw new BizException(ErrorCode.FORBIDDEN);

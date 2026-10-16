@@ -38,7 +38,7 @@ public class PasswordMailController {
         var m = new SimpleMailMessage();
         m.setFrom(from);
         m.setTo(b.email());
-        m.setSubject("BIND".equals(b.purpose())?"YunaNexus 邮箱绑定验证码":"YunaNexus 密码重置验证码");
+        m.setSubject("BIND".equals(b.purpose()) ? "YunaNexus 邮箱绑定验证码" : "YunaNexus 密码重置验证码");
         m.setText("你的身份验证码为：" + b.code() + "，10分钟内有效。请勿向他人提供验证码。如非本人操作，请忽略本邮件。");
         try {
             mailer.send(m);
