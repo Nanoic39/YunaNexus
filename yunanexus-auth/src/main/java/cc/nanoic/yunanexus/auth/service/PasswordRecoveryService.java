@@ -242,6 +242,30 @@ public class PasswordRecoveryService {
                 event);
     }
 
+    public void requestEmail(long uid,String address,String oldPassword){
+        String email=email(address);limit("auth:email-bind:limit:"+uid,3,3600);
+        var u=users.selectByUserId(uid);
+        if(u==null||oldPassword==null||oldPassword.length()>64||!encoder.matches(oldPassword,u.getPassword()))throw bad("当前密码不正确");
+        if(u.getEmail()!=null&&email.equalsIgnoreCase(u.getEmail()))throw bad("此邮箱已绑定");
+        var existing=users.selectByEmail(email);if(existing!=null&&existing.getUserId()!=uid)throw bad("邮箱不可用");
+        String key="auth:email-bind:"+uid;
+        if(!Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(key+":cooldown","1",Duration.ofSeconds(60))))throw bad("请60秒后再发送验证码");
+        String code=String.format(Locale.ROOT,"%06d",new SecureRandom().nextInt(1000000));
+        redis.opsForValue().set(key,OAuthApplicationService.hash(email+"|"+code)+"|"+uid,Duration.ofMinutes(10));redis.delete(key+":attempts");
+        try {var result=mail.send(new PasswordMailClient.Mail(email,code,"BIND"));if(result==null||result.getCode()!=200)throw new IllegalStateException();}
+        catch(Exception e){redis.delete(key);throw bad("邮件投递失败，请稍后重试");}
+    }
+    @Transactional
+    public void bindEmail(long uid,String address,String code){
+        String email=email(address),key="auth:email-bind:"+uid;
+        if(code==null||!code.matches("[0-9]{6}"))throw bad("验证码无效或已过期");
+        String result=redis.execute(VERIFY,List.of(key,key+":attempts"),OAuthApplicationService.hash(email+"|"+code));
+        if(!Long.toString(uid).equals(result))throw bad("验证码无效或已过期");
+        db.queryForObject("SELECT user_id FROM auth_user WHERE user_id=? FOR UPDATE",Long.class,uid);
+        try {if(db.update("UPDATE auth_user SET email=? WHERE user_id=?",email,uid)!=1)throw bad("账号不存在");}
+        catch(org.springframework.dao.DuplicateKeyException e){throw bad("邮箱不可用");}
+    }
+
     public Map<String, Object> security(long uid) {
         var u = users.selectByUserId(uid);
         if (u == null) throw new BizException(ErrorCode.UNAUTHORIZED);
