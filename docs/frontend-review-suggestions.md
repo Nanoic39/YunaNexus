@@ -1,5 +1,7 @@
 # YunaNexusClient 前端审查与优化建议
 
+> 历史审查报告，部分问题已经修复。当前推进顺序与验收状态见 [系统完善计划](system-completion-plan.md)，请勿把下文历史现状视为当前部署结果。
+
 > 审查对象：`YunaNexusClient`（前端仓库，Stage 一 + 门户内容系统）
 > 审查依据：前端仓库 `docs/architecture.md`、`docs/roadmap.md`、`docs/design-system.md`，以及后端 `docs/api-contract.md`
 > 结论：**框架与样板页交付质量高，分层纪律良好；当前处于「Mock 自洽、接真网关会出问题」的阶段**。以下问题按优先级排列，建议前端 AI 按第七节的顺序落地。
