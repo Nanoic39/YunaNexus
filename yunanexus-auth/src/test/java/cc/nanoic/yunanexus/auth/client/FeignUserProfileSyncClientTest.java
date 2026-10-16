@@ -1,14 +1,7 @@
 package cc.nanoic.yunanexus.auth.client;
 
-import cc.nanoic.yunanexus.auth.entity.AuthRegisterOutbox;
-import cc.nanoic.yunanexus.common.core.model.Result;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -16,10 +9,17 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import cc.nanoic.yunanexus.auth.entity.AuthRegisterOutbox;
+import cc.nanoic.yunanexus.common.core.model.Result;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+
 /**
- * {@link FeignUserProfileSyncClient} 单元测试。<p>
+ * {@link FeignUserProfileSyncClient} 单元测试。
  *
- * 覆盖：outbox → 请求体映射、成功码校验、异常传播、幂等回查语义。
+ * <p>覆盖：outbox → 请求体映射、成功码校验、异常传播、幂等回查语义。
  *
  * @author yunanexus
  */
@@ -52,7 +52,8 @@ class FeignUserProfileSyncClientTest {
 
         client.createUserProfile(outbox());
 
-        ArgumentCaptor<UserProfileCreateRequest> captor = ArgumentCaptor.forClass(UserProfileCreateRequest.class);
+        ArgumentCaptor<UserProfileCreateRequest> captor =
+                ArgumentCaptor.forClass(UserProfileCreateRequest.class);
         verify(feignClient).create(captor.capture());
         UserProfileCreateRequest request = captor.getValue();
         assertEquals(10001L, request.getUserId());
@@ -62,15 +63,15 @@ class FeignUserProfileSyncClientTest {
         assertEquals("alice@example.com", request.getEmail());
         assertEquals("86", request.getMobileCountry());
         assertEquals("13800000000", request.getMobile());
-        assertNull(request.getNickname());
+        assertEquals("alice", request.getNickname());
     }
 
     @Test
     void 创建资料非成功码抛出异常() {
         when(feignClient.create(any())).thenReturn(Result.error(400, "分片不一致"));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> client.createUserProfile(outbox()));
+        IllegalStateException ex =
+                assertThrows(IllegalStateException.class, () -> client.createUserProfile(outbox()));
         assertTrue(ex.getMessage().contains("创建用户资料"));
         assertTrue(ex.getMessage().contains("400"));
     }
@@ -100,7 +101,8 @@ class FeignUserProfileSyncClientTest {
     void 回查非成功码抛出异常() {
         when(feignClient.byUserId(10001L)).thenReturn(Result.error(500, "系统内部错误"));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> client.exists(10001L));
+        IllegalStateException ex =
+                assertThrows(IllegalStateException.class, () -> client.exists(10001L));
         assertTrue(ex.getMessage().contains("回查用户资料"));
     }
 }

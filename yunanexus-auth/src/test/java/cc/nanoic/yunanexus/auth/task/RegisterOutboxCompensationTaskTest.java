@@ -1,18 +1,5 @@
 package cc.nanoic.yunanexus.auth.task;
 
-import cc.nanoic.yunanexus.auth.client.UserProfileSyncClient;
-import cc.nanoic.yunanexus.auth.config.RegisterOutboxProperties;
-import cc.nanoic.yunanexus.auth.entity.AuthRegisterOutbox;
-import cc.nanoic.yunanexus.auth.mapper.AuthRegisterOutboxMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.time.Clock;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.List;
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -23,10 +10,24 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import cc.nanoic.yunanexus.auth.client.UserProfileSyncClient;
+import cc.nanoic.yunanexus.auth.config.RegisterOutboxProperties;
+import cc.nanoic.yunanexus.auth.entity.AuthRegisterOutbox;
+import cc.nanoic.yunanexus.auth.mapper.AuthRegisterOutboxMapper;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+
 /**
- * {@link RegisterOutboxCompensationTask} 单元测试。<p>
+ * {@link RegisterOutboxCompensationTask} 单元测试。
  *
- * 覆盖：成功同步、幂等回查短路、失败退避重试、超上限置 FAILED。
+ * <p>覆盖：成功同步、幂等回查短路、失败退避重试、超上限置 FAILED。
  *
  * @author yunanexus
  */
@@ -51,6 +52,34 @@ class RegisterOutboxCompensationTaskTest {
         properties.setMaxBackoffSeconds(3600);
         Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
         task = new RegisterOutboxCompensationTask(outboxMapper, syncClient, properties, clock);
+    }
+
+    @Test
+    void immediateSyncInitializesCommittedRegistration() {
+        var user = new cc.nanoic.yunanexus.auth.entity.AuthUser();
+        user.setUserId(USER_ID);
+        user.setUsername("new_user");
+        user.setExternalId("external");
+        user.setShardIndex(0);
+        when(syncClient.exists(USER_ID)).thenReturn(false);
+        task.synchronizeRegistered(user);
+        verify(syncClient)
+                .createUserProfile(
+                        org.mockito.ArgumentMatchers.argThat(
+                                row ->
+                                        row.getUserId() == USER_ID
+                                                && "new_user".equals(row.getUsername())));
+        verify(outboxMapper).markDone(eq(USER_ID), any());
+    }
+
+    @Test
+    void immediateFailureRetainsDurableRetry() {
+        var user = new cc.nanoic.yunanexus.auth.entity.AuthUser();
+        user.setUserId(USER_ID);
+        when(syncClient.exists(USER_ID)).thenThrow(new IllegalStateException("unavailable"));
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> task.synchronizeRegistered(user));
+        verify(outboxMapper).markRetry(eq(USER_ID), eq(1), any(), eq("IllegalStateException"));
+        verify(outboxMapper, never()).markDone(anyLong(), any());
     }
 
     private AuthRegisterOutbox pending(int retryCount) {
@@ -101,7 +130,8 @@ class RegisterOutboxCompensationTaskTest {
         task.compensate();
 
         // retryCount=1 → next=2 → 退避 30 << (2-1) = 60 秒
-        verify(outboxMapper).markRetry(eq(USER_ID), eq(2), any(LocalDateTime.class), eq("RuntimeException"));
+        verify(outboxMapper)
+                .markRetry(eq(USER_ID), eq(2), any(LocalDateTime.class), eq("RuntimeException"));
         verify(outboxMapper, never()).markFailed(anyLong(), anyInt(), any());
     }
 

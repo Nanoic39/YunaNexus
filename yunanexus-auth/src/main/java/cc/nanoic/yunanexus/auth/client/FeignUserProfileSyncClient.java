@@ -3,13 +3,13 @@ package cc.nanoic.yunanexus.auth.client;
 import cc.nanoic.yunanexus.auth.entity.AuthRegisterOutbox;
 import cc.nanoic.yunanexus.common.core.model.Result;
 import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
+
 import org.springframework.stereotype.Component;
 
 /**
- * {@link UserProfileSyncClient} 的 Feign 实现（阶段 5 用户中心落地后启用）。<p>
+ * {@link UserProfileSyncClient} 的 Feign 实现（阶段 5 用户中心落地后启用）。
  *
- * 将 outbox 记录映射为用户中心内部接口请求；响应非成功码时抛出异常，交由补偿任务
- * 按指数退避重试（ADR-021）。
+ * <p>将 outbox 记录映射为用户中心内部接口请求；响应非成功码时抛出异常，交由补偿任务 按指数退避重试（ADR-021）。
  *
  * @author yunanexus
  */
@@ -17,7 +17,9 @@ import org.springframework.stereotype.Component;
 public class FeignUserProfileSyncClient implements UserProfileSyncClient {
 
     private final UserProfileSyncFeignClient feignClient;
-    @org.springframework.beans.factory.annotation.Autowired(required=false) private RootAdminClient roles;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RootAdminClient roles;
 
     public FeignUserProfileSyncClient(UserProfileSyncFeignClient feignClient) {
         this.feignClient = feignClient;
@@ -30,6 +32,7 @@ public class FeignUserProfileSyncClient implements UserProfileSyncClient {
         request.setShardIndex(outbox.getShardIndex());
         request.setExternalId(outbox.getExternalId());
         request.setUsername(outbox.getUsername());
+        request.setNickname(outbox.getUsername());
         request.setEmail(outbox.getEmail());
         request.setMobileCountry(outbox.getMobileCountry());
         request.setMobile(outbox.getMobile());
@@ -43,7 +46,7 @@ public class FeignUserProfileSyncClient implements UserProfileSyncClient {
     public boolean exists(long userId) {
         Result<UserProfileView> result = feignClient.byUserId(userId);
         requireSuccess(result, "回查用户资料");
-        if(result.getData()!=null)bindRole(userId);
+        if (result.getData() != null) bindRole(userId);
         return result.getData() != null;
     }
 
@@ -54,11 +57,21 @@ public class FeignUserProfileSyncClient implements UserProfileSyncClient {
         return result.getData();
     }
 
-    private void bindRole(long id){if(roles!=null){var r=roles.bindDefault(id);if(r==null||r.getCode()!=200)throw new IllegalStateException("Default role sync failed");}}
+    private void bindRole(long id) {
+        if (roles != null) {
+            var r = roles.bindDefault(id);
+            if (r == null || r.getCode() != 200)
+                throw new IllegalStateException("Default role sync failed");
+        }
+    }
+
     private void requireSuccess(Result<?> result, String action) {
         if (result == null || result.getCode() != ErrorCode.SUCCESS.getCode()) {
-            throw new IllegalStateException("用户中心" + action + "失败: "
-                    + (result == null ? "无响应" : result.getCode() + " " + result.getMsg()));
+            throw new IllegalStateException(
+                    "用户中心"
+                            + action
+                            + "失败: "
+                            + (result == null ? "无响应" : result.getCode() + " " + result.getMsg()));
         }
     }
 }

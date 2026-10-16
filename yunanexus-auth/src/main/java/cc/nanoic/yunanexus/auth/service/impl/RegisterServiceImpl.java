@@ -12,7 +12,9 @@ import cc.nanoic.yunanexus.common.core.model.Result;
 import cc.nanoic.yunanexus.common.core.util.SecureExternalIdGenerator;
 import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
 import cc.nanoic.yunanexus.common.web.exception.BizException;
+
 import lombok.extern.slf4j.Slf4j;
+
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,18 +25,18 @@ import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 注册服务实现（ADR-021 最终一致补偿）。<p>
+ * 注册服务实现（ADR-021 最终一致补偿）。
  *
- * 注册流程：<br>
+ * <p>注册流程：<br>
  * 1. Redisson 分布式锁（按 username，防并发重复创建，ADR-016）；<br>
  * 2. 唯一键预检（username / email / mobile）；<br>
  * 3. 调用 meta 领取全局内部用户 ID（Feign + Nacos）；<br>
  * 4. 分片决策（可插拔 {@link ShardAllocator}，默认取模，阶段 5 后由用户中心决策）；<br>
  * 5. 编码外部 ID（最新版本密钥）；<br>
- * 6. 同一本地事务写入 {@code auth_user} 与注册 outbox（{@link RegisterPersistenceService}）。<p>
+ * 6. 同一本地事务写入 {@code auth_user} 与注册 outbox（{@link RegisterPersistenceService}）。
  *
- * <b>跨服务一致性</b>：用户资料同步（阶段 5）由 outbox + 定时补偿 + 幂等回查兜底（ADR-021）；
- * outbox 记录随注册同事务写入（durable），补偿任务在用户中心就绪后开启。
+ * <p><b>跨服务一致性</b>：用户资料同步（阶段 5）由 outbox + 定时补偿 + 幂等回查兜底（ADR-021）； outbox
+ * 记录随注册同事务写入（durable），补偿任务在用户中心就绪后开启。
  *
  * @author yunanexus
  */
@@ -61,15 +63,19 @@ public class RegisterServiceImpl implements RegisterService {
     private final RegisterPersistenceService registerPersistenceService;
     private final AuthProperties properties;
 
-    public RegisterServiceImpl(AuthUserMapper authUserMapper,
-                               MetaIdClient metaIdClient,
-                               SecureExternalIdGenerator externalIdGenerator,
-                               PasswordEncoder passwordEncoder,
-                               RedissonClient redissonClient,
-                               Clock clock,
-                               ShardAllocator shardAllocator,
-                               RegisterPersistenceService registerPersistenceService,
-                               AuthProperties properties) {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private cc.nanoic.yunanexus.auth.task.RegisterOutboxCompensationTask registrationSync;
+
+    public RegisterServiceImpl(
+            AuthUserMapper authUserMapper,
+            MetaIdClient metaIdClient,
+            SecureExternalIdGenerator externalIdGenerator,
+            PasswordEncoder passwordEncoder,
+            RedissonClient redissonClient,
+            Clock clock,
+            ShardAllocator shardAllocator,
+            RegisterPersistenceService registerPersistenceService,
+            AuthProperties properties) {
         this.authUserMapper = authUserMapper;
         this.metaIdClient = metaIdClient;
         this.externalIdGenerator = externalIdGenerator;
@@ -104,9 +110,7 @@ public class RegisterServiceImpl implements RegisterService {
         }
     }
 
-    /**
-     * 实际注册逻辑（锁内执行）。
-     */
+    /** 实际注册逻辑（锁内执行）。 */
     private String doRegister(RegisterRequest request, String username) {
         // 手机号功能默认关闭（无 SMS 能力无法校验归属）：注册不接受手机号 / 国家号
         if (!properties.isMobileEnabled()
@@ -117,13 +121,16 @@ public class RegisterServiceImpl implements RegisterService {
         if (authUserMapper.selectByUsername(username) != null) {
             throw new BizException(ErrorCode.REGISTER_USER_ALREADY_EXISTS);
         }
-        if (request.getEmail() != null && !request.getEmail().isBlank()
+        if (request.getEmail() != null
+                && !request.getEmail().isBlank()
                 && authUserMapper.selectByEmail(request.getEmail().trim()) != null) {
             throw new BizException(ErrorCode.REGISTER_USER_ALREADY_EXISTS);
         }
         String mobileCountry = resolveMobileCountry(request);
-        if (request.getMobile() != null && !request.getMobile().isBlank()
-                && authUserMapper.selectByMobile(mobileCountry, request.getMobile().trim()) != null) {
+        if (request.getMobile() != null
+                && !request.getMobile().isBlank()
+                && authUserMapper.selectByMobile(mobileCountry, request.getMobile().trim())
+                        != null) {
             throw new BizException(ErrorCode.REGISTER_USER_ALREADY_EXISTS);
         }
 
@@ -139,16 +146,21 @@ public class RegisterServiceImpl implements RegisterService {
         // 同一本地事务写入 auth_user + 注册 outbox
         AuthUser user = buildUser(request, username, mobileCountry, userId, shardIndex, externalId);
         registerPersistenceService.persistWithOutbox(user);
+        // The proxied persistence call has committed; the default role and profile are idempotent.
+        if (registrationSync != null) registrationSync.synchronizeRegistered(user);
 
         log.info("注册成功 userId={} shardIndex={} 外部ID与 outbox 已落库", userId, shardIndex);
         return externalId;
     }
 
-    /**
-     * 构造待落库的用户实体（密码 BCrypt，时间取时钟）。
-     */
-    private AuthUser buildUser(RegisterRequest request, String username, String mobileCountry,
-                               long userId, int shardIndex, String externalId) {
+    /** 构造待落库的用户实体（密码 BCrypt，时间取时钟）。 */
+    private AuthUser buildUser(
+            RegisterRequest request,
+            String username,
+            String mobileCountry,
+            long userId,
+            int shardIndex,
+            String externalId) {
         AuthUser user = new AuthUser();
         user.setUserId(userId);
         user.setShardIndex(shardIndex);
@@ -166,9 +178,7 @@ public class RegisterServiceImpl implements RegisterService {
         return user;
     }
 
-    /**
-     * 领取全局内部用户 ID。
-     */
+    /** 领取全局内部用户 ID。 */
     private long fetchUserId() {
         try {
             Result<Long> result = metaIdClient.nextId("user");
@@ -184,13 +194,12 @@ public class RegisterServiceImpl implements RegisterService {
         }
     }
 
-    /**
-     * 解析手机号国家号：未填时手机号存在则默认 +86，否则 null。
-     */
+    /** 解析手机号国家号：未填时手机号存在则默认 +86，否则 null。 */
     private String resolveMobileCountry(RegisterRequest request) {
         if (request.getMobile() != null && !request.getMobile().isBlank()) {
             return (request.getMobileCountry() == null || request.getMobileCountry().isBlank())
-                    ? "+86" : request.getMobileCountry().trim();
+                    ? "+86"
+                    : request.getMobileCountry().trim();
         }
         return blankToNull(request.getMobileCountry());
     }

@@ -4,7 +4,9 @@ import cc.nanoic.yunanexus.auth.client.UserProfileSyncClient;
 import cc.nanoic.yunanexus.auth.config.RegisterOutboxProperties;
 import cc.nanoic.yunanexus.auth.entity.AuthRegisterOutbox;
 import cc.nanoic.yunanexus.auth.mapper.AuthRegisterOutboxMapper;
+
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -14,13 +16,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 注册 outbox 补偿任务（ADR-021）。<p>
+ * 注册 outbox 补偿任务（ADR-021）。
  *
- * 周期性扫描 {@code status=0} 且到期的 outbox 记录，调用用户中心创建用户资料：
+ * <p>周期性扫描 {@code status=0} 且到期的 outbox 记录，调用用户中心创建用户资料：
+ *
  * <ul>
- *   <li>先幂等回查（{@code exists}）——已存在则直接置 DONE，避免重复创建；</li>
- *   <li>创建成功置 DONE；</li>
- *   <li>失败按指数退避安排下次重试，超过 {@code max-retry} 置 FAILED 并告警（error 日志）。</li>
+ *   <li>先幂等回查（{@code exists}）——已存在则直接置 DONE，避免重复创建；
+ *   <li>创建成功置 DONE；
+ *   <li>失败按指数退避安排下次重试，超过 {@code max-retry} 置 FAILED 并告警（error 日志）。
  * </ul>
  *
  * <b>启用条件</b>：{@code yunanexus.auth.outbox.enabled=true}（默认开启）。
@@ -37,28 +40,51 @@ public class RegisterOutboxCompensationTask {
     private final RegisterOutboxProperties properties;
     private final Clock clock;
 
-    public RegisterOutboxCompensationTask(AuthRegisterOutboxMapper outboxMapper,
-                                          UserProfileSyncClient userProfileSyncClient,
-                                          RegisterOutboxProperties properties,
-                                          Clock clock) {
+    public RegisterOutboxCompensationTask(
+            AuthRegisterOutboxMapper outboxMapper,
+            UserProfileSyncClient userProfileSyncClient,
+            RegisterOutboxProperties properties,
+            Clock clock) {
         this.outboxMapper = outboxMapper;
         this.userProfileSyncClient = userProfileSyncClient;
         this.properties = properties;
         this.clock = clock;
     }
 
-    /**
-     * 每 60 秒执行一次补偿（首次延迟 30 秒，避开启动抖动）。
-     */
+    /** 每 60 秒执行一次补偿（首次延迟 30 秒，避开启动抖动）。 */
     @Scheduled(initialDelayString = "30000", fixedDelayString = "60000")
     public void compensate() {
         LocalDateTime now = LocalDateTime.now(clock);
-        List<AuthRegisterOutbox> pending = outboxMapper.selectPending(now, properties.getBatchSize());
+        List<AuthRegisterOutbox> pending =
+                outboxMapper.selectPending(now, properties.getBatchSize());
         if (pending.isEmpty()) {
             return;
         }
         for (AuthRegisterOutbox record : pending) {
             processOne(record);
+        }
+    }
+
+    /**
+     * Fast path after the registration transaction commits; durable retries remain authoritative.
+     */
+    public void synchronizeRegistered(cc.nanoic.yunanexus.auth.entity.AuthUser user) {
+        AuthRegisterOutbox record = new AuthRegisterOutbox();
+        record.setUserId(user.getUserId());
+        record.setExternalId(user.getExternalId());
+        record.setShardIndex(user.getShardIndex());
+        record.setUsername(user.getUsername());
+        record.setEmail(user.getEmail());
+        record.setMobileCountry(user.getMobileCountry());
+        record.setMobile(user.getMobile());
+        record.setRetryCount(0);
+        try {
+            processOne(record);
+        } catch (RuntimeException e) {
+            // The auth transaction is already committed. Do not misreport a successful
+            // registration.
+            log.warn(
+                    "注册即时同步暂不可用 userId={} type={}", user.getUserId(), e.getClass().getSimpleName());
         }
     }
 
@@ -82,17 +108,19 @@ public class RegisterOutboxCompensationTask {
                 log.error("注册 outbox 同步失败超上限 userId={} 重试={} 类型={}", userId, nextRetry, reason);
             } else {
                 long backoff = computeBackoffSeconds(nextRetry);
-                outboxMapper.markRetry(userId, nextRetry,
-                        LocalDateTime.now(clock).plusSeconds(backoff), reason);
-                log.warn("注册 outbox 同步失败 userId={} 重试={} 下次退避={}s 类型={}",
-                        userId, nextRetry, backoff, reason);
+                outboxMapper.markRetry(
+                        userId, nextRetry, LocalDateTime.now(clock).plusSeconds(backoff), reason);
+                log.warn(
+                        "注册 outbox 同步失败 userId={} 重试={} 下次退避={}s 类型={}",
+                        userId,
+                        nextRetry,
+                        backoff,
+                        reason);
             }
         }
     }
 
-    /**
-     * 指数退避：initial * 2^(retry-1)，封顶 maxBackoffSeconds。
-     */
+    /** 指数退避：initial * 2^(retry-1)，封顶 maxBackoffSeconds。 */
     private long computeBackoffSeconds(int retry) {
         long initial = properties.getInitialBackoffSeconds();
         long max = properties.getMaxBackoffSeconds();
