@@ -44,7 +44,11 @@ public class OAuthApplicationService {
         var v = new LinkedHashMap<>(row);
         v.put("redirectUris", List.of(row.get("redirectUris").toString().split("\n")));
         v.put("scopes", List.of(row.get("scopes").toString().split(",")));
-        v.replaceAll((k,value)->value instanceof java.sql.Timestamp t?t.toLocalDateTime().toString():value);
+        v.replaceAll(
+                (k, value) ->
+                        value instanceof java.sql.Timestamp t
+                                ? t.toLocalDateTime().toString()
+                                : value);
         v.put("clientSecret", null);
         return v;
     }
@@ -130,7 +134,7 @@ public class OAuthApplicationService {
                 >= 100) throw bad("最多保留100条应用记录");
         if (db.queryForObject(
                         "SELECT COUNT(*) FROM auth_oauth_application WHERE owner_user_id=? AND"
-                            + " deleted=0",
+                                + " deleted=0",
                         Long.class,
                         owner)
                 >= 20) throw bad("最多创建20个应用");
@@ -186,7 +190,7 @@ public class OAuthApplicationService {
         if (remark != null && remark.length() > 500) throw bad("审核备注过长");
         db.update(
                 "UPDATE auth_oauth_application SET status=?,audit_remark=?,audit_time=NOW() WHERE"
-                    + " id=?",
+                        + " id=?",
                 approved ? 1 : 2,
                 remark,
                 id);
@@ -202,7 +206,7 @@ public class OAuthApplicationService {
                     urls.getFirst());
             db.update(
                     "INSERT INTO auth_platform(user_id,client_code,status,authorized_at)"
-                        + " VALUES(?,?,1,NOW()) ON DUPLICATE KEY UPDATE status=1",
+                            + " VALUES(?,?,1,NOW()) ON DUPLICATE KEY UPDATE status=1",
                     old.get("ownerUserId"),
                     old.get("clientId"));
         }
@@ -247,7 +251,7 @@ public class OAuthApplicationService {
         var rows =
                 db.queryForList(
                         "SELECT redirect_uris FROM auth_oauth_application WHERE client_code=? AND"
-                            + " status=1 AND deleted=0",
+                                + " status=1 AND deleted=0",
                         code);
         return rows.size() == 1
                 && List.of(rows.getFirst().get("redirect_uris").toString().split("\n"))
@@ -259,7 +263,7 @@ public class OAuthApplicationService {
         var rows =
                 db.queryForList(
                         "SELECT secret_hash FROM auth_oauth_application WHERE client_code=? AND"
-                            + " status=1 AND deleted=0",
+                                + " status=1 AND deleted=0",
                         code);
         if (secret == null
                 || secret.length() > 128
@@ -277,7 +281,7 @@ public class OAuthApplicationService {
         var rows =
                 db.queryForList(
                         "SELECT scopes FROM auth_oauth_application WHERE client_code=? AND status=1"
-                            + " AND deleted=0",
+                                + " AND deleted=0",
                         code);
         if (rows.size() != 1) return false;
         var scopes = Set.of(rows.getFirst().get("scopes").toString().split(","));
@@ -289,6 +293,7 @@ public class OAuthApplicationService {
             return scopes.contains("profile:read");
         if ("GET".equals(method)
                 && ("/api/v1/notice/inbox".equals(path)
+                        || "/api/v1/notice/inbox/summary".equals(path)
                         || path.matches("/api/v1/notice/inbox/[1-9][0-9]*")))
             return scopes.contains("notice:read");
         return PersonalApiKeyService.allows(scopes, method, path);

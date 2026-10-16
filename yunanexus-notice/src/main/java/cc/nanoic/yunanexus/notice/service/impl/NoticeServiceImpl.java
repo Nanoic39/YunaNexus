@@ -19,9 +19,11 @@ import cc.nanoic.yunanexus.notice.mapper.NoticeTemplateMapper;
 import cc.nanoic.yunanexus.notice.mq.NoticeProducer;
 import cc.nanoic.yunanexus.notice.render.TemplateRenderer;
 import cc.nanoic.yunanexus.notice.service.NoticeService;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
@@ -30,9 +32,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 通知发送与投递服务实现（roadmap 7.6 ~ 7.8）。<p>
+ * 通知发送与投递服务实现（roadmap 7.6 ~ 7.8）。
  *
- * 发送链路：模板渲染 → 号段取号（{@code notice}）→ 记录落库（待发送）→ 投递延迟消息。<br>
+ * <p>发送链路：模板渲染 → 号段取号（{@code notice}）→ 记录落库（待发送）→ 投递延迟消息。<br>
  * 投递链路：MQ 消费者回查记录 → 通道发送器真实投递 → 回写已发送 / 发送失败。
  *
  * @author yunanexus
@@ -63,14 +65,15 @@ public class NoticeServiceImpl implements NoticeService {
     private final NoticeProperties properties;
     private final ObjectMapper objectMapper;
 
-    public NoticeServiceImpl(NoticeTemplateMapper templateMapper,
-                             NoticeRecordMapper recordMapper,
-                             MetaIdClient metaIdClient,
-                             TemplateRenderer templateRenderer,
-                             NoticeProducer noticeProducer,
-                             NoticeSenderRegistry senderRegistry,
-                             NoticeProperties properties,
-                             ObjectMapper objectMapper) {
+    public NoticeServiceImpl(
+            NoticeTemplateMapper templateMapper,
+            NoticeRecordMapper recordMapper,
+            MetaIdClient metaIdClient,
+            TemplateRenderer templateRenderer,
+            NoticeProducer noticeProducer,
+            NoticeSenderRegistry senderRegistry,
+            NoticeProperties properties,
+            ObjectMapper objectMapper) {
         this.templateMapper = templateMapper;
         this.recordMapper = recordMapper;
         this.metaIdClient = metaIdClient;
@@ -90,7 +93,8 @@ public class NoticeServiceImpl implements NoticeService {
         if (template.getStatus() == null || template.getStatus() != NoticeTemplate.STATUS_ENABLED) {
             throw new BizException(ErrorCode.NOTICE_TEMPLATE_DISABLED, request.getTemplateCode());
         }
-        int channelCode = request.getChannel() != null ? request.getChannel() : template.getChannel();
+        int channelCode =
+                request.getChannel() != null ? request.getChannel() : template.getChannel();
         if (NoticeChannel.of(channelCode) == null) {
             throw new BizException(ErrorCode.NOTICE_CHANNEL_UNSUPPORTED, "通道: " + channelCode);
         }
@@ -99,8 +103,10 @@ public class NoticeServiceImpl implements NoticeService {
         String title = templateRenderer.render(template.getTitle(), params);
         String content = templateRenderer.render(template.getContent(), params);
         String paramsJson = toJson(params);
-        int delayLevel = request.getDelayLevel() != null
-                ? request.getDelayLevel() : properties.getRocketmq().getDelayLevel();
+        int delayLevel =
+                request.getDelayLevel() != null
+                        ? request.getDelayLevel()
+                        : properties.getRocketmq().getDelayLevel();
 
         List<NoticeRecordView> views = new ArrayList<>();
         for (String receiver : request.getReceivers()) {
@@ -119,8 +125,12 @@ public class NoticeServiceImpl implements NoticeService {
 
             noticeProducer.send(new NoticeMessage(record.getId(), noticeId), delayLevel);
             views.add(NoticeRecordView.from(recordMapper.selectByNoticeId(noticeId)));
-            log.info("通知已入队 noticeId={} channel={} receiver={} delayLevel={}",
-                    noticeId, channelCode, receiver, delayLevel);
+            log.info(
+                    "通知已入队 noticeId={} channel={} receiver={} delayLevel={}",
+                    noticeId,
+                    channelCode,
+                    receiver,
+                    delayLevel);
         }
         return views;
     }
@@ -139,34 +149,68 @@ public class NoticeServiceImpl implements NoticeService {
             record.setSendTime(LocalDateTime.now());
             record.setErrorMsg(null);
             recordMapper.updateById(record);
-            log.info("通知投递成功 noticeId={} channel={} receiver={}",
-                    record.getNoticeId(), record.getChannel(), record.getReceiver());
+            log.info(
+                    "通知投递成功 noticeId={} channel={} receiver={}",
+                    record.getNoticeId(),
+                    record.getChannel(),
+                    record.getReceiver());
         } catch (RuntimeException e) {
             record.setStatus(NoticeRecord.STATUS_FAILED);
             record.setErrorMsg(truncate(e.getMessage()));
             record.setRetryCount(record.getRetryCount() == null ? 1 : record.getRetryCount() + 1);
             recordMapper.updateById(record);
-            log.error("通知投递失败 noticeId={} channel={} receiver={}: {}",
-                    record.getNoticeId(), record.getChannel(), record.getReceiver(), e.getMessage());
+            log.error(
+                    "通知投递失败 noticeId={} channel={} receiver={}: {}",
+                    record.getNoticeId(),
+                    record.getChannel(),
+                    record.getReceiver(),
+                    e.getMessage());
         }
     }
 
     @Override
     public PageResult<NoticeRecordView> inbox(String receiver, int page, int size) {
+        return inbox(receiver, page, size, null);
+    }
+
+    @Override
+    public PageResult<NoticeRecordView> inbox(String receiver, int page, int size, Integer status) {
+        if (status != null && status != 1 && status != 3)
+            throw new BizException(ErrorCode.BAD_REQUEST, "站内信状态仅支持 1（未读）和 3（已读）");
         int p = normalizePage(page);
         int s = normalizeSize(size);
-        long total = recordMapper.countInbox(receiver);
-        if (total == 0) {
-            return PageResult.empty(p, s);
-        }
-        List<NoticeRecordView> records = recordMapper.selectInboxPage(receiver, offset(p, s), s)
-                .stream().map(NoticeRecordView::from).toList();
+        long total =
+                status == null
+                        ? recordMapper.countInbox(receiver)
+                        : recordMapper.countInboxFiltered(receiver, status);
+        if (total == 0) return PageResult.empty(p, s);
+        var records =
+                (status == null
+                                ? recordMapper.selectInboxPage(receiver, offset(p, s), s)
+                                : recordMapper.selectInboxFiltered(
+                                        receiver, status, offset(p, s), s))
+                        .stream().map(NoticeRecordView::from).toList();
         return PageResult.of(records, total, p, s);
+    }
+
+    @Override
+    public cc.nanoic.yunanexus.notice.domain.NoticeInboxSummary inboxSummary(String receiver) {
+        return recordMapper.inboxSummary(receiver);
+    }
+
+    @Override
+    public int markAllRead(String receiver) {
+        return recordMapper.markAllRead(receiver);
     }
 
     @Override
     public void markRead(long noticeId, String receiver) {
         if (recordMapper.markRead(noticeId, receiver) == 0) {
+            var record = recordMapper.selectByNoticeId(noticeId);
+            if (record != null
+                    && receiver.equals(record.getReceiver())
+                    && Integer.valueOf(1).equals(record.getChannel())
+                    && Integer.valueOf(3).equals(record.getStatus())) return;
             throw new BizException(ErrorCode.NOTICE_RECORD_NOT_FOUND, "通知不存在或不可标记已读: " + noticeId);
         }
     }
@@ -181,17 +225,20 @@ public class NoticeServiceImpl implements NoticeService {
     }
 
     @Override
-    public PageResult<NoticeRecordView> listRecords(String templateCode, String receiver, Integer status,
-                                                    int page, int size) {
+    public PageResult<NoticeRecordView> listRecords(
+            String templateCode, String receiver, Integer status, int page, int size) {
         int p = normalizePage(page);
         int s = normalizeSize(size);
         long total = recordMapper.countRecords(templateCode, receiver, status);
         if (total == 0) {
             return PageResult.empty(p, s);
         }
-        List<NoticeRecordView> records = recordMapper
-                .selectRecordPage(templateCode, receiver, status, offset(p, s), s)
-                .stream().map(NoticeRecordView::from).toList();
+        List<NoticeRecordView> records =
+                recordMapper
+                        .selectRecordPage(templateCode, receiver, status, offset(p, s), s)
+                        .stream()
+                        .map(NoticeRecordView::from)
+                        .toList();
         return PageResult.of(records, total, p, s);
     }
 
@@ -214,6 +261,7 @@ public class NoticeServiceImpl implements NoticeService {
     }
 
     private static int normalizePage(int page) {
+        if (page > 10000) throw new BizException(ErrorCode.BAD_REQUEST, "页码超出查询上限");
         return Math.max(page, 1);
     }
 

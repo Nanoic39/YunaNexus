@@ -1,5 +1,21 @@
 package cc.nanoic.yunanexus.notice.service.impl;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import cc.nanoic.yunanexus.common.core.model.PageResult;
 import cc.nanoic.yunanexus.common.core.model.Result;
 import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
@@ -18,27 +34,15 @@ import cc.nanoic.yunanexus.notice.mapper.NoticeRecordMapper;
 import cc.nanoic.yunanexus.notice.mapper.NoticeTemplateMapper;
 import cc.nanoic.yunanexus.notice.mq.NoticeProducer;
 import cc.nanoic.yunanexus.notice.render.TemplateRenderer;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
  * {@link NoticeServiceImpl} 单元测试（发送入队 / 投递回写 / 站内信）。
@@ -65,8 +69,16 @@ class NoticeServiceImplTest {
         noticeProducer = mock(NoticeProducer.class);
         senderRegistry = mock(NoticeSenderRegistry.class);
         NoticeProperties properties = new NoticeProperties();
-        service = new NoticeServiceImpl(templateMapper, recordMapper, metaIdClient,
-                new TemplateRenderer(), noticeProducer, senderRegistry, properties, new ObjectMapper());
+        service =
+                new NoticeServiceImpl(
+                        templateMapper,
+                        recordMapper,
+                        metaIdClient,
+                        new TemplateRenderer(),
+                        noticeProducer,
+                        senderRegistry,
+                        properties,
+                        new ObjectMapper());
     }
 
     private NoticeTemplate template(int channel, int status) {
@@ -104,20 +116,29 @@ class NoticeServiceImplTest {
 
     @Test
     void sendRendersPersistsAndEnqueuesPerReceiver() {
-        when(templateMapper.selectByCode(TEMPLATE_CODE)).thenReturn(template(NoticeChannel.INNER.getCode(), NoticeTemplate.STATUS_ENABLED));
-        when(metaIdClient.nextId("notice")).thenReturn(Result.success(9001L), Result.success(9002L));
+        when(templateMapper.selectByCode(TEMPLATE_CODE))
+                .thenReturn(template(NoticeChannel.INNER.getCode(), NoticeTemplate.STATUS_ENABLED));
+        when(metaIdClient.nextId("notice"))
+                .thenReturn(Result.success(9001L), Result.success(9002L));
 
         List<NoticeRecord> persisted = new ArrayList<>();
-        when(recordMapper.insert(any(NoticeRecord.class))).thenAnswer(invocation -> {
-            NoticeRecord inserted = invocation.getArgument(0);
-            inserted.setId((long) (persisted.size() + 1));
-            persisted.add(inserted);
-            return 1;
-        });
-        when(recordMapper.selectByNoticeId(anyLong())).thenAnswer(invocation -> {
-            long noticeId = invocation.getArgument(0);
-            return persisted.stream().filter(r -> r.getNoticeId() == noticeId).findFirst().orElse(null);
-        });
+        when(recordMapper.insert(any(NoticeRecord.class)))
+                .thenAnswer(
+                        invocation -> {
+                            NoticeRecord inserted = invocation.getArgument(0);
+                            inserted.setId((long) (persisted.size() + 1));
+                            persisted.add(inserted);
+                            return 1;
+                        });
+        when(recordMapper.selectByNoticeId(anyLong()))
+                .thenAnswer(
+                        invocation -> {
+                            long noticeId = invocation.getArgument(0);
+                            return persisted.stream()
+                                    .filter(r -> r.getNoticeId() == noticeId)
+                                    .findFirst()
+                                    .orElse(null);
+                        });
 
         List<NoticeRecordView> views = service.send(sendRequest(List.of(RECEIVER, "1002")));
 
@@ -134,7 +155,9 @@ class NoticeServiceImplTest {
     void sendRejectsUnknownTemplate() {
         when(templateMapper.selectByCode(TEMPLATE_CODE)).thenReturn(null);
 
-        BizException ex = assertThrows(BizException.class, () -> service.send(sendRequest(List.of(RECEIVER))));
+        BizException ex =
+                assertThrows(
+                        BizException.class, () -> service.send(sendRequest(List.of(RECEIVER))));
         assertEquals(ErrorCode.NOTICE_TEMPLATE_NOT_FOUND.getCode(), ex.getCode());
         verify(recordMapper, never()).insert(any(NoticeRecord.class));
     }
@@ -142,9 +165,12 @@ class NoticeServiceImplTest {
     @Test
     void sendRejectsDisabledTemplate() {
         when(templateMapper.selectByCode(TEMPLATE_CODE))
-                .thenReturn(template(NoticeChannel.INNER.getCode(), NoticeTemplate.STATUS_DISABLED));
+                .thenReturn(
+                        template(NoticeChannel.INNER.getCode(), NoticeTemplate.STATUS_DISABLED));
 
-        BizException ex = assertThrows(BizException.class, () -> service.send(sendRequest(List.of(RECEIVER))));
+        BizException ex =
+                assertThrows(
+                        BizException.class, () -> service.send(sendRequest(List.of(RECEIVER))));
         assertEquals(ErrorCode.NOTICE_TEMPLATE_DISABLED.getCode(), ex.getCode());
     }
 
@@ -165,7 +191,9 @@ class NoticeServiceImplTest {
                 .thenReturn(template(NoticeChannel.INNER.getCode(), NoticeTemplate.STATUS_ENABLED));
         when(metaIdClient.nextId("notice")).thenReturn(Result.error(500, "meta down"));
 
-        BizException ex = assertThrows(BizException.class, () -> service.send(sendRequest(List.of(RECEIVER))));
+        BizException ex =
+                assertThrows(
+                        BizException.class, () -> service.send(sendRequest(List.of(RECEIVER))));
         assertEquals(ErrorCode.NOTICE_SEND_FAILED.getCode(), ex.getCode());
         verify(recordMapper, never()).insert(any(NoticeRecord.class));
     }
@@ -174,7 +202,13 @@ class NoticeServiceImplTest {
 
     @Test
     void dispatchMarksSentOnSuccess() {
-        NoticeRecord record = record(5L, 9001L, NoticeChannel.INNER.getCode(), RECEIVER, NoticeRecord.STATUS_PENDING);
+        NoticeRecord record =
+                record(
+                        5L,
+                        9001L,
+                        NoticeChannel.INNER.getCode(),
+                        RECEIVER,
+                        NoticeRecord.STATUS_PENDING);
         when(recordMapper.selectById(5L)).thenReturn(record);
         NoticeSender sender = mock(NoticeSender.class);
         when(senderRegistry.get(NoticeChannel.INNER)).thenReturn(sender);
@@ -190,7 +224,13 @@ class NoticeServiceImplTest {
 
     @Test
     void dispatchMarksFailedAndTruncatesErrorOnException() {
-        NoticeRecord record = record(5L, 9001L, NoticeChannel.EMAIL.getCode(), "a@b.com", NoticeRecord.STATUS_PENDING);
+        NoticeRecord record =
+                record(
+                        5L,
+                        9001L,
+                        NoticeChannel.EMAIL.getCode(),
+                        "a@b.com",
+                        NoticeRecord.STATUS_PENDING);
         when(recordMapper.selectById(5L)).thenReturn(record);
         NoticeSender sender = mock(NoticeSender.class);
         when(senderRegistry.get(NoticeChannel.EMAIL)).thenReturn(sender);
@@ -220,8 +260,15 @@ class NoticeServiceImplTest {
     @Test
     void inboxMapsRecordsToViews() {
         when(recordMapper.countInbox(RECEIVER)).thenReturn(1L);
-        when(recordMapper.selectInboxPage(eq(RECEIVER), anyInt(), anyInt())).thenReturn(
-                List.of(record(1L, 9001L, NoticeChannel.INNER.getCode(), RECEIVER, NoticeRecord.STATUS_SENT)));
+        when(recordMapper.selectInboxPage(eq(RECEIVER), anyInt(), anyInt()))
+                .thenReturn(
+                        List.of(
+                                record(
+                                        1L,
+                                        9001L,
+                                        NoticeChannel.INNER.getCode(),
+                                        RECEIVER,
+                                        NoticeRecord.STATUS_SENT)));
 
         PageResult<NoticeRecordView> result = service.inbox(RECEIVER, 1, 20);
 
@@ -253,5 +300,37 @@ class NoticeServiceImplTest {
 
         BizException ex = assertThrows(BizException.class, () -> service.getRecord(9001L));
         assertEquals(ErrorCode.NOTICE_RECORD_NOT_FOUND.getCode(), ex.getCode());
+    }
+
+    @Test
+    void filtersApplyBeforePaginationAndInvalidRangesNeverQueryDatabase() {
+        when(recordMapper.countInboxFiltered(RECEIVER, 1)).thenReturn(25L);
+        when(recordMapper.selectInboxFiltered(RECEIVER, 1, 10, 10)).thenReturn(List.of());
+        assertEquals(25, service.inbox(RECEIVER, 2, 10, 1).getTotal());
+        verify(recordMapper).selectInboxFiltered(RECEIVER, 1, 10, 10);
+        assertThrows(BizException.class, () -> service.inbox(RECEIVER, 1, 10, 2));
+        assertThrows(BizException.class, () -> service.inbox(RECEIVER, Integer.MAX_VALUE, 100));
+    }
+
+    @Test
+    void alreadyReadIsIdempotentOnlyForTheSameRecipientAndInnerChannel() {
+        var value = record(1L, 9001L, NoticeChannel.INNER.getCode(), RECEIVER, 3);
+        when(recordMapper.selectByNoticeId(9001L)).thenReturn(value);
+        assertDoesNotThrow(() -> service.markRead(9001L, RECEIVER));
+        assertThrows(BizException.class, () -> service.markRead(9001L, "another-user"));
+        value.setChannel(2);
+        assertThrows(BizException.class, () -> service.markRead(9001L, RECEIVER));
+    }
+
+    @Test
+    void allReadAndGlobalSummaryAreAlwaysScopedToReceiver() {
+        when(recordMapper.markAllRead(RECEIVER)).thenReturn(31);
+        assertEquals(31, service.markAllRead(RECEIVER));
+        verify(recordMapper).markAllRead(RECEIVER);
+        var summary = new cc.nanoic.yunanexus.notice.domain.NoticeInboxSummary();
+        summary.setTotal(45);
+        summary.setUnread(31);
+        when(recordMapper.inboxSummary(RECEIVER)).thenReturn(summary);
+        assertSame(summary, service.inboxSummary(RECEIVER));
     }
 }
