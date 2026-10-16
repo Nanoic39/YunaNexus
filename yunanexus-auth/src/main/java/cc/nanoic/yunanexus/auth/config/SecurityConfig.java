@@ -46,6 +46,7 @@ public class SecurityConfig {
             AdminProperties adminProperties,
             AuthenticationManager authenticationManager,
             org.springframework.beans.factory.ObjectProvider<cc.nanoic.yunanexus.auth.client.RootAdminClient> roleClients,
+            org.springframework.beans.factory.ObjectProvider<cc.nanoic.yunanexus.auth.service.OAuthApplicationService> applicationServices,
             @Qualifier("authSecurityErrorWriter") SecurityErrorWriter securityErrorWriter) throws Exception {
 
         // CSRF 配置
@@ -62,6 +63,11 @@ public class SecurityConfig {
         XorCsrfTokenRequestAttributeHandler csrfHandler = new XorCsrfTokenRequestAttributeHandler();
 
         JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(authenticationManager, securityErrorWriter);
+        jwtFilter.setClientAuthorization((i,r)->{
+            if("/internal/auth/oauth/allow".equals(r.getRequestURI()))return true;
+            var apps=applicationServices.getIfAvailable();
+            return apps!=null&&apps.allows(i.clientCode(),r.getMethod(),r.getRequestURI());
+        });
         AdminAuthenticationFilter adminFilter = new AdminAuthenticationFilter(adminProperties, securityErrorWriter, userId -> {
             var client=roleClients.getIfAvailable();
             if (client==null) throw new IllegalStateException("Role verification unavailable");
@@ -104,12 +110,13 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/internal/auth/admin/check").authenticated()
+                .requestMatchers(HttpMethod.GET, "/internal/auth/admin/check", "/internal/auth/admin/super-check", "/internal/auth/admin/identity", "/internal/auth/oauth/allow").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/captcha").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/register",
                     "/api/v1/auth/refresh", "/api/v1/auth/unlock-appeal",
+                    "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/verify", "/api/v1/auth/password-reset/complete",
                     "/api/v1/auth/sso/token", "/api/v1/auth/sso/authorize").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout", "/api/v1/auth/logout-all").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()

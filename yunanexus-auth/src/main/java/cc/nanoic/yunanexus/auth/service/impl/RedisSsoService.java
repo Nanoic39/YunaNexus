@@ -34,6 +34,9 @@ import java.util.regex.Pattern;
 
 @Service
 public class RedisSsoService implements SsoService {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private cc.nanoic.yunanexus.auth.service.OAuthApplicationService applications;
+    private boolean redirectAllowed(AuthClient client,String uri){return client.getClientCode().startsWith("oauth_")?applications!=null&&applications.redirectAllowed(client.getClientCode(),uri):client.getRedirectUri().equals(uri);}
 
     private static final String ROOT_PREFIX = "auth:sso_root:";
     private static final String CODE_PREFIX = "auth:sso_code:";
@@ -232,7 +235,7 @@ public class RedisSsoService implements SsoService {
 
         AuthClient client = authenticationService.requireGrant(session, request.getClientCode());
 
-        if (!client.getRedirectUri().equals(request.getRedirectUri())) {
+        if (!redirectAllowed(client,request.getRedirectUri())) {
             throw new BizException(ErrorCode.FORBIDDEN, "redirectUri 不匹配");
         }
 
@@ -305,6 +308,10 @@ public class RedisSsoService implements SsoService {
     @Override
     public LoginResult exchange(TokenExchangeRequest request) {
         validateExchangeRequest(request);
+        if(request.getClientCode().startsWith("oauth_")){
+            if(applications==null)throw new BizException(ErrorCode.FORBIDDEN,"接入验证不可用");
+            applications.verifySecret(request.getClientCode(),request.getClientSecret());
+        }
 
         String codeHash = sha256Hex(request.getCode());
         String codeKey = authRedisKeys.ssoCode(codeHash);
@@ -386,7 +393,7 @@ public class RedisSsoService implements SsoService {
         }
 
         AuthClient client = authenticationService.requireGrant(session, codeRecord.clientCode());
-        if (!client.getRedirectUri().equals(codeRecord.redirectUri())) {
+        if (!redirectAllowed(client,codeRecord.redirectUri())) {
             throw new BizException(ErrorCode.FORBIDDEN, "redirectUri 不匹配");
         }
         validateRedirectUri(codeRecord.redirectUri());

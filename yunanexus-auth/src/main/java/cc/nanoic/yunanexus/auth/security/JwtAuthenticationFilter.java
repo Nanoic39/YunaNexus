@@ -18,6 +18,8 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final AuthenticationManager authenticationManager;
+    private java.util.function.BiPredicate<AuthenticatedIdentity,HttpServletRequest> clientAuthorization=(i,r)->false;
+    public void setClientAuthorization(java.util.function.BiPredicate<AuthenticatedIdentity,HttpServletRequest> check){this.clientAuthorization=check;}
     private final SecurityErrorWriter securityErrorWriter;
 
     public JwtAuthenticationFilter(
@@ -53,6 +55,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             PreAuthenticatedAuthenticationToken preAuthToken = new PreAuthenticatedAuthenticationToken(token, null);
             Authentication authentication = authenticationManager.authenticate(preAuthToken);
+            if(authentication.getPrincipal() instanceof AuthenticatedIdentity i && i.clientCode().startsWith("oauth_") && !clientAuthorization.test(i,request)) {
+                securityErrorWriter.write(response,403,"应用无此接口权限");return;
+            }
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (BizException e) {
             SecurityContextHolder.clearContext();

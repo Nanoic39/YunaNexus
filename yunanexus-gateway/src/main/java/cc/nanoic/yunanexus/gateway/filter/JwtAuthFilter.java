@@ -31,6 +31,8 @@ import reactor.core.publisher.Mono;
  */
 @Component
 public class JwtAuthFilter implements GlobalFilter, Ordered {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private cc.nanoic.yunanexus.gateway.security.OAuthClientChecker oauthClients;
 
     @org.springframework.beans.factory.annotation.Autowired
     private cc.nanoic.yunanexus.gateway.security.PersonalApiKeyChecker personalApiKeyChecker;
@@ -115,6 +117,10 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
                             .header(properties.getUserIdHeader(), Long.toString(decoded.internalId()))
                             .header(properties.getShardHeader(), Integer.toString(decoded.shardIndex()))
                             .build();
+                    if(payload.clientCode().startsWith("oauth_")){
+                        if(oauthClients==null)return errorWriter.write(exchange,503,GatewayErrorCodes.SERVICE_UNAVAILABLE,"应用权限验证不可用");
+                        return oauthClients.allows(authorization,request.getMethod().name(),request.getPath().value()).flatMap(allowed->Boolean.TRUE.equals(allowed)?chain.filter(sanitizedExchange.mutate().request(request).build()):errorWriter.write(exchange,403,GatewayErrorCodes.FORBIDDEN,"应用无此接口权限"));
+                    }
                     return chain.filter(sanitizedExchange.mutate().request(request).build());
                 })
                 .onErrorResume(GatewayAuthException.class,
