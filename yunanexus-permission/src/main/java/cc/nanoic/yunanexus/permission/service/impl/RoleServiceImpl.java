@@ -44,6 +44,7 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public PermRole create(RoleSaveRequest request) {
+        if(java.util.Set.of("user","admin","super_admin").contains(request.getRoleCode()))throw new BizException(ErrorCode.FORBIDDEN,"保留角色不可创建");
         if (existsByCode(request.getRoleCode())) {
             throw new BizException(ErrorCode.ROLE_CODE_EXISTS);
         }
@@ -64,6 +65,7 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public PermRole update(long id, RoleSaveRequest request) {
         PermRole role = requireRole(id);
+        if(role.getRoleCode()!=null && java.util.Set.of("user","admin","super_admin").contains(role.getRoleCode()))throw new BizException(ErrorCode.FORBIDDEN,"系统默认角色不可修改或删除");
         role.setRoleName(request.getRoleName());
         role.setDescription(request.getDescription());
         if (request.getDataScope() != null) {
@@ -79,7 +81,8 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(long id) {
-        requireRole(id);
+        var role=requireRole(id);
+        if(role.getRoleCode()!=null && java.util.Set.of("user","admin","super_admin").contains(role.getRoleCode()))throw new BizException(ErrorCode.FORBIDDEN,"系统默认角色不可删除");
         userRoleMapper.delete(new LambdaQueryWrapper<PermUserRole>().eq(PermUserRole::getRoleId, id));
         rolePermissionMapper.delete(new LambdaQueryWrapper<PermRolePermission>().eq(PermRolePermission::getRoleId, id));
         roleDeptMapper.delete(new LambdaQueryWrapper<PermRoleDept>().eq(PermRoleDept::getRoleId, id));

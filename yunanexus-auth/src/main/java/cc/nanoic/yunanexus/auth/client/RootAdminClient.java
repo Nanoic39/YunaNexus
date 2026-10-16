@@ -9,4 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface RootAdminClient {
     @GetMapping("/internal/permission/root-admin")
     Result<Boolean> check(@RequestParam("userId") long userId);
+    @GetMapping("/internal/permission/has-code") Result<Boolean> hasCode(@RequestParam("userId") long userId,@RequestParam("code") String code);
+    @GetMapping("/internal/permission/super-admin") Result<Boolean> superCheck(@RequestParam("userId") long userId);
+    @org.springframework.web.bind.annotation.PostMapping("/internal/permission/default-role") Result<Void> bindDefault(@RequestParam("userId") long userId);
 }

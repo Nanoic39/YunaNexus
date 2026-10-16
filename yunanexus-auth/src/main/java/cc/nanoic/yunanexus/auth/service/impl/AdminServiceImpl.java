@@ -47,6 +47,7 @@ public class AdminServiceImpl implements AdminService {
     private final SessionService sessionService;
     private final AccountEpochService accountEpochService;
     private final Clock clock;
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private cc.nanoic.yunanexus.auth.client.RootAdminClient rootRoles;
 
     public AdminServiceImpl(AuthUnlockAppealMapper appealMapper,
                             AuthUserMapper authUserMapper,
@@ -131,6 +132,14 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public void disableUser(long userId) {
+        var auth=org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if(auth!=null && auth.getPrincipal() instanceof cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity i && i.userId()==userId)
+            throw new cc.nanoic.yunanexus.common.web.exception.BizException(cc.nanoic.yunanexus.common.web.constant.ErrorCode.FORBIDDEN,"不能禁用自己的账户");
+        if(rootRoles!=null&&auth!=null&&auth.getPrincipal() instanceof cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity i){
+            var target=rootRoles.superCheck(userId);var actor=rootRoles.superCheck(i.userId());
+            if(target==null||actor==null||target.getCode()!=200||actor.getCode()!=200)throw new cc.nanoic.yunanexus.common.web.exception.BizException(cc.nanoic.yunanexus.common.web.constant.ErrorCode.INTERNAL_ERROR,"权限校验不可用");
+            if(Boolean.TRUE.equals(target.getData())&&!Boolean.TRUE.equals(actor.getData()))throw new cc.nanoic.yunanexus.common.web.exception.BizException(cc.nanoic.yunanexus.common.web.constant.ErrorCode.FORBIDDEN,"不能禁用超级管理员");
+        }
         requireUser(userId);
         authUserMapper.updateStatusAndLock(userId, 0, null, null);
         log.info("管理后台禁用账号 userId={}", userId);

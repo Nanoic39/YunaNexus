@@ -20,6 +20,21 @@ public class AdminBearerVerifier {
         this.verificationUrl = verificationUrl;
     }
 
+    public record Actor(long userId,boolean superAdmin){}
+    public Actor actor(String authorization) {
+        if(authorization==null||!authorization.startsWith("Bearer ")||verificationUrl==null||verificationUrl.isBlank())return null;
+        try {
+            var request=HttpRequest.newBuilder(URI.create(verificationUrl.replace("/admin/check","/admin/identity"))).timeout(Duration.ofSeconds(3)).header("Authorization",authorization).GET().build();
+            var response=client.send(request,HttpResponse.BodyHandlers.ofInputStream());
+            try(var body=response.body()) {
+                if(response.statusCode()!=200)return null;
+                byte[] bytes=body.readNBytes(4097);if(bytes.length>4096)return null;
+                var root=mapper.readTree(bytes);var data=root.path("data");
+                if(root.path("code").asInt()!=200||!data.path("superAdmin").isBoolean()||data.path("userId").asLong()<=0)return null;
+                return new Actor(data.path("userId").asLong(),data.path("superAdmin").asBoolean());
+            }
+        } catch(InterruptedException e){Thread.currentThread().interrupt();return null;}catch(Exception e){return null;}
+    }
     /** 返回 200/401/403/503；任何配置、网络或响应异常均拒绝。 */
     public int verify(String authorization) {
         if (authorization == null || !authorization.startsWith("Bearer ") || authorization.length() <= 7) return 401;

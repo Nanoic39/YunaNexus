@@ -37,6 +37,8 @@ import java.util.Objects;
  */
 @Service
 public class BindingServiceImpl implements BindingService {
+    @org.springframework.beans.factory.annotation.Autowired
+    private cc.nanoic.yunanexus.permission.security.PrivilegedRoleGuard privileged;
 
     private final PermUserRoleMapper userRoleMapper;
     private final PermRolePermissionMapper rolePermissionMapper;
@@ -76,6 +78,7 @@ public class BindingServiceImpl implements BindingService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void setUserRoles(long userId, List<Long> roleIds) {
+        if(privileged!=null)privileged.assignment(userId,roleIds);
         List<Long> targets = distinct(roleIds);
         if (!targets.isEmpty()) {
             long found = roleMapper.selectCount(new LambdaQueryWrapper<PermRole>().in(PermRole::getId, targets));
@@ -100,6 +103,7 @@ public class BindingServiceImpl implements BindingService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void setRolePermissions(long roleId, List<Long> permissionIds) {
+        if(privileged!=null)privileged.role(roleId);
         if (roleMapper.selectById(roleId) == null) {
             throw new BizException(ErrorCode.ROLE_NOT_FOUND);
         }
@@ -150,6 +154,7 @@ public class BindingServiceImpl implements BindingService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void setRoleDepts(long roleId, List<Long> deptIds) {
+        if(privileged!=null)privileged.role(roleId);
         if (roleMapper.selectById(roleId) == null) {
             throw new BizException(ErrorCode.ROLE_NOT_FOUND);
         }
@@ -177,6 +182,7 @@ public class BindingServiceImpl implements BindingService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void setRoleMenus(long roleId, List<Long> menuIds) {
+        if(privileged!=null)privileged.role(roleId);
         if (roleMapper.selectById(roleId) == null) {
             throw new BizException(ErrorCode.ROLE_NOT_FOUND);
         }

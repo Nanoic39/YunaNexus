@@ -43,6 +43,18 @@ public class InternalPermissionController {
     }
 
 
+    @GetMapping("/super-admin")
+    public Result<Boolean> superAdmin(@RequestParam("userId") long userId) {return Result.success(userId>0&&roleMapper.countSuperAdmin(userId)>0);}
+    @Resource private org.springframework.jdbc.core.JdbcTemplate db;
+    @GetMapping("/has-code")
+    public Result<Boolean> hasCode(@RequestParam("userId") long userId,@RequestParam("code") String code){return Result.success(userId>0&&code!=null&&code.length()<=128&&db.queryForObject("SELECT COUNT(*) FROM perm_user_role ur JOIN perm_role r ON r.id=ur.role_id JOIN perm_role_permission rp ON rp.role_id=r.id JOIN perm_permission p ON p.id=rp.permission_id WHERE ur.user_id=? AND r.status=1 AND p.status=1 AND BINARY p.perm_code=?",Integer.class,userId,code)>0);}
+    @PostMapping("/default-role")
+    public Result<Void> bindDefault(@RequestParam("userId") long userId) {
+        if(userId<=0)throw new IllegalArgumentException("Invalid user");
+        if(db.queryForObject("SELECT COUNT(*) FROM perm_role WHERE role_code='user' AND status=1",Integer.class)!=1)throw new IllegalStateException("Default role unavailable");
+        db.update("INSERT IGNORE INTO perm_user_role(user_id,role_id) SELECT ?,id FROM perm_role WHERE role_code='user' AND status=1",userId);
+        return Result.success();
+    }
     @Resource
     private AuthorizationService authorizationService;
 

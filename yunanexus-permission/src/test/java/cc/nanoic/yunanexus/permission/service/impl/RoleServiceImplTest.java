@@ -53,7 +53,7 @@ class RoleServiceImplTest {
     void 新增角色标识重复抛出业务异常() {
         when(roleMapper.selectCount(any())).thenReturn(1L);
 
-        BizException ex = assertThrows(BizException.class, () -> service.create(request("admin")));
+        BizException ex = assertThrows(BizException.class, () -> service.create(request("editor")));
         assertEquals(ErrorCode.ROLE_CODE_EXISTS.getCode(), ex.getCode());
         verify(roleMapper, never()).insert(any(PermRole.class));
     }
@@ -64,11 +64,11 @@ class RoleServiceImplTest {
         when(roleMapper.insert(any(PermRole.class))).thenReturn(1);
         PermRole persisted = new PermRole();
         persisted.setId(10L);
-        persisted.setRoleCode("admin");
+        persisted.setRoleCode("editor");
         persisted.setStatus(PermRole.STATUS_ENABLED);
         when(roleMapper.selectById(any())).thenReturn(persisted);
 
-        PermRole result = service.create(request("admin"));
+        PermRole result = service.create(request("editor"));
 
         assertEquals(10L, result.getId());
         assertEquals(PermRole.STATUS_ENABLED, result.getStatus());
@@ -78,7 +78,7 @@ class RoleServiceImplTest {
     void 更新角色不存在抛出业务异常() {
         when(roleMapper.selectById(1L)).thenReturn(null);
 
-        BizException ex = assertThrows(BizException.class, () -> service.update(1L, request("admin")));
+        BizException ex = assertThrows(BizException.class, () -> service.update(1L, request("editor")));
         assertEquals(ErrorCode.ROLE_NOT_FOUND.getCode(), ex.getCode());
     }
 
@@ -86,19 +86,19 @@ class RoleServiceImplTest {
     void 更新角色仅改名称描述状态() {
         PermRole existing = new PermRole();
         existing.setId(1L);
-        existing.setRoleCode("admin");
+        existing.setRoleCode("editor");
         existing.setRoleName("旧名");
         when(roleMapper.selectById(1L)).thenReturn(existing);
         when(roleMapper.updateById(any(PermRole.class))).thenReturn(1);
 
-        RoleSaveRequest request = request("admin");
+        RoleSaveRequest request = request("editor");
         request.setRoleName("新名");
         request.setStatus(PermRole.STATUS_DISABLED);
         service.update(1L, request);
 
         assertEquals("新名", existing.getRoleName());
         assertEquals(PermRole.STATUS_DISABLED, existing.getStatus());
-        assertEquals("admin", existing.getRoleCode());
+        assertEquals("editor", existing.getRoleCode());
         verify(roleMapper).updateById(existing);
     }
 
@@ -122,5 +122,13 @@ class RoleServiceImplTest {
 
         BizException ex = assertThrows(BizException.class, () -> service.getById(99L));
         assertEquals(ErrorCode.ROLE_NOT_FOUND.getCode(), ex.getCode());
+    }
+    @Test void 系统默认角色不可创建修改删除() {
+        for(String code:java.util.List.of("admin","super_admin","user")){
+            assertEquals(403,assertThrows(BizException.class,()->service.create(request(code))).getCode());
+            var role=new PermRole();role.setId(99L);role.setRoleCode(code);when(roleMapper.selectById(99L)).thenReturn(role);
+            assertEquals(403,assertThrows(BizException.class,()->service.update(99L,request(code))).getCode());
+            assertEquals(403,assertThrows(BizException.class,()->service.delete(99L)).getCode());
+        }
     }
 }

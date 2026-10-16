@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 public class FeignUserProfileSyncClient implements UserProfileSyncClient {
 
     private final UserProfileSyncFeignClient feignClient;
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private RootAdminClient roles;
 
     public FeignUserProfileSyncClient(UserProfileSyncFeignClient feignClient) {
         this.feignClient = feignClient;
@@ -35,12 +36,14 @@ public class FeignUserProfileSyncClient implements UserProfileSyncClient {
 
         Result<Integer> result = feignClient.create(request);
         requireSuccess(result, "创建用户资料");
+        bindRole(outbox.getUserId());
     }
 
     @Override
     public boolean exists(long userId) {
         Result<UserProfileView> result = feignClient.byUserId(userId);
         requireSuccess(result, "回查用户资料");
+        if(result.getData()!=null)bindRole(userId);
         return result.getData() != null;
     }
 
@@ -51,6 +54,7 @@ public class FeignUserProfileSyncClient implements UserProfileSyncClient {
         return result.getData();
     }
 
+    private void bindRole(long id){if(roles!=null){var r=roles.bindDefault(id);if(r==null||r.getCode()!=200)throw new IllegalStateException("Default role sync failed");}}
     private void requireSuccess(Result<?> result, String action) {
         if (result == null || result.getCode() != ErrorCode.SUCCESS.getCode()) {
             throw new IllegalStateException("用户中心" + action + "失败: "

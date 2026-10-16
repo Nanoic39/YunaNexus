@@ -262,4 +262,11 @@ class AdminServiceImplTest {
         user.setStatus(status);
         return user;
     }
+    @Test void 管理员不能禁用自己() {
+        var context=org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(new cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity("ext","web","sid",7L),null));
+        org.springframework.security.core.context.SecurityContextHolder.setContext(context);
+        try {assertEquals(403,assertThrows(BizException.class,()->service.disableUser(7L)).getCode());verifyNoInteractions(userMapper);}
+        finally {org.springframework.security.core.context.SecurityContextHolder.clearContext();}
+    }
 }
