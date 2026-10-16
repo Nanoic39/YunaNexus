@@ -34,7 +34,7 @@ jobs:
         run: |
           # Host-only env files contain no CI input; create empty placeholders for portable validation.
           sudo mkdir -p /YunaNexus/platform/secrets
-          for service in meta auth gateway user permission file notice audit analytics; do
+          for service in meta auth gateway user permission file notice audit analytics smtp; do
             sudo touch "/YunaNexus/platform/secrets/$service.env"
           done
           docker compose version

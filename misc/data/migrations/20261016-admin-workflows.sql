@@ -70,3 +70,5 @@ INSERT IGNORE INTO perm_role_menu(role_id,menu_id) SELECT r.id,m.id FROM perm_ro
 INSERT IGNORE INTO perm_user_role(user_id,role_id) SELECT u.user_id,r.id FROM yunanexus_auth.auth_user u CROSS JOIN perm_role r WHERE r.role_code='user';
 
 UPDATE perm_permission SET action=CASE action WHEN 'GET' THEN 'read' WHEN 'POST' THEN 'write' ELSE action END WHERE perm_code IN ('account:reset-records:read','account:profile:read','account:profile:update','account:password:change','account:files:read','account:files:write','account:notices:read') AND action IN ('GET','POST');
+
+UPDATE perm_role SET role_name='管理员' WHERE BINARY role_code='admin' AND role_name IN ('超级管理员','系统管理员');
