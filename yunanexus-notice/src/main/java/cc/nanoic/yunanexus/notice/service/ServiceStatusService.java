@@ -9,4 +9,8 @@ public interface ServiceStatusService {
     ServiceStatusView getStatus(String name);
 
     ServiceStatusSummary getSummary();
+
+    ServiceStatusSummary getSummary(int hours);
+
+    ServiceStatusView getHistory(String name, int hours);
 }

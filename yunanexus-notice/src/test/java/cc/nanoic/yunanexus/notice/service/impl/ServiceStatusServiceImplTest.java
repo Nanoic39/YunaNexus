@@ -1,17 +1,21 @@
 package cc.nanoic.yunanexus.notice.service.impl;
 
-import cc.nanoic.yunanexus.common.web.exception.BizException;
-import cc.nanoic.yunanexus.notice.domain.PortalElement;
-import org.junit.jupiter.api.Test;
-import org.springframework.cloud.client.DefaultServiceInstance;
-import org.springframework.cloud.client.discovery.DiscoveryClient;
-import tools.jackson.databind.ObjectMapper;
-import java.net.http.*;
-import java.time.*;
-import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+
+import cc.nanoic.yunanexus.common.web.exception.BizException;
+import cc.nanoic.yunanexus.notice.domain.PortalElement;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.cloud.client.DefaultServiceInstance;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
+
+import tools.jackson.databind.ObjectMapper;
+
+import java.net.http.*;
+import java.time.*;
+import java.util.List;
 
 class ServiceStatusServiceImplTest {
     private final DiscoveryClient discovery = mock(DiscoveryClient.class);
@@ -19,12 +23,16 @@ class ServiceStatusServiceImplTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     private ServiceStatusServiceImpl service() {
-        return new ServiceStatusServiceImpl(discovery, mapper,
-                Clock.fixed(Instant.parse("2026-10-15T00:00:00Z"), ZoneOffset.UTC), http);
+        return new ServiceStatusServiceImpl(
+                discovery,
+                mapper,
+                Clock.fixed(Instant.parse("2026-10-15T00:00:00Z"), ZoneOffset.UTC),
+                http);
     }
 
     private DefaultServiceInstance instance() {
-        var instance = new DefaultServiceInstance("one", "yunanexus-auth", "localhost", 8100, false);
+        var instance =
+                new DefaultServiceInstance("one", "yunanexus-auth", "localhost", 8100, false);
         instance.getMetadata().put("management.port", "8101");
         return instance;
     }
@@ -34,7 +42,8 @@ class ServiceStatusServiceImplTest {
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(code);
         when(response.body()).thenReturn(body);
-        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response);
     }
 
     @Test
@@ -51,9 +60,18 @@ class ServiceStatusServiceImplTest {
             assertSame(result, service.getStatus("svc-auth"));
             assertSame(result, service.getStatus("yunanexus-auth"));
             verify(discovery, times(1)).getInstances("yunanexus-auth");
-            verify(http).send(argThat((HttpRequest r) -> r.uri().getPort() == 8101
-                    && r.uri().getPath().equals("/actuator/health")), any(HttpResponse.BodyHandler.class));
-        } finally { service.close(); }
+            verify(http)
+                    .send(
+                            argThat(
+                                    (HttpRequest r) ->
+                                            r.uri().getPort() == 8101
+                                                    && r.uri()
+                                                            .getPath()
+                                                            .equals("/actuator/health")),
+                            any(HttpResponse.BodyHandler.class));
+        } finally {
+            service.close();
+        }
     }
 
     @Test
@@ -66,7 +84,9 @@ class ServiceStatusServiceImplTest {
             var result = service.getStatus("auth");
             assertEquals("degraded", result.status());
             assertEquals(50, result.availability());
-        } finally { service.close(); }
+        } finally {
+            service.close();
+        }
     }
 
     @Test
@@ -80,12 +100,15 @@ class ServiceStatusServiceImplTest {
             assertEquals("svc-gateway", summary.services().getFirst().key());
             assertEquals("degraded", summary.status());
             assertEquals(11.11, summary.availability());
-        } finally { service.close(); }
+        } finally {
+            service.close();
+        }
     }
 
     @Test
     void failuresBecomeDownAndUnknownNameIsRejected() throws Exception {
-        when(discovery.getInstances("yunanexus-meta")).thenThrow(new IllegalStateException("offline"));
+        when(discovery.getInstances("yunanexus-meta"))
+                .thenThrow(new IllegalStateException("offline"));
         when(discovery.getInstances("yunanexus-auth")).thenReturn(List.of(instance()));
         respond(503, "{\"status\":\"DOWN\"}");
         var service = service();
@@ -93,7 +116,9 @@ class ServiceStatusServiceImplTest {
             assertEquals("down", service.getStatus("meta").status());
             assertEquals("down", service.getStatus("auth").status());
             assertThrows(BizException.class, () -> service.getStatus("http://localhost"));
-        } finally { service.close(); }
+        } finally {
+            service.close();
+        }
     }
 
     @Test
@@ -101,8 +126,11 @@ class ServiceStatusServiceImplTest {
         when(discovery.getInstances("yunanexus-auth")).thenReturn(List.of(instance()));
         respond(200, "not-json");
         var service = service();
-        try { assertEquals("down", service.getStatus("auth").status()); }
-        finally { service.close(); }
+        try {
+            assertEquals("down", service.getStatus("auth").status());
+        } finally {
+            service.close();
+        }
     }
 
     @Test
@@ -131,13 +159,29 @@ class ServiceStatusServiceImplTest {
             when(clock.instant()).thenReturn(gap);
             when(clock.millis()).thenReturn(gap.toEpochMilli());
             assertEquals(List.of("up"), service.getStatus("auth").history());
-        } finally { service.close(); }
+        } finally {
+            service.close();
+        }
     }
+
+    @Test
+    void unsupportedHistoryRangeIsRejectedBeforeAnyProbe() {
+        var service = service();
+        try {
+            assertThrows(BizException.class, () -> service.getHistory("auth", Integer.MAX_VALUE));
+            assertThrows(BizException.class, () -> service.getSummary(-1));
+            verifyNoInteractions(discovery);
+        } finally {
+            service.close();
+        }
+    }
+
     @Test
     void portalStatusConfigurationRoundTrips() {
-        String json = "{\"type\":\"services\",\"statusUrl\":\"/api/v1/status\","
-                + "\"statusIntervalSeconds\":30,\"items\":[{\"id\":\"svc-auth\","
-                + "\"statusUrl\":\"/api/v1/status/auth\"}]}";
+        String json =
+                "{\"type\":\"services\",\"statusUrl\":\"/api/v1/status\","
+                        + "\"statusIntervalSeconds\":30,\"items\":[{\"id\":\"svc-auth\","
+                        + "\"statusUrl\":\"/api/v1/status/auth\"}]}";
         var element = mapper.readValue(json, PortalElement.class);
         var copy = mapper.readValue(mapper.writeValueAsString(element), PortalElement.class);
         assertEquals("/api/v1/status", copy.getStatusUrl());
