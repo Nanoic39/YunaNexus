@@ -1,48 +1,17 @@
 # 门户服务状态查询
 
-由通知服务实现，网关负责转发、匿名访问和限流。响应使用统一 Result<T> 包装。
+由通知服务实现，网关负责匿名访问、转发和限流。保留独立服务地址与平均状态总接口：
 
-| 方法 | 地址 | 说明 |
-| --- | --- | --- |
-| GET | /api/v1/status | 返回 status、availability 和 services 列表 |
-| GET | /api/v1/status/{name} | 单服务查询，支持 auth、svc-auth、yunanexus-auth 三种名称 |
+- `GET /api/v1/status?hours=24`：各服务状态与平均可用率。
+- `GET /api/v1/status/{name}?hours=24`：独立服务（auth、user、file 等，也兼容 svc-* / yunanexus-*）。
+- `GET /api/v1/status/{name}/history?hours=24`：24 小时、168 小时（7 天）、720 小时（30 天）；其他范围返回 400。
 
-支持 gateway、auth、user、permission、file、notice、audit、meta、analytics。
-未知名称返回业务码 404，沿用现有全局异常处理逻辑。
+每个服务返回 `status`、`availability`、`checkedAt`、`timeline`。`timeline` 按时间升序，包含 UTC ISO8601 `startAt/endAt`、`status`、可空 `availability`、`samples`。24 小时每格 30 分钟（48 格），7 天每格 3 小时（56 格），30 天每格 12 小时（60 格）。最后一格包含当前未结束时段。
 
-单服务 data 示例：
+无采样时段状态为 `unknown`，可用率为 null、样本数为 0，不补造历史；有样本按实例健康分数加权统计。可用率只代表已经观测的样本，不能代表未观测期间。`history` 旧每日数组仅为兼容字段，新页面只使用 timeline。
 
-```json
-{"key":"svc-auth","name":"yunanexus-auth","status":"up","availability":99.5,"history":["degraded","up"]}
-```
+通知服务每分钟独立采样，HTTP 查询共享 15 秒缓存。采样访问 Nacos 注册的 `management.port` 对应 `/actuator/health`，实例超时/缺失管理端口/失败记为不可用；所有实例等权。定时采样不依赖门户访问。
 
-总接口 services 元素与单服务 data 格式相同；key 对齐前端门户条目 id。
+历史持久化至通知服务数据库 `notice_service_status_bucket`，启动时幂等建表（需要 CREATE 权限），使用半小时主键累积真实观测，每分钟清理 31 天前记录。单服务最多约 1489 行，九个服务约 1.34 万行，重启不丢失。生产数据位于现有 /YunaNexus MySQL 数据卷内，无新增公网端口。
 
-## 统计规则
-
-通过 Nacos 发现实例，读取 management.port 元数据，访问各实例 /actuator/health。
-HTTP 200 且 UP 得 1 分，UNKNOWN 得 0.5 分；其他状态、非 200、无管理端口、
-解析失败、请求异常或超时得 0 分。单实例超时 2 秒，单服务查询最多等待 4 秒。
-无实例或服务发现失败视为 down。单服务按实例平均分判定：1 为 up，0 为 down，其余 degraded。
-总状态全部 up 为 up，全部 down 为 down，其余 degraded。
-
-availability 是保留窗口内查询采样健康分的平均值乘 100，保留两位小数。
-总 availability 是九个服务可用率的等权平均，包括离线服务。
-每个服务缓存 15 秒，独立及总查询共享缓存并合并并发请求，总查询并行执行。
-没有定时采样，无访问时不采集，因此该值不是连续运行时间 SLA。
-
-history 按 UTC 每日采样平均状态返回，旧到新，最多 180 天。当天历史是当天平均，
-status 是最新观测，两者可能不同。无未采样的历史填充；遇漏采日期重新累计连续历史。
-历史只存通知服务内存，重启后清空，多副本之间不共享。
-
-## 门户配置与部署
-
-PortalElement 支持 statusUrl、statusIntervalSeconds，PortalItem 支持 statusUrl。
-聚合模式：元素 statusUrl 设为 /api/v1/status。
-独立模式：清空元素地址，条目设置 /api/v1/status/auth 等地址。
-前端须关闭 MSW Mock 才会访问真实服务。
-
-各服务管理端口通过 discovery.metadata.management.port 注册，跟随 management.server.port。
-需重启各服务以注册新元数据，并确保通知服务可经内网访问其管理端口。
-若 Nacos 覆盖网关配置，需同步加入 yunanexus-status 路由、/api/v1/status 和
-/api/v1/status/* 匿名白名单，以及相应限流规则。
+Nacos/网关自定义配置需允许 `/api/v1/status/**`，包含嵌套 history 路径，管理端口仅内网可访问。
