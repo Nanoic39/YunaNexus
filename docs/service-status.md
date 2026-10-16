@@ -12,6 +12,6 @@
 
 通知服务每分钟独立采样，HTTP 查询共享 15 秒缓存。采样访问 Nacos 注册的 `management.port` 对应 `/actuator/health`，实例超时/缺失管理端口/失败记为不可用；所有实例等权。定时采样不依赖门户访问。
 
-历史持久化至通知服务数据库 `notice_service_status_bucket`，启动时幂等建表（需要 CREATE 权限），使用半小时主键累积真实观测，每分钟清理 31 天前记录。单服务最多约 1489 行，九个服务约 1.34 万行，重启不丢失。生产数据位于现有 /YunaNexus MySQL 数据卷内，无新增公网端口。
+历史持久化至通知服务数据库 `notice_service_status_bucket`，发布前由运维账号执行幂等迁移 `misc/data/migrations/20261016-service-status.sql`，业务账号保持 SELECT/INSERT/UPDATE/DELETE 权限，使用半小时主键累积真实观测，每分钟清理 31 天前记录。单服务最多约 1489 行，九个服务约 1.34 万行，重启不丢失。生产数据位于现有 /YunaNexus MySQL 数据卷内，无新增公网端口。
 
 Nacos/网关自定义配置需允许 `/api/v1/status/**`，包含嵌套 history 路径，管理端口仅内网可访问。

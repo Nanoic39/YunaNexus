@@ -2,8 +2,6 @@ package cc.nanoic.yunanexus.notice.service.impl;
 
 import cc.nanoic.yunanexus.notice.domain.ServiceStatusPeriod;
 
-import jakarta.annotation.PostConstruct;
-
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -18,20 +16,6 @@ public class ServiceStatusHistory {
 
     public ServiceStatusHistory(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
-    }
-
-    @PostConstruct
-    void initialize() {
-        jdbc.execute(
-                """
-                CREATE TABLE IF NOT EXISTS notice_service_status_bucket (
-                  service_name VARCHAR(32) NOT NULL,
-                  bucket_start BIGINT NOT NULL,
-                  score_sum DOUBLE NOT NULL,
-                  sample_count BIGINT NOT NULL,
-                  PRIMARY KEY(service_name, bucket_start)
-                ) ENGINE=InnoDB
-                """);
     }
 
     void record(String service, long now, double score) {

@@ -93,3 +93,12 @@ SELECT 'default', 'YunaNexus', '综合中控管理平台', '未来所有业务�
 WHERE NOT EXISTS (SELECT 1 FROM `portal_site` WHERE `site_key` = 'default');
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- Durable service health observations (bounded to 31 days).
+CREATE TABLE IF NOT EXISTS `notice_service_status_bucket` (
+    `service_name` VARCHAR(32) NOT NULL,
+    `bucket_start` BIGINT NOT NULL,
+    `score_sum` DOUBLE NOT NULL,
+    `sample_count` BIGINT NOT NULL,
+    PRIMARY KEY (`service_name`, `bucket_start`)
+) ENGINE=InnoDB;
