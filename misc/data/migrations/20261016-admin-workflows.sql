@@ -30,14 +30,14 @@ INSERT IGNORE INTO perm_role(role_code,role_name,description,data_scope,status) 
  ('super_admin','超级管理员','系统角色与权限维护；密码始终以不可逆哈希存储',1,1);
 INSERT IGNORE INTO perm_permission(perm_code,resource,action,description,status) VALUES
  ('system:manage','/api/v1/**/admin/**','*','系统管理接口',1),
- ('account:reset-records:read','/api/v1/auth/admin/password-reset-records','GET','查看密码重置审计记录，不含密码',1),
- ('account:profile:read','/api/v1/user/profile','GET','读取本人资料',1),
- ('account:profile:update','/api/v1/user/profile','POST','修改本人资料',1),
- ('account:password:change','/api/v1/auth/account/password','POST','修改本人密码',1),
- ('account:files:read','/api/v1/file/me/**','GET','读取本人文件',1),
- ('account:files:write','/api/v1/file/me/**','POST','管理本人文件',1),
+ ('account:reset-records:read','/api/v1/auth/admin/password-reset-records','read','查看密码重置审计记录，不含密码',1),
+ ('account:profile:read','/api/v1/user/profile','read','读取本人资料',1),
+ ('account:profile:update','/api/v1/user/profile','write','修改本人资料',1),
+ ('account:password:change','/api/v1/auth/account/password','write','修改本人密码',1),
+ ('account:files:read','/api/v1/file/me/**','read','读取本人文件',1),
+ ('account:files:write','/api/v1/file/me/**','write','管理本人文件',1),
  ('account:applications:manage','/api/v1/auth/account/**','*','本人授权和接入应用',1),
- ('account:notices:read','/api/v1/notice/inbox/**','GET','读取本人通知',1);
+ ('account:notices:read','/api/v1/notice/inbox/**','read','读取本人通知',1);
 INSERT IGNORE INTO perm_role_permission(role_id,permission_id) SELECT r.id,p.id FROM perm_role r CROSS JOIN perm_permission p WHERE r.role_code IN ('admin','super_admin') AND p.perm_code IN ('system:manage','account:reset-records:read');
 INSERT IGNORE INTO perm_role_permission(role_id,permission_id) SELECT r.id,p.id FROM perm_role r CROSS JOIN perm_permission p WHERE r.role_code IN ('user','super_admin') AND p.perm_code LIKE 'account:%';
 INSERT IGNORE INTO perm_menu(menu_code,menu_name,parent_id,path,sort,status) VALUES
@@ -68,3 +68,5 @@ INSERT IGNORE INTO perm_menu(menu_code,menu_name,parent_id,path,sort,status) SEL
 INSERT IGNORE INTO perm_menu(menu_code,menu_name,parent_id,path,sort,status) SELECT 'system:notice-records','发送记录',id,'/notice/records',110,1 FROM perm_menu WHERE menu_code='system';
 INSERT IGNORE INTO perm_role_menu(role_id,menu_id) SELECT r.id,m.id FROM perm_role r CROSS JOIN perm_menu m WHERE (r.role_code IN ('admin','super_admin') AND (m.menu_code='system' OR m.menu_code LIKE 'system:%')) OR (r.role_code IN ('user','super_admin') AND (m.menu_code='workspace' OR m.menu_code LIKE 'workspace:%'));
 INSERT IGNORE INTO perm_user_role(user_id,role_id) SELECT u.user_id,r.id FROM yunanexus_auth.auth_user u CROSS JOIN perm_role r WHERE r.role_code='user';
+
+UPDATE perm_permission SET action=CASE action WHEN 'GET' THEN 'read' WHEN 'POST' THEN 'write' ELSE action END WHERE perm_code IN ('account:reset-records:read','account:profile:read','account:profile:update','account:password:change','account:files:read','account:files:write','account:notices:read') AND action IN ('GET','POST');
