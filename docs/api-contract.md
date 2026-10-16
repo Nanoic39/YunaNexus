@@ -981,7 +981,11 @@ POST /api/v1/notice/read/{noticeId}
 请求头：X-User-Id
 ```
 
-仅 `channel=1`、本人、`status=1` 的记录可置为 `status=3`；否则返回 `60103`。
+仅 `channel=1`、本人、`status=1` 的记录可置为 `status=3`；本人已读站内信重复请求也成功，其他记录返回 `60103`。
+
+`POST /api/v1/notice/read/all` 将当前用户全部 `channel=1 AND status=1` 记录一次性标记已读，返回 `{changed: 实际修改条数}`；重复请求返回 `changed=0`。不修改待发、失败、邮件或其他用户记录。
+
+收件箱可选 `status=1`（未读）或 `status=3`（已读），服务端先筛选再分页，其他状态拒绝。`page` 上限 10000，避免偏移溢出。`GET /api/v1/notice/inbox/summary` 返回当前用户全部已送达站内信的 `{total, unread}`，不受分页和筛选影响。身份仅由网关注入，不接受正文指定接收人。OAuth `notice:read` 可读取汇总，不能执行已读写操作。
 
 ### 7.5 查询通知记录
 
