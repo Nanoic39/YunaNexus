@@ -83,5 +83,59 @@ class OAuthApplicationServiceTest {
         var service = new OAuthApplicationService(mock(JdbcTemplate.class));
         assertThrows(BizException.class, () -> service.verifySecret("oauth_unknown", "wrong"));
     }
-    @Test void missingOwnedApplicationUses404InsteadOf500(){var handler=new cc.nanoic.yunanexus.auth.security.AuthSecurityExceptionHandler();var result=handler.handleBizException(new BizException(cc.nanoic.yunanexus.common.web.constant.ErrorCode.NOT_FOUND,"应用不存在"));assertEquals(404,result.getStatusCode().value());}
+
+    @Test
+    void missingOwnedApplicationUses404InsteadOf500() {
+        var handler = new cc.nanoic.yunanexus.auth.security.AuthSecurityExceptionHandler();
+        var result =
+                handler.handleBizException(
+                        new BizException(
+                                cc.nanoic.yunanexus.common.web.constant.ErrorCode.NOT_FOUND,
+                                "应用不存在"));
+        assertEquals(404, result.getStatusCode().value());
+    }
+
+    @Test
+    void consentRejectsMismatchedCallbackBeforeGranting() {
+        var db = mock(JdbcTemplate.class);
+        var service = new OAuthApplicationService(db);
+        when(db.queryForList(startsWith("SELECT client_code AS clientId"), eq("oauth_test")))
+                .thenReturn(
+                        List.of(
+                                Map.of(
+                                        "clientId",
+                                        "oauth_test",
+                                        "appName",
+                                        "app",
+                                        "scopes",
+                                        "profile:read",
+                                        "redirectUris",
+                                        "https://example.com/cb")));
+        assertThrows(
+                BizException.class,
+                () -> service.consentPreview("oauth_test", "https://evil.example/cb"));
+        verify(db, never()).update(anyString(), any(Object[].class));
+    }
+
+    @Test
+    void consentBindsOnlyTheVerifiedUserAndRegisteredCallback() {
+        var db = mock(JdbcTemplate.class);
+        var service = new OAuthApplicationService(db);
+        when(db.queryForList(startsWith("SELECT id FROM auth_oauth_application"), eq("oauth_test")))
+                .thenReturn(List.of(Map.of("id", 1)));
+        when(db.queryForList(startsWith("SELECT client_code AS clientId"), eq("oauth_test")))
+                .thenReturn(
+                        List.of(
+                                Map.of(
+                                        "clientId",
+                                        "oauth_test",
+                                        "appName",
+                                        "app",
+                                        "scopes",
+                                        "profile:read",
+                                        "redirectUris",
+                                        "https://example.com/cb")));
+        service.consent(7L, "oauth_test", "https://example.com/cb");
+        verify(db).update(startsWith("INSERT INTO auth_platform"), eq(7L), eq("oauth_test"));
+    }
 }

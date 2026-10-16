@@ -3,6 +3,7 @@ package cc.nanoic.yunanexus.auth.service;
 import cc.nanoic.yunanexus.auth.domain.AuthorizeRequest;
 import cc.nanoic.yunanexus.auth.domain.LoginResult;
 import cc.nanoic.yunanexus.auth.domain.TokenExchangeRequest;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -13,6 +14,10 @@ public interface SsoService {
     void clear(HttpServletRequest request, HttpServletResponse response);
 
     String authorize(AuthorizeRequest request, String cookieValue);
+
+    String authorizeForIdentity(
+            AuthorizeRequest request,
+            cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity identity);
 
     LoginResult exchange(TokenExchangeRequest request);
 

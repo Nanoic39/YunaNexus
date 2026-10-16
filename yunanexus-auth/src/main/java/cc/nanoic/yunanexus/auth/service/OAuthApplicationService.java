@@ -180,6 +180,7 @@ public class OAuthApplicationService {
                 String.join(",", new TreeSet<>(b.scopes())),
                 id);
         disable(old.get("clientId").toString());
+        db.update("UPDATE auth_platform SET status=0 WHERE client_code=?", old.get("clientId"));
         return require(id, owner, false);
     }
 
@@ -204,11 +205,6 @@ public class OAuthApplicationService {
                     old.get("clientId"),
                     old.get("appName"),
                     urls.getFirst());
-            db.update(
-                    "INSERT INTO auth_platform(user_id,client_code,status,authorized_at)"
-                            + " VALUES(?,?,1,NOW()) ON DUPLICATE KEY UPDATE status=1",
-                    old.get("ownerUserId"),
-                    old.get("clientId"));
         }
         return require(id, null, false);
     }
@@ -275,6 +271,43 @@ public class OAuthApplicationService {
                                 .toString()
                                 .getBytes(StandardCharsets.US_ASCII)))
             throw new BizException(ErrorCode.FORBIDDEN, "客户端凭证无效");
+    }
+
+    public Map<String, Object> consentPreview(String code, String redirectUri) {
+        if (code == null || !code.startsWith("oauth_") || code.length() > 64 || redirectUri == null)
+            throw bad("授权请求无效");
+        var rows =
+                db.queryForList(
+                        "SELECT client_code AS clientId,app_name AS appName,description,website_url"
+                            + " AS websiteUrl,scopes,redirect_uris AS redirectUris FROM"
+                            + " auth_oauth_application WHERE client_code=? AND status=1 AND"
+                            + " deleted=0",
+                        code);
+        if (rows.size() != 1) throw new BizException(ErrorCode.NOT_FOUND, "应用未启用或不存在");
+        var row = new LinkedHashMap<>(rows.getFirst());
+        if (!List.of(row.get("redirectUris").toString().split("\n")).contains(redirectUri))
+            throw new BizException(ErrorCode.FORBIDDEN, "回调地址不匹配");
+        row.remove("redirectUris");
+        row.put("redirectUri", redirectUri);
+        row.put("scopes", List.of(row.get("scopes").toString().split(",")));
+        return row;
+    }
+
+    @Transactional
+    public void consent(long userId, String code, String redirectUri) {
+        // Lock the app against concurrent scope changes before persisting this consent.
+        var rows =
+                db.queryForList(
+                        "SELECT id FROM auth_oauth_application WHERE client_code=? AND status=1 AND"
+                            + " deleted=0 FOR UPDATE",
+                        code);
+        if (rows.size() != 1) throw new BizException(ErrorCode.NOT_FOUND, "应用未启用或不存在");
+        consentPreview(code, redirectUri);
+        db.update(
+                "INSERT INTO auth_platform(user_id,client_code,status,authorized_at)"
+                    + " VALUES(?,?,1,NOW()) ON DUPLICATE KEY UPDATE status=1,authorized_at=NOW()",
+                userId,
+                code);
     }
 
     public boolean allows(String code, String method, String path) {

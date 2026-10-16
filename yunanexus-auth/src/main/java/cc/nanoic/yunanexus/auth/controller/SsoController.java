@@ -7,8 +7,10 @@ import cc.nanoic.yunanexus.auth.service.SsoService;
 import cc.nanoic.yunanexus.common.core.model.Result;
 import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
 import cc.nanoic.yunanexus.common.web.exception.BizException;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,7 +31,12 @@ public class SsoController {
     @PostMapping("/authorize")
     public Result<Map<String, String>> authorize(
             @Valid @RequestBody AuthorizeRequest request,
-            HttpServletRequest httpRequest) {
+            HttpServletRequest httpRequest,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+                    cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity identity) {
+        if (identity != null)
+            return Result.success(
+                    Map.of("redirectUrl", ssoService.authorizeForIdentity(request, identity)));
         String cookieValue = ssoService.readCookie(httpRequest);
         if (cookieValue == null || cookieValue.isEmpty()) {
             throw new BizException(ErrorCode.UNAUTHORIZED, "SSO Cookie 缺失");
@@ -40,8 +47,7 @@ public class SsoController {
 
     @PostMapping("/token")
     public Result<LoginResult> exchange(
-            @Valid @RequestBody TokenExchangeRequest request,
-            HttpServletRequest httpRequest) {
+            @Valid @RequestBody TokenExchangeRequest request, HttpServletRequest httpRequest) {
         String ssoCookie = ssoService.readCookie(httpRequest);
         if (ssoCookie != null && !ssoCookie.isEmpty()) {
             throw new BizException(ErrorCode.UNAUTHORIZED, "token 端点不允许携带 SSO Cookie");

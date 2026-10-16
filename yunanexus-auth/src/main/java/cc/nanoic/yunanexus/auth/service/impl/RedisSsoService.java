@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.auth.service.impl;
 
+import cc.nanoic.yunanexus.auth.config.AuthRedisKeys;
 import cc.nanoic.yunanexus.auth.config.SecurityProperties;
 import cc.nanoic.yunanexus.auth.domain.AuthorizeRequest;
 import cc.nanoic.yunanexus.auth.domain.LoginResult;
@@ -7,16 +8,18 @@ import cc.nanoic.yunanexus.auth.domain.SessionInfo;
 import cc.nanoic.yunanexus.auth.domain.TokenExchangeRequest;
 import cc.nanoic.yunanexus.auth.entity.AuthClient;
 import cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity;
-import cc.nanoic.yunanexus.auth.config.AuthRedisKeys;
 import cc.nanoic.yunanexus.auth.service.AuthService;
 import cc.nanoic.yunanexus.auth.service.AuthenticationService;
 import cc.nanoic.yunanexus.auth.service.SsoService;
 import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
 import cc.nanoic.yunanexus.common.web.exception.BizException;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -34,9 +37,14 @@ import java.util.regex.Pattern;
 
 @Service
 public class RedisSsoService implements SsoService {
-    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private cc.nanoic.yunanexus.auth.service.OAuthApplicationService applications;
-    private boolean redirectAllowed(AuthClient client,String uri){return client.getClientCode().startsWith("oauth_")?applications!=null&&applications.redirectAllowed(client.getClientCode(),uri):client.getRedirectUri().equals(uri);}
+
+    private boolean redirectAllowed(AuthClient client, String uri) {
+        return client.getClientCode().startsWith("oauth_")
+                ? applications != null && applications.redirectAllowed(client.getClientCode(), uri)
+                : client.getRedirectUri().equals(uri);
+    }
 
     private static final String ROOT_PREFIX = "auth:sso_root:";
     private static final String CODE_PREFIX = "auth:sso_code:";
@@ -48,32 +56,34 @@ public class RedisSsoService implements SsoService {
     private static final Pattern CODE_PATTERN = Pattern.compile("^[A-Za-z0-9-_]{43}$");
     private static final Pattern VERIFIER_PATTERN = Pattern.compile("^[A-Za-z0-9-._~]{43,128}$");
 
-    private static final String LUA_SET_SCRIPT = 
-        "local t = redis.call('TIME') " +
-        "local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000) " +
-        "if tonumber(ARGV[2]) <= now then return -1 end " +
-        "local result = redis.call('SET', KEYS[1], ARGV[1], 'NX', 'PX', ARGV[3]) " +
-        "if result then redis.call('PEXPIREAT', KEYS[1], ARGV[2]) return 1 else return 0 end";
+    private static final String LUA_SET_SCRIPT =
+            "local t = redis.call('TIME') local now = tonumber(t[1]) * 1000 +"
+                + " math.floor(tonumber(t[2]) / 1000) if tonumber(ARGV[2]) <= now then return -1"
+                + " end local result = redis.call('SET', KEYS[1], ARGV[1], 'NX', 'PX', ARGV[3]) if"
+                + " result then redis.call('PEXPIREAT', KEYS[1], ARGV[2]) return 1 else return 0"
+                + " end";
 
-    private static final String LUA_CONSUME_SCRIPT = 
-        "local t = redis.call('TIME') " +
-        "local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000) " +
-        "local current = redis.call('GET', KEYS[1]) " +
-        "if current == ARGV[1] then " +
-        "  local expire = tonumber(ARGV[2]) " +
-        "  if expire > now then " +
-        "    redis.call('DEL', KEYS[1]) " +
-        "    return 1 " +
-        "  else " +
-        "    redis.call('DEL', KEYS[1]) " +
-        "    return -1 " +
-        "  end " +
-        "else " +
-        "  return 0 " +
-        "end";
+    private static final String LUA_CONSUME_SCRIPT =
+            "local t = redis.call('TIME') "
+                    + "local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000) "
+                    + "local current = redis.call('GET', KEYS[1]) "
+                    + "if current == ARGV[1] then "
+                    + "  local expire = tonumber(ARGV[2]) "
+                    + "  if expire > now then "
+                    + "    redis.call('DEL', KEYS[1]) "
+                    + "    return 1 "
+                    + "  else "
+                    + "    redis.call('DEL', KEYS[1]) "
+                    + "    return -1 "
+                    + "  end "
+                    + "else "
+                    + "  return 0 "
+                    + "end";
 
-    private static final DefaultRedisScript<Long> SET_SCRIPT = new DefaultRedisScript<>(LUA_SET_SCRIPT, Long.class);
-    private static final DefaultRedisScript<Long> CONSUME_SCRIPT = new DefaultRedisScript<>(LUA_CONSUME_SCRIPT, Long.class);
+    private static final DefaultRedisScript<Long> SET_SCRIPT =
+            new DefaultRedisScript<>(LUA_SET_SCRIPT, Long.class);
+    private static final DefaultRedisScript<Long> CONSUME_SCRIPT =
+            new DefaultRedisScript<>(LUA_CONSUME_SCRIPT, Long.class);
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -102,8 +112,10 @@ public class RedisSsoService implements SsoService {
     }
 
     @Override
-    public void establish(LoginResult result, HttpServletRequest request, HttpServletResponse response) {
-        AuthenticatedIdentity identity = authenticationService.authenticateAccess(result.getAccessToken());
+    public void establish(
+            LoginResult result, HttpServletRequest request, HttpServletResponse response) {
+        AuthenticatedIdentity identity =
+                authenticationService.authenticateAccess(result.getAccessToken());
         SessionInfo session = authenticationService.requireSession(identity.sid());
 
         byte[] secretBytes = new byte[ROOT_SECRET_BYTES];
@@ -128,17 +140,23 @@ public class RedisSsoService implements SsoService {
             throw new BizException(ErrorCode.SESSION_NOT_FOUND, "会话剩余时间不足");
         }
 
-        RootRecord rootRecord = new RootRecord(
-            session.getSid(),
-            String.valueOf(session.getUserId()),
-            session.getAccountEpoch(),
-            sessionExpireAt
-        );
+        RootRecord rootRecord =
+                new RootRecord(
+                        session.getSid(),
+                        String.valueOf(session.getUserId()),
+                        session.getAccountEpoch(),
+                        sessionExpireAt);
 
         String rootKey = authRedisKeys.ssoRoot(rootHash);
         try {
             String rootJson = objectMapper.writeValueAsString(rootRecord);
-            Long setResult = redisTemplate.execute(SET_SCRIPT, List.of(rootKey), rootJson, String.valueOf(sessionExpireAt), String.valueOf(ttlMillis));
+            Long setResult =
+                    redisTemplate.execute(
+                            SET_SCRIPT,
+                            List.of(rootKey),
+                            rootJson,
+                            String.valueOf(sessionExpireAt),
+                            String.valueOf(ttlMillis));
 
             if (setResult == null || setResult == -1) {
                 throw new BizException(ErrorCode.SESSION_NOT_FOUND, "会话已过期");
@@ -148,7 +166,8 @@ public class RedisSsoService implements SsoService {
             }
 
             try {
-                SessionInfo recheckedSession = authenticationService.requireSession(session.getSid());
+                SessionInfo recheckedSession =
+                        authenticationService.requireSession(session.getSid());
                 if (!session.getAccountEpoch().equals(recheckedSession.getAccountEpoch())) {
                     throw new BizException(ErrorCode.TOKEN_REVOKED, "账号纪元已变更");
                 }
@@ -185,6 +204,49 @@ public class RedisSsoService implements SsoService {
         cookie.setMaxAge(0);
         cookie.setAttribute("SameSite", "Lax");
         response.addCookie(cookie);
+    }
+
+    @Override
+    public String authorizeForIdentity(AuthorizeRequest request, AuthenticatedIdentity identity) {
+        if (identity == null || !"web".equals(identity.clientCode()))
+            throw new BizException(ErrorCode.FORBIDDEN, "请使用门户会话授权");
+        validateAuthorizeRequest(request);
+        SessionInfo session = authenticationService.requireSession(identity.sid());
+        if (session.getUserId() != identity.userId()
+                || !identity.externalId().equals(session.getExternalId()))
+            throw new BizException(ErrorCode.UNAUTHORIZED, "授权身份不一致");
+        long expiry =
+                Math.min(
+                        session.getExpireAtMillis(),
+                        clock.millis() + securityProperties.getCodeTtlSeconds() * 1000L);
+        long ttl = expiry - clock.millis();
+        if (ttl < 1) throw new BizException(ErrorCode.SESSION_NOT_FOUND);
+        byte[] bytes = new byte[ROOT_SECRET_BYTES];
+        secureRandom.nextBytes(bytes);
+        String secret = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String rootKey = authRedisKeys.ssoRoot(sha256Hex(secret));
+        var record =
+                new RootRecord(
+                        session.getSid(),
+                        String.valueOf(session.getUserId()),
+                        session.getAccountEpoch(),
+                        expiry);
+        try {
+            var result =
+                    redisTemplate.execute(
+                            SET_SCRIPT,
+                            List.of(rootKey),
+                            objectMapper.writeValueAsString(record),
+                            String.valueOf(expiry),
+                            String.valueOf(ttl));
+            if (result == null || result != 1)
+                throw new BizException(ErrorCode.INTERNAL_ERROR, "授权请求创建失败");
+            return authorize(request, secret);
+        } catch (Exception e) {
+            redisTemplate.delete(rootKey);
+            if (e instanceof RuntimeException r) throw r;
+            throw new IllegalStateException("授权请求创建失败");
+        }
     }
 
     @Override
@@ -235,7 +297,7 @@ public class RedisSsoService implements SsoService {
 
         AuthClient client = authenticationService.requireGrant(session, request.getClientCode());
 
-        if (!redirectAllowed(client,request.getRedirectUri())) {
+        if (!redirectAllowed(client, request.getRedirectUri())) {
             throw new BizException(ErrorCode.FORBIDDEN, "redirectUri 不匹配");
         }
 
@@ -246,30 +308,36 @@ public class RedisSsoService implements SsoService {
         String code = Base64.getUrlEncoder().withoutPadding().encodeToString(codeBytes);
         String codeHash = sha256Hex(code);
 
-        long codeTtlMillis = Math.min(
-            (long) securityProperties.getCodeTtlSeconds() * 1000,
-            rootRecord.expireAtMillis() - nowMillis
-        );
+        long codeTtlMillis =
+                Math.min(
+                        (long) securityProperties.getCodeTtlSeconds() * 1000,
+                        rootRecord.expireAtMillis() - nowMillis);
         if (codeTtlMillis < 1) {
             throw new BizException(ErrorCode.UNAUTHORIZED, "SSO 会话剩余时间不足");
         }
         long codeExpireAt = nowMillis + codeTtlMillis;
 
-        CodeRecord codeRecord = new CodeRecord(
-            rootHash,
-            rootRecord.sourceSid(),
-            rootRecord.userId(),
-            rootRecord.accountEpoch(),
-            request.getClientCode(),
-            request.getRedirectUri(),
-            request.getCodeChallenge(),
-            codeExpireAt
-        );
+        CodeRecord codeRecord =
+                new CodeRecord(
+                        rootHash,
+                        rootRecord.sourceSid(),
+                        rootRecord.userId(),
+                        rootRecord.accountEpoch(),
+                        request.getClientCode(),
+                        request.getRedirectUri(),
+                        request.getCodeChallenge(),
+                        codeExpireAt);
 
         String codeKey = authRedisKeys.ssoCode(codeHash);
         try {
             String codeJson = objectMapper.writeValueAsString(codeRecord);
-            Long setResult = redisTemplate.execute(SET_SCRIPT, List.of(codeKey), codeJson, String.valueOf(codeExpireAt), String.valueOf(codeTtlMillis));
+            Long setResult =
+                    redisTemplate.execute(
+                            SET_SCRIPT,
+                            List.of(codeKey),
+                            codeJson,
+                            String.valueOf(codeExpireAt),
+                            String.valueOf(codeTtlMillis));
 
             if (setResult == null || setResult == -1) {
                 throw new BizException(ErrorCode.UNAUTHORIZED, "SSO 会话已过期");
@@ -283,12 +351,14 @@ public class RedisSsoService implements SsoService {
                 if (recheckedRootJson == null) {
                     throw new BizException(ErrorCode.UNAUTHORIZED, "SSO 会话已失效");
                 }
-                RootRecord recheckedRoot = objectMapper.readValue(recheckedRootJson, RootRecord.class);
+                RootRecord recheckedRoot =
+                        objectMapper.readValue(recheckedRootJson, RootRecord.class);
                 if (!recheckedRoot.accountEpoch().equals(rootRecord.accountEpoch())) {
                     throw new BizException(ErrorCode.TOKEN_REVOKED, "账号纪元已变更");
                 }
 
-                SessionInfo recheckedSession = authenticationService.requireSession(session.getSid());
+                SessionInfo recheckedSession =
+                        authenticationService.requireSession(session.getSid());
                 if (!recheckedSession.getAccountEpoch().equals(session.getAccountEpoch())) {
                     throw new BizException(ErrorCode.TOKEN_REVOKED, "账号纪元已变更");
                 }
@@ -308,9 +378,9 @@ public class RedisSsoService implements SsoService {
     @Override
     public LoginResult exchange(TokenExchangeRequest request) {
         validateExchangeRequest(request);
-        if(request.getClientCode().startsWith("oauth_")){
-            if(applications==null)throw new BizException(ErrorCode.FORBIDDEN,"接入验证不可用");
-            applications.verifySecret(request.getClientCode(),request.getClientSecret());
+        if (request.getClientCode().startsWith("oauth_")) {
+            if (applications == null) throw new BizException(ErrorCode.FORBIDDEN, "接入验证不可用");
+            applications.verifySecret(request.getClientCode(), request.getClientSecret());
         }
 
         String codeHash = sha256Hex(request.getCode());
@@ -369,8 +439,8 @@ public class RedisSsoService implements SsoService {
         }
 
         if (!rootRecord.sourceSid().equals(codeRecord.sourceSid())
-            || !rootRecord.userId().equals(codeRecord.userId())
-            || !rootRecord.accountEpoch().equals(codeRecord.accountEpoch())) {
+                || !rootRecord.userId().equals(codeRecord.userId())
+                || !rootRecord.accountEpoch().equals(codeRecord.accountEpoch())) {
             throw new BizException(ErrorCode.UNAUTHORIZED, "SSO 会话身份不匹配");
         }
 
@@ -393,17 +463,17 @@ public class RedisSsoService implements SsoService {
         }
 
         AuthClient client = authenticationService.requireGrant(session, codeRecord.clientCode());
-        if (!redirectAllowed(client,codeRecord.redirectUri())) {
+        if (!redirectAllowed(client, codeRecord.redirectUri())) {
             throw new BizException(ErrorCode.FORBIDDEN, "redirectUri 不匹配");
         }
         validateRedirectUri(codeRecord.redirectUri());
 
-        Long consumeResult = redisTemplate.execute(
-            CONSUME_SCRIPT,
-            List.of(codeKey),
-            codeJson,
-            String.valueOf(codeRecord.expiresAtMillis())
-        );
+        Long consumeResult =
+                redisTemplate.execute(
+                        CONSUME_SCRIPT,
+                        List.of(codeKey),
+                        codeJson,
+                        String.valueOf(codeRecord.expiresAtMillis()));
 
         if (consumeResult == null || consumeResult == 0) {
             throw new BizException(ErrorCode.TOKEN_INVALID, "授权码已被使用");
@@ -446,10 +516,12 @@ public class RedisSsoService implements SsoService {
         if (request.getState() == null || !STATE_PATTERN.matcher(request.getState()).matches()) {
             throw new BizException(ErrorCode.BAD_REQUEST, "state 格式无效");
         }
-        if (request.getCodeChallenge() == null || !CHALLENGE_PATTERN.matcher(request.getCodeChallenge()).matches()) {
+        if (request.getCodeChallenge() == null
+                || !CHALLENGE_PATTERN.matcher(request.getCodeChallenge()).matches()) {
             throw new BizException(ErrorCode.BAD_REQUEST, "codeChallenge 格式无效");
         }
-        if (request.getCodeChallengeMethod() == null || !"S256".equals(request.getCodeChallengeMethod())) {
+        if (request.getCodeChallengeMethod() == null
+                || !"S256".equals(request.getCodeChallengeMethod())) {
             throw new BizException(ErrorCode.BAD_REQUEST, "仅支持 S256");
         }
         if (request.getClientCode() == null || request.getClientCode().isBlank()) {
@@ -464,7 +536,8 @@ public class RedisSsoService implements SsoService {
         if (request.getCode() == null || !CODE_PATTERN.matcher(request.getCode()).matches()) {
             throw new BizException(ErrorCode.BAD_REQUEST, "code 格式无效");
         }
-        if (request.getCodeVerifier() == null || !VERIFIER_PATTERN.matcher(request.getCodeVerifier()).matches()) {
+        if (request.getCodeVerifier() == null
+                || !VERIFIER_PATTERN.matcher(request.getCodeVerifier()).matches()) {
             throw new BizException(ErrorCode.BAD_REQUEST, "codeVerifier 格式无效");
         }
         if (request.getClientCode() == null || request.getClientCode().isBlank()) {
@@ -479,9 +552,12 @@ public class RedisSsoService implements SsoService {
         if (redirectUri == null || redirectUri.length() > 500) {
             throw new BizException(ErrorCode.BAD_REQUEST, "redirectUri 无效");
         }
-        if (redirectUri.contains("\r") || redirectUri.contains("\n")
-            || redirectUri.contains("%0d") || redirectUri.contains("%0a")
-            || redirectUri.contains("%0D") || redirectUri.contains("%0A")) {
+        if (redirectUri.contains("\r")
+                || redirectUri.contains("\n")
+                || redirectUri.contains("%0d")
+                || redirectUri.contains("%0a")
+                || redirectUri.contains("%0D")
+                || redirectUri.contains("%0A")) {
             throw new BizException(ErrorCode.BAD_REQUEST, "redirectUri 无效");
         }
         URI uri;
@@ -519,7 +595,8 @@ public class RedisSsoService implements SsoService {
         }
         if ("http".equals(scheme)) {
             boolean isLoopback = "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
-            if ((!securityProperties.isAllowLocalHttp() || !isLoopback) && !securityProperties.isTemporaryHttpOrigin(uri)) {
+            if ((!securityProperties.isAllowLocalHttp() || !isLoopback)
+                    && !securityProperties.isTemporaryHttpOrigin(uri)) {
                 throw new BizException(ErrorCode.BAD_REQUEST, "redirectUri 不允许非回环 HTTP");
             }
         }
@@ -559,20 +636,15 @@ public class RedisSsoService implements SsoService {
     }
 
     private record RootRecord(
-        String sourceSid,
-        String userId,
-        String accountEpoch,
-        long expireAtMillis
-    ) {}
+            String sourceSid, String userId, String accountEpoch, long expireAtMillis) {}
 
     private record CodeRecord(
-        String rootHash,
-        String sourceSid,
-        String userId,
-        String accountEpoch,
-        String clientCode,
-        String redirectUri,
-        String codeChallenge,
-        long expiresAtMillis
-    ) {}
+            String rootHash,
+            String sourceSid,
+            String userId,
+            String accountEpoch,
+            String clientCode,
+            String redirectUri,
+            String codeChallenge,
+            long expiresAtMillis) {}
 }
