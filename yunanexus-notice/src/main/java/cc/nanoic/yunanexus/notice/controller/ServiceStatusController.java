@@ -21,21 +21,30 @@ public class ServiceStatusController {
 
     @GetMapping
     public Result<ServiceStatusSummary> summary(
-            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "24") int hours) {
+            @org.springframework.web.bind.annotation.RequestParam(
+                            value = "hours",
+                            defaultValue = "24")
+                    int hours) {
         return Result.success(serviceStatusService.getSummary(hours));
     }
 
     @GetMapping("/{name}/history")
     public Result<ServiceStatusView> history(
             @PathVariable("name") String name,
-            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "24") int hours) {
+            @org.springframework.web.bind.annotation.RequestParam(
+                            value = "hours",
+                            defaultValue = "24")
+                    int hours) {
         return Result.success(serviceStatusService.getHistory(name, hours));
     }
 
     @GetMapping("/{name}")
     public Result<ServiceStatusView> status(
             @PathVariable("name") String name,
-            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "24") int hours) {
+            @org.springframework.web.bind.annotation.RequestParam(
+                            value = "hours",
+                            defaultValue = "24")
+                    int hours) {
         return Result.success(serviceStatusService.getHistory(name, hours));
     }
 }
