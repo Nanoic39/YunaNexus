@@ -1,14 +1,15 @@
 package cc.nanoic.yunanexus.auth.domain;
 
 import cc.nanoic.yunanexus.auth.entity.AuthUser;
+
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 /**
- * 认证用户视图（管理后台）。<p>
+ * 认证用户视图（管理后台）。
  *
- * 由 {@link AuthUser} 转换而来，刻意不包含密码哈希等敏感字段。
+ * <p>由 {@link AuthUser} 转换而来，刻意不包含密码哈希等敏感字段。
  *
  * @author yunanexus
  */
@@ -22,12 +23,22 @@ public class UserView {
     private String mobileCountry;
     private String mobile;
     private Integer status;
+
+    @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'")
     private LocalDateTime lockedUntil;
+
     private String lockReason;
     private Integer failCount;
+
+    @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'")
     private LocalDateTime lastLoginTime;
+
     private String lastLoginIp;
+
+    @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'")
     private LocalDateTime createTime;
+
+    @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'")
     private LocalDateTime updateTime;
 
     /**

@@ -188,6 +188,7 @@ services:
     env_file:
     - /YunaNexus/platform/secrets/auth.env
     environment:
+      YUNANEXUS_AUTH_TRUSTED_PROXY_CIDRS: 172.29.10.0/24
       SPRING_PROFILES_ACTIVE: prd
       SPRING_CONFIG_IMPORT: optional:file:/config/auth.yaml
       JAVA_TOOL_OPTIONS: -Xms32m -Xmx112m -XX:MaxMetaspaceSize=112m -XX:ReservedCodeCacheSize=32m

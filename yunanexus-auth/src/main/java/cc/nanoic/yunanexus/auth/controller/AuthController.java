@@ -16,10 +16,12 @@ import cc.nanoic.yunanexus.auth.service.UnlockAppealService;
 import cc.nanoic.yunanexus.common.core.model.Result;
 import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
 import cc.nanoic.yunanexus.common.web.exception.BizException;
+
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,20 +37,15 @@ import java.util.Map;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    @Resource
-    private AuthService authService;
+    @Resource private AuthService authService;
 
-    @Resource
-    private RegisterService registerService;
+    @Resource private RegisterService registerService;
 
-    @Resource
-    private UnlockAppealService unlockAppealService;
+    @Resource private UnlockAppealService unlockAppealService;
 
-    @Resource
-    private CaptchaService captchaService;
+    @Resource private CaptchaService captchaService;
 
-    @Resource
-    private SsoService ssoService;
+    @Resource private SsoService ssoService;
 
     @PostMapping("/login")
     public Result<LoginResult> login(
@@ -122,14 +119,19 @@ public class AuthController {
 
     @GetMapping("/csrf")
     public Result<Map<String, String>> csrf(CsrfToken csrfToken) {
-        return Result.success(Map.of(
-            "token", csrfToken.getToken(),
-            "headerName", csrfToken.getHeaderName(),
-            "parameterName", csrfToken.getParameterName()
-        ));
+        return Result.success(
+                Map.of(
+                        "token", csrfToken.getToken(),
+                        "headerName", csrfToken.getHeaderName(),
+                        "parameterName", csrfToken.getParameterName()));
     }
 
+    @org.springframework.beans.factory.annotation.Value(
+            "${yunanexus.auth.trusted-proxy-cidrs:127.0.0.1/32,::1/128}")
+    private String trustedProxyCidrs = "127.0.0.1/32,::1/128";
+
     private String clientIp(HttpServletRequest request) {
-        return request.getRemoteAddr();
+        return cc.nanoic.yunanexus.auth.security.ClientIpResolver.resolve(
+                request, trustedProxyCidrs);
     }
 }
