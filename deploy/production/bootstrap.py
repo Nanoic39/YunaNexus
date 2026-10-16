@@ -11,6 +11,7 @@ def write(path,text,mode=0o600):
  p=ROOT/path;p.write_text(text,encoding='utf8');p.chmod(mode)
 def env(path,values): write(path,''.join(f'{k}={v}\n' for k,v in values.items()))
 if (ROOT/'secrets/compose.env').exists(): raise SystemExit('Secrets already initialized; refusing to overwrite')
+write('secrets/smtp.env','')
 rand=lambda:secrets.token_urlsafe(36)
 passwords={s:rand() for s in ['mysql','redis','nacos','admin','permission']}
 key=subprocess.check_output(['openssl','genpkey','-algorithm','RSA','-pkeyopt','rsa_keygen_bits:3072'],stderr=subprocess.DEVNULL)
@@ -45,7 +46,7 @@ for name in ['meta','auth','gateway','user','permission','file','notice','audit'
  # JSON is valid YAML and avoids a runtime YAML dependency.
  if name in ['auth','meta','notice','permission']:config['spring']['datasource']={'hikari':{'minimum-idle':1,'maximum-pool-size':4}}
  if name=='auth':config['yunanexus']={'auth':{'security':{'public-origin':'http://103.39.66.135:3000','allow-local-http':False,'allow-insecure-http':True,'cors-allowed-origins':['http://103.39.66.135:3000','http://103.39.66.135:3001']}}}
- if name in ['permission','notice']:config.setdefault('yunanexus',{})['admin']={'verification-url':'http://auth:8100/internal/auth/admin/check'}
+ if name in ['permission','notice','user']:config.setdefault('yunanexus',{})['admin']={'verification-url':'http://auth:8100/internal/auth/admin/check'}
  if name=='gateway':config['yunanexus']={'gateway':{'api-key-verification-url':'http://auth:8100/internal/auth/api-key/verify','permission':{'enabled':True,'check-url':'http://permission:8300/internal/permission/check','permit-paths':['/api/v1/permission/me','/api/v1/auth/me','/api/v1/auth/logout','/api/v1/auth/logout-all','/api/v1/notice/inbox','/api/v1/notice/inbox/*','/api/v1/notice/read/*','/api/v1/user/profile','/api/v1/user/tags','/api/v1/user/badges','/api/v1/file/me','/api/v1/file/me/**','/api/v1/auth/account/**']}}}
  write('config/'+name+'.yaml',json.dumps(config),0o644)
 for source in (ROOT/'ops/sql').glob('*.sql'):shutil.copy2(source,ROOT/'data/sqlinit'/source.name)

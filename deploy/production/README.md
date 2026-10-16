@@ -185,3 +185,18 @@ python3 /YunaNexus/platform/ops/configure-integration.py --admin-user nanoic --c
 脚本仅新增认证库的个人密钥表、文件物理库 0 的分享索引，并配置私网密钥验证地址与本人接口权限例外。
 随后发布后端、更新 Nginx 配置并发布前端。头像预览需要 CSP 的 `img-src blob:`；Nginx 请求体上限 21MB 为 20MB 文件预留 multipart 开销。
 所有文件下载和分享响应禁止缓存，入口不记录查询参数，分享标识只出现在前端 fragment 与 POST 请求体。
+
+
+## 管理工作流增量部署
+
+将 `misc/data/migrations/20261016-admin-workflows.sql` 和 `configure-admin-workflows.py` 放入 `/YunaNexus/platform/ops/`。
+先通过服务器本地安全终端提供 `secrets/smtp.env`（0600）：`SMTP_HOST`、`SMTP_PORT=465`、`SMTP_USERNAME`、`SMTP_PASSWORD`。该文件不进仓库。
+执行 `python3 /YunaNexus/platform/ops/configure-admin-workflows.py`，脚本先备份认证库、权限库和用户库0，再新增表、默认角色权限菜单并将明确指定的 nanoic 绑定超级管理员。随后发布后端、重载入口配置、发布前端。
+
+- 徽章目录和发放索引集中在用户物理库0，用户获得的徽章按原有分片路由。发放幂等，可重试中断的批次；当前支持手动发放，条件规则不接受假成功。
+- 接入应用支持本人申请、修改重审、撤回、密钥轮转，管理员审核和启停。每人最多20个有效应用、100条历史记录；列表不返回凭证摘要或密钥明文。
+- 新接入客户端标识以 `oauth_` 开头；使用现有 SSO authorize/token 端点，PKCE S256 和精确回调匹配，token 交换还必须提供 `clientSecret`。不允许用用户密码直接登录第三方客户端。
+- 审核通过仅给申请人授权用于联调；其他平台用户仍需单独获得平台授权。JWT 每次请求实时验证应用状态和申请范围，不能访问账号管理或管理员接口；读取完整个人资料还需 `email:read`。
+- 注册资料同步 outbox 同时幂等绑定 `user` 角色。默认 `user`、`admin`、`super_admin` 不允许通过通用 CRUD 改名、停用或删除；根角色分配及默认角色授权绑定需超级管理员，不能移除自己的超级管理员身份。
+- 邮箱自助重置：发送冷却60秒，验证码10分钟/5次，验证后重置为临时 `12345678` 并禁止正常登录，必须凭一次性5分钟票据设置8~64位新密码。密码变更撤销全部会话和个人密钥；管理员仅按 `account:reset-records:read` 权限查看审计事件，无主动重置或密码读取接口。
+- 所有密码继续 BCrypt 单向存储；SMTP、验证码、客户端密钥及重置票据不进入日志、仓库或浏览器持久存储。
