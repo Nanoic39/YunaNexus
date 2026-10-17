@@ -15,6 +15,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     services:
+      mysql:
+        image: mysql@sha256:24989179f58856db763f418010c1169fecc944e3ec1ea7e921572d83eb070f70
+        env:
+          MYSQL_ROOT_PASSWORD: disposable-ci-only
+          MYSQL_DATABASE: yunanexus_points_test
+          MYSQL_ROOT_HOST: "%"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
       redis:
         image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
         ports:
@@ -28,6 +41,7 @@ jobs:
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: "6379"
       REDIS_DATABASE: "0"
+      POINTS_TEST_MYSQL_PASSWORD: disposable-ci-only
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -40,7 +54,7 @@ jobs:
       - name: Scan publication candidates
         run: python3 scripts/scan-publication.py
       - name: Test and build production
-        run: mvn -B -ntp -Pprd -Dyunanexus.redis.it=true clean verify
+        run: mvn -B -ntp -Pprd -Dyunanexus.redis.it=true -Dyunanexus.mysql.it=true clean verify
       - name: Annotate test failures
         if: failure()
         run: python3 scripts/report-test-failures.py
