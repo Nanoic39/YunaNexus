@@ -342,7 +342,11 @@ public class SecurityRedisMvcIntegrationTest {
         String setCookie = result.getResponse().getHeader("Set-Cookie");
         assertNotNull(setCookie);
         assertTrue(setCookie.contains("HttpOnly"), "Missing HttpOnly in cookie attributes: " + setCookie.replaceFirst("=[^;]*", "=<redacted>"));
-        assertTrue(setCookie.contains("Lax"), "Missing Lax in cookie attributes: " + setCookie.replaceFirst("=[^;]*", "=<redacted>"));
+        // Spring's mock response omits generic Servlet Cookie attributes from the header.
+        // Verify the actual Servlet 6 cookie attribute rather than weakening SameSite coverage.
+        Cookie csrfCookie = result.getResponse().getCookie("YunaCsrf_LOCAL");
+        assertNotNull(csrfCookie);
+        assertEquals("Lax", csrfCookie.getAttribute("SameSite"));
         assertTrue(setCookie.contains("Path=/"), "Missing Path=/ in cookie attributes: " + setCookie.replaceFirst("=[^;]*", "=<redacted>"));
         assertTrue(setCookie.contains("YunaCsrf_LOCAL"), "Missing YunaCsrf_LOCAL in cookie attributes: " + setCookie.replaceFirst("=[^;]*", "=<redacted>"));
 
