@@ -59,6 +59,17 @@ class AdminServiceImplTest {
                         sessionService,
                         accountEpochService,
                         Clock.fixed(NOW, ZoneOffset.UTC));
+        var roles = mock(cc.nanoic.yunanexus.auth.client.RootAdminClient.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "rootRoles", roles);
+        when(roles.superCheck(anyLong())).thenReturn(cc.nanoic.yunanexus.common.core.model.Result.success(false));
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "admin", null, List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"))));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearActor() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
     }
 
     @Test

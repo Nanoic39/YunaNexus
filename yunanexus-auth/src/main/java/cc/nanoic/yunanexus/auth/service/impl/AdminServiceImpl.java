@@ -92,8 +92,10 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public void approveAppeal(long id, String auditor, String remark) {
         AuthUnlockAppeal appeal = requirePendingAppeal(id);
+        if (appeal.getUserId() != null) requireAccountStatusAllowed(appeal.getUserId(), false);
         int updated = appealMapper.audit(id, STATUS_APPROVED, auditorOf(auditor), remark, now());
         if (updated != 1) {
             throw new BizException(ErrorCode.APPEAL_ALREADY_AUDITED);
@@ -108,7 +110,8 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public void rejectAppeal(long id, String auditor, String remark) {
-        requirePendingAppeal(id);
+        AuthUnlockAppeal appeal = requirePendingAppeal(id);
+        if (appeal.getUserId() != null) requireAccountStatusAllowed(appeal.getUserId(), false);
         int updated = appealMapper.audit(id, STATUS_REJECTED, auditorOf(auditor), remark, now());
         if (updated != 1) {
             throw new BizException(ErrorCode.APPEAL_ALREADY_AUDITED);
@@ -171,32 +174,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public void disableUser(long userId) {
-        var auth =
-                org.springframework.security.core.context.SecurityContextHolder.getContext()
-                        .getAuthentication();
-        if (auth != null
-                && auth.getPrincipal()
-                        instanceof cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity i
-                && i.userId() == userId)
-            throw new cc.nanoic.yunanexus.common.web.exception.BizException(
-                    cc.nanoic.yunanexus.common.web.constant.ErrorCode.FORBIDDEN, "不能禁用自己的账户");
-        if (rootRoles != null
-                && auth != null
-                && auth.getPrincipal()
-                        instanceof cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity i) {
-            var target = rootRoles.superCheck(userId);
-            var actor = rootRoles.superCheck(i.userId());
-            if (target == null
-                    || actor == null
-                    || target.getCode() != 200
-                    || actor.getCode() != 200)
-                throw new cc.nanoic.yunanexus.common.web.exception.BizException(
-                        cc.nanoic.yunanexus.common.web.constant.ErrorCode.INTERNAL_ERROR,
-                        "权限校验不可用");
-            if (Boolean.TRUE.equals(target.getData()) && !Boolean.TRUE.equals(actor.getData()))
-                throw new cc.nanoic.yunanexus.common.web.exception.BizException(
-                        cc.nanoic.yunanexus.common.web.constant.ErrorCode.FORBIDDEN, "不能禁用超级管理员");
-        }
+        requireAccountStatusAllowed(userId, true);
         requireUser(userId);
         authUserMapper.updateStatusAndLock(userId, 0, null, null);
         log.info("管理后台禁用账号 userId={}", userId);
@@ -246,8 +224,33 @@ public class AdminServiceImpl implements AdminService {
         return result.getData();
     }
 
+    /** Account state changes must not be used to bypass administrator session protection. */
+    private void requireAccountStatusAllowed(long userId, boolean disabling) {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated())
+            throw new BizException(ErrorCode.FORBIDDEN, "缺少管理员身份");
+        if (auth.getPrincipal() instanceof cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity actor
+                && disabling && actor.userId() == userId)
+            throw new BizException(ErrorCode.FORBIDDEN, "不能禁用自己的账户");
+        if (rootRoles == null) throw new BizException(ErrorCode.INTERNAL_ERROR, "权限校验不可用");
+        boolean targetSuper = roleResult(rootRoles.superCheck(userId));
+        if (disabling && targetSuper)
+            throw new BizException(ErrorCode.FORBIDDEN, "禁止通过禁用账户踢出超级管理员");
+        if (auth.getPrincipal() instanceof cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity actor) {
+            if (!"web".equals(actor.clientCode()) || !roleResult(rootRoles.check(actor.userId())))
+                throw new BizException(ErrorCode.FORBIDDEN, "无管理权限");
+            boolean actorSuper = roleResult(rootRoles.superCheck(actor.userId()));
+            if (!actorSuper && (targetSuper || roleResult(rootRoles.check(userId))))
+                throw new BizException(ErrorCode.FORBIDDEN, "不能修改管理员账户状态；请由超级管理员处理");
+        } else if (!"admin".equals(auth.getPrincipal()) || auth.getAuthorities().stream()
+                .noneMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()))) {
+            throw new BizException(ErrorCode.FORBIDDEN, "无管理权限");
+        }
+    }
+
     private void resetToNormal(long userId, String action) {
         AuthUser user = requireUser(userId);
+        requireAccountStatusAllowed(userId, false);
         authUserMapper.updateStatusAndLock(userId, 1, null, null);
         loginAttemptService.reset(user.getUsername());
         log.info("管理后台{}账号 userId={}", action, userId);
