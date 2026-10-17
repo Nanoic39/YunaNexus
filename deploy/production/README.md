@@ -213,3 +213,6 @@ python3 /YunaNexus/platform/ops/configure-integration.py --admin-user nanoic --c
 前端发布保留 current 和 previous 两版。Nginx 先查 current 的哈希静态资源，缺失时查询 previous 的对应应用；两版都没有的文件返回 404，不返回 SPA HTML。浏览器对确认为丢失分块的导航错误最多每分钟自动恢复一次，普通业务错误不触发刷新。升级 Nginx 时在原有挂载文件内写入，执行 `nginx -t` 成功后再 reload，避免替换 inode 后容器仍读取旧文件。
 
 角色创建、修改和授权均由后端按操作人的实时权限和数据范围校验。删除角色在同一事务清理用户、权限、菜单和部门绑定；超级管理员不可被管理踢人接口踢出，普通管理员也不能踢出其他管理员。角色与权限筛选在用户列表分页前组合生效。
+
+
+CI 的生产构建使用固定摘要的临时 Redis 容器，执行 `-Dyunanexus.redis.it=true`，会话并发、账户撤销和 MVC 安全集成测试必须通过后才发布包。该 Redis 仅存在于 GitHub 执行器，不使用生产地址或生产凭据；测试数据使用随机 `auth-it-` 前缀隔离并清理。普通本地构建未启用此开关时会显示相应跳过项，不代表集成测试已执行。
