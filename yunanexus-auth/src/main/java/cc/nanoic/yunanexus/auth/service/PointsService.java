@@ -19,7 +19,7 @@ public class PointsService {
  public PointsService(JdbcTemplate db,Clock clock,OAuthApplicationService applications){this.db=db;this.clock=clock;this.applications=applications;}
  private long user(AuthenticatedIdentity actor){if(actor==null||actor.userId()<=0)throw new BizException(ErrorCode.UNAUTHORIZED);return actor.userId();}
  private Map<String,Object> lock(long uid){
-  db.update("INSERT IGNORE INTO auth_points_account(user_id,balance,streak) VALUES(?,0,0)",uid);
+  db.update("INSERT INTO auth_points_account(user_id,balance,streak) VALUES(?,0,0) ON DUPLICATE KEY UPDATE user_id=auth_points_account.user_id",uid);
   return db.queryForMap("SELECT balance,streak,last_check_in FROM auth_points_account WHERE user_id=? FOR UPDATE",uid);
  }
  private LocalDate today(){return clock.instant().atZone(BUSINESS_ZONE).toLocalDate();}

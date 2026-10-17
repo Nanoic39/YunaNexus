@@ -62,7 +62,7 @@ class PointsMysqlIntegrationTest {
  }
  @Test void databaseFailureRollsBackLedgerAndBalance(){
   tx.execute(status->service.account(web));
-  db.execute("CREATE TRIGGER points_test_fail BEFORE UPDATE ON auth_points_account FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='transaction probe'");
+  db.execute("CREATE TRIGGER points_test_fail BEFORE UPDATE ON auth_points_account FOR EACH ROW SET NEW.balance=IF(NEW.balance>OLD.balance,-1,NEW.balance)");
   try{assertThrows(RuntimeException.class,()->change("rollback",100,true));assertEquals(0,balance());assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM auth_points_ledger",Integer.class));}finally{db.execute("DROP TRIGGER points_test_fail");}
  }
 }
