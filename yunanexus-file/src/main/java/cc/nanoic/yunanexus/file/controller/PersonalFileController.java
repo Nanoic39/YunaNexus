@@ -23,14 +23,15 @@ public class PersonalFileController {
         response.setHeader("Referrer-Policy", "no-referrer");
     }
 
-    @jakarta.annotation.Resource private PublicFileService publicFiles;
+    private final PublicFileService publicFiles;
 
     private final PersonalFileService personal;
     private final FileService files;
     private final AvatarService avatars;
 
     public PersonalFileController(
-            PersonalFileService personal, FileService files, AvatarService avatars) {
+            PersonalFileService personal, FileService files, AvatarService avatars, PublicFileService publicFiles) {
+        this.publicFiles=publicFiles;
         this.personal = personal;
         this.files = files;
         this.avatars = avatars;

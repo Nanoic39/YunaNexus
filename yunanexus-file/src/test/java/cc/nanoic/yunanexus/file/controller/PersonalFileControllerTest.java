@@ -21,7 +21,7 @@ class PersonalFileControllerTest {
     FileService files = mock(FileService.class);
     AvatarService avatars = mock(AvatarService.class);
     MockMvc mvc =
-            MockMvcBuilders.standaloneSetup(new PersonalFileController(personal, files, avatars))
+            MockMvcBuilders.standaloneSetup(new PersonalFileController(personal, files, avatars, mock(PublicFileService.class)))
                     .build();
 
     @Test
