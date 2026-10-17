@@ -16,7 +16,10 @@ class ApplicationYamlTest {
         var properties = sources.getFirst();
         assertEquals("/api/v1/permission/me", properties.getProperty("yunanexus.gateway.permission.permit-paths[0]"));
         assertEquals("/api/v1/notice/inbox", properties.getProperty("yunanexus.gateway.permission.permit-paths[4]"));
-        assertEquals("/api/v1/user/profile", properties.getProperty("yunanexus.gateway.permission.permit-paths[10]"));
+        var businessPaths=new java.util.HashSet<String>();
+        for(int i=0;properties.containsProperty("yunanexus.gateway.permission.permit-paths["+i+"]");i++)businessPaths.add(properties.getProperty("yunanexus.gateway.permission.permit-paths["+i+"]").toString());
+        assertTrue(businessPaths.contains("/api/v1/user/profile"));
+        assertTrue(businessPaths.contains("/api/v1/auth/application/permissions/check"));
         for (int i = 0; properties.containsProperty("yunanexus.gateway.permit-paths[" + i + "]"); i++) {
             assertFalse(properties.getProperty("yunanexus.gateway.permit-paths[" + i + "]").toString().startsWith("/api/v1/user/"));
         }
