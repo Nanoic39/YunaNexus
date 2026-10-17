@@ -12,4 +12,10 @@ class PublicFileControllerTest {
   assertEquals("image/gif",PublicFileController.rasterType("GIF89a".getBytes(StandardCharsets.US_ASCII)));
   assertEquals("image/webp",PublicFileController.rasterType("RIFF0000WEBP".getBytes(StandardCharsets.US_ASCII)));
  }
+ @Test void revokedLinkReturnsRealHttp404()throws Exception{
+  var service=org.mockito.Mockito.mock(cc.nanoic.yunanexus.file.service.PublicFileService.class);
+  org.mockito.Mockito.when(service.open("a".repeat(43))).thenThrow(new cc.nanoic.yunanexus.common.web.exception.BizException(cc.nanoic.yunanexus.common.web.constant.ErrorCode.FILE_NOT_FOUND));
+  var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new PublicFileController(service)).build();
+  mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/file/public/assets/"+"a".repeat(43))).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+ }
 }

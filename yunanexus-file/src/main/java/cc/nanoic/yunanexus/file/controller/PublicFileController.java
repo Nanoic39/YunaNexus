@@ -26,7 +26,13 @@ public class PublicFileController {
     }
     @GetMapping("/public/assets/{token}")
     public ResponseEntity<InputStreamResource> content(@PathVariable("token") String token) throws IOException {
-        var file=files.open(token);
+        cc.nanoic.yunanexus.file.domain.FileRange file;
+        try {file=files.open(token);}
+        catch(cc.nanoic.yunanexus.common.web.exception.BizException e){
+            if(e.getCode()==cc.nanoic.yunanexus.common.web.constant.ErrorCode.FILE_NOT_FOUND.getCode())
+                return ResponseEntity.notFound().header(HttpHeaders.CACHE_CONTROL,"no-store").build();
+            throw e;
+        }
         var stream=new BufferedInputStream(file.content());
         String type;
         try { stream.mark(16); byte[] prefix=stream.readNBytes(12); stream.reset(); type=rasterType(prefix); }
