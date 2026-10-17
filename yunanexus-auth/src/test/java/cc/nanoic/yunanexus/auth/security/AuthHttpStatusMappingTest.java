@@ -149,6 +149,7 @@ class AuthHttpStatusMappingTest {
         aliceUser.setFailCount(0);
 
         AuthClient client = new AuthClient();
+        client.setApplicationCategory("OFFICIAL_NATIVE");
         client.setClientCode(CLIENT_WEB);
         client.setStatus(1);
 
@@ -469,7 +470,7 @@ class AuthHttpStatusMappingTest {
             return new AuthServiceImpl(authUserMapper(), authClientMapper(), authPlatformMapper(),
                     authLoginAttemptMapper(), passwordEncoder(), loginAttemptService(), captchaService(),
                     tokenService(), tokenBlacklistService(), sessionService(), authProperties(), clock(),
-                    accountEpochService(), authenticationService(), Mockito.mock(cc.nanoic.yunanexus.auth.client.UserProfileSyncClient.class));
+                    accountEpochService(), authenticationService(), Mockito.mock(cc.nanoic.yunanexus.auth.client.UserProfileSyncClient.class), Mockito.mock(cc.nanoic.yunanexus.auth.service.OAuthApplicationService.class));
         }
 
         @Bean

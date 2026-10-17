@@ -105,6 +105,7 @@ class PersonalApiKeyServiceTest {
         grant.setStatus(1);
         when(grants.selectByUserIdAndClient(9, "web")).thenReturn(grant);
         AuthClient client = new AuthClient();
+        client.setApplicationCategory("OFFICIAL_NATIVE");
         client.setStatus(1);
         when(clients.selectByClientCode("web")).thenReturn(client);
         assertEquals(

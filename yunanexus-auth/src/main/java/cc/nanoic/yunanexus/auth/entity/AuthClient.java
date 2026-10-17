@@ -16,6 +16,7 @@ public class AuthClient {
     private String clientName;
     private String redirectUri;
     private Integer status;
+    private String applicationCategory;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

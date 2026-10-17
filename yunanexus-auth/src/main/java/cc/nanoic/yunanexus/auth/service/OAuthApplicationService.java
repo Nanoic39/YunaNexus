@@ -33,14 +33,14 @@ public class OAuthApplicationService {
             List<String> scopes) {}
 
     private static final Set<String> SCOPES =
-            Set.of("profile:read", "email:read", "files:read", "files:write", "notice:read");
+            Set.of("profile:read", "email:read", "files:read", "files:write", "notice:read", "points:read", "points:write", "permissions:read");
     private static final String SELECT =
-            "SELECT a.id,a.client_code AS clientId,a.app_name AS"
+            "SELECT COALESCE(c.application_category,'THIRD_PARTY') AS applicationCategory,a.id,a.client_code AS clientId,a.app_name AS"
                 + " appName,a.description,a.logo,a.website_url AS websiteUrl,a.redirect_uris AS"
                 + " redirectUris,a.scopes,a.owner_user_id AS ownerUserId,u.username AS"
                 + " ownerName,a.status,a.audit_remark AS auditRemark,a.audit_time AS"
                 + " auditTime,a.create_time AS createTime,a.update_time AS updateTime FROM"
-                + " auth_oauth_application a JOIN auth_user u ON u.user_id=a.owner_user_id WHERE"
+                + " auth_oauth_application a JOIN auth_user u ON u.user_id=a.owner_user_id LEFT JOIN auth_client c ON c.client_code=a.client_code WHERE"
                 + " a.deleted=0";
 
     private Map<String, Object> view(Map<String, Object> row) {
@@ -50,7 +50,7 @@ public class OAuthApplicationService {
         v.replaceAll(
                 (k, value) ->
                         value instanceof java.sql.Timestamp t
-                                ? t.toLocalDateTime().toString()
+                                ? t.toLocalDateTime().atOffset(java.time.ZoneOffset.UTC).toString()
                                 : value);
         v.put("clientSecret", null);
         return v;
@@ -90,7 +90,7 @@ public class OAuthApplicationService {
                 || b.redirectUris().size() > 10
                 || b.scopes() == null
                 || b.scopes().isEmpty()
-                || b.scopes().size() > 5
+                || b.scopes().size() > 8
                 || !SCOPES.containsAll(b.scopes())) throw bad("名称、回调地址或权限无效");
         if (b.description() != null && b.description().length() > 1000) throw bad("描述最多1000字");
         for (String uri : b.redirectUris()) safeUri(uri, true);
@@ -322,6 +322,9 @@ public class OAuthApplicationService {
                         code);
         if (rows.size() != 1) return false;
         var scopes = Set.of(rows.getFirst().get("scopes").toString().split(","));
+        if("POST".equals(method) && "/api/v1/auth/application/permissions/check".equals(path))return scopes.contains("permissions:read");
+        if("GET".equals(method) && Set.of("/api/v1/auth/account/points","/api/v1/auth/account/points/ledger").contains(path))return scopes.contains("points:read");
+        if("POST".equals(method) && "/api/v1/auth/account/points/transactions".equals(path))return scopes.contains("points:write");
         if ("GET".equals(method)
                 && "/api/v1/user/profile".equals(path)
                 && !scopes.contains("email:read")) return false;

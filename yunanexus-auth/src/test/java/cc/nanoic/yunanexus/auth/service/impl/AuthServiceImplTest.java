@@ -114,9 +114,10 @@ class AuthServiceImplTest {
         service = new AuthServiceImpl(authUserMapper, authClientMapper, authPlatformMapper,
                 loginAttemptMapper, passwordEncoder, loginAttemptService, captchaService,
                 tokenService, blacklistService, sessionService, properties, clock,
-                accountEpochService, authenticationService, userProfileSyncClient);
+                accountEpochService, authenticationService, userProfileSyncClient, mock(cc.nanoic.yunanexus.auth.service.OAuthApplicationService.class));
 
         client = new AuthClient();
+        client.setApplicationCategory("OFFICIAL_NATIVE");
         client.setClientCode("web");
         client.setStatus(1);
 
@@ -763,6 +764,7 @@ class AuthServiceImplTest {
 
         // 目标客户端存在但未授权
         AuthClient targetAuthClient = new AuthClient();
+        targetAuthClient.setApplicationCategory("OFFICIAL_NATIVE");
         targetAuthClient.setClientCode(targetClient);
         targetAuthClient.setStatus(1);
         when(authClientMapper.selectByClientCode(targetClient)).thenReturn(targetAuthClient);
@@ -786,6 +788,7 @@ class AuthServiceImplTest {
         when(accountEpochService.isCurrent(10001L, FIXED_EPOCH)).thenReturn(true);
 
         AuthClient targetAuthClient = new AuthClient();
+        targetAuthClient.setApplicationCategory("OFFICIAL_NATIVE");
         targetAuthClient.setClientCode(targetClient);
         targetAuthClient.setStatus(1);
         AuthPlatform targetPlatform = new AuthPlatform();
@@ -808,4 +811,13 @@ class AuthServiceImplTest {
         assertEquals(targetClient, captor.getValue().getClientCode());
         assertEquals(FIXED_EPOCH, captor.getValue().getAccountEpoch());
     }
+    @Test
+    void unclassifiedAndThirdPartyPasswordLoginRejectedBeforeCredentialLookup(){
+        client.setApplicationCategory(null);
+        assertThrows(BizException.class,()->service.login(loginRequest(),"127.0.0.1"));
+        client.setApplicationCategory("THIRD_PARTY");
+        assertThrows(BizException.class,()->service.login(loginRequest(),"127.0.0.1"));
+        verifyNoInteractions(authUserMapper);
+    }
+
 }

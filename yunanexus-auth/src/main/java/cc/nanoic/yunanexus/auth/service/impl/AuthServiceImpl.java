@@ -56,6 +56,8 @@ import java.util.UUID;
 @Service
 public class AuthServiceImpl implements AuthService {
 
+    private final cc.nanoic.yunanexus.auth.service.OAuthApplicationService oauthApplications;
+
     private final AuthUserMapper authUserMapper;
     private final AuthClientMapper authClientMapper;
     private final AuthPlatformMapper authPlatformMapper;
@@ -86,7 +88,9 @@ public class AuthServiceImpl implements AuthService {
                            Clock clock,
                            AccountEpochService accountEpochService,
                            AuthenticationService authenticationService,
-                           UserProfileSyncClient userProfileSyncClient) {
+                           UserProfileSyncClient userProfileSyncClient,
+                           cc.nanoic.yunanexus.auth.service.OAuthApplicationService oauthApplications) {
+        this.oauthApplications=oauthApplications;
         this.authUserMapper = authUserMapper;
         this.authClientMapper = authClientMapper;
         this.authPlatformMapper = authPlatformMapper;
@@ -106,8 +110,11 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResult login(LoginRequest request, String ip) {
-        if(request.getClientCode()!=null&&request.getClientCode().startsWith("oauth_"))throw new BizException(ErrorCode.BAD_REQUEST,"接入应用请使用SSO授权码流程");
         AuthClient client = requireEnabledClient(request.getClientCode());
+        if(!cc.nanoic.yunanexus.auth.entity.ApplicationCategory.allowsPassword(client.getApplicationCategory()))
+            throw new BizException(ErrorCode.FORBIDDEN,"此应用仅允许授权码登录");
+        if(client.getClientCode().startsWith("oauth_"))
+            oauthApplications.verifySecret(client.getClientCode(),request.getClientSecret());
 
         AuthUser user = findByCredential(request.getUsername());
         if (user == null) {

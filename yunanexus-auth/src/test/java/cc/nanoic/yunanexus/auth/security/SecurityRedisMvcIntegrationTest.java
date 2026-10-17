@@ -226,11 +226,13 @@ public class SecurityRedisMvcIntegrationTest {
         aliceUser.setFailCount(0);
 
         clientWeb = new AuthClient();
+        clientWeb.setApplicationCategory("OFFICIAL_NATIVE");
         clientWeb.setClientCode(CLIENT_WEB);
         clientWeb.setRedirectUri(REDIRECT_WEB);
         clientWeb.setStatus(1);
 
         clientAdmin = new AuthClient();
+        clientAdmin.setApplicationCategory("OFFICIAL_NATIVE");
         clientAdmin.setClientCode(CLIENT_ADMIN);
         clientAdmin.setRedirectUri(REDIRECT_ADMIN);
         clientAdmin.setStatus(1);
@@ -1424,7 +1426,7 @@ public class SecurityRedisMvcIntegrationTest {
             return new AuthServiceImpl(authUserMapper(), authClientMapper(), authPlatformMapper(),
                     authLoginAttemptMapper(), passwordEncoder(), loginAttemptService(), captchaService(),
                     tokenService(), tokenBlacklistService(), sessionService(), authProperties(), clock(),
-                    accountEpochService(), authenticationService(), Mockito.mock(UserProfileSyncClient.class));
+                    accountEpochService(), authenticationService(), Mockito.mock(UserProfileSyncClient.class), Mockito.mock(cc.nanoic.yunanexus.auth.service.OAuthApplicationService.class));
         }
 
         @Bean

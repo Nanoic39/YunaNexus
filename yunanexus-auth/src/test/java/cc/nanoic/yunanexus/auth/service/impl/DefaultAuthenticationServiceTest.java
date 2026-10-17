@@ -77,6 +77,7 @@ class DefaultAuthenticationServiceTest {
 
     private AuthClient validClient() {
         AuthClient c = new AuthClient();
+        c.setApplicationCategory("OFFICIAL_NATIVE");
         c.setClientCode("clientA");
         c.setStatus(1);
         return c;

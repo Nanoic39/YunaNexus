@@ -31,4 +31,7 @@ public class LoginRequest {
     /** SSO 客户端标识 */
     @NotBlank(message = "客户端标识不能为空")
     private String clientCode;
+
+    /** Confidential official applications authenticate on their server; never embed in browser code. */
+    private String clientSecret;
 }
