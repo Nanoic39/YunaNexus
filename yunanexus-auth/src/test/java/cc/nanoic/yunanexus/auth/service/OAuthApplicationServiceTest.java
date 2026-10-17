@@ -17,8 +17,13 @@ class OAuthApplicationServiceTest {
                 "test", null, null, "https://example.com", urls, scopes);
     }
 
+    private OAuthApplicationService service(JdbcTemplate db) {
+        return new OAuthApplicationService(db, new cc.nanoic.yunanexus.auth.config.SecurityProperties());
+    }
+
     @Test
     void rejectsUnsafeCallbacksAndUnknownScopes() {
+        var service = service(mock(JdbcTemplate.class));
         for (String uri :
                 List.of(
                         "javascript:alert(1)",
@@ -29,17 +34,13 @@ class OAuthApplicationServiceTest {
                         "https://example.com/cb\n"))
             assertThrows(
                     BizException.class,
-                    () ->
-                            OAuthApplicationService.validate(
-                                    body(List.of(uri), List.of("profile:read"))));
+                    () -> service.validate(body(List.of(uri), List.of("profile:read"))));
         assertThrows(
                 BizException.class,
-                () ->
-                        OAuthApplicationService.validate(
-                                body(List.of("https://example.com/cb"), List.of("admin:all"))));
+                () -> service.validate(body(List.of("https://example.com/cb"), List.of("admin:all"))));
         assertDoesNotThrow(
                 () ->
-                        OAuthApplicationService.validate(
+                        service.validate(
                                 body(
                                         List.of(
                                                 "https://example.com/cb",
@@ -48,9 +49,33 @@ class OAuthApplicationServiceTest {
     }
 
     @Test
+    void allowsHttpCallbackOnTrustedTemporaryOrigin() {
+        var security = new cc.nanoic.yunanexus.auth.config.SecurityProperties();
+        security.setAllowInsecureHttp(true);
+        security.setPublicOrigin("http://103.39.66.135:3000");
+        security.setCorsAllowedOrigins(
+                List.of("http://103.39.66.135:3000", "http://103.39.66.135:5010"));
+        var service = new OAuthApplicationService(mock(JdbcTemplate.class), security);
+
+        assertDoesNotThrow(
+                () ->
+                        service.validate(
+                                body(
+                                        List.of("http://103.39.66.135:5010/sso/callback"),
+                                        List.of("profile:read"))));
+        assertThrows(
+                BizException.class,
+                () ->
+                        service.validate(
+                                body(
+                                        List.of("http://103.39.66.135:5020/sso/callback"),
+                                        List.of("profile:read"))));
+    }
+
+    @Test
     void userListingIsOwnerBoundAndDoesNotExposeCredential() {
         var db = mock(JdbcTemplate.class);
-        var service = new OAuthApplicationService(db);
+        var service = service(db);
         var row = new LinkedHashMap<String, Object>();
         row.put("redirectUris", "https://example.com/cb");
         row.put("scopes", "profile:read");
@@ -67,7 +92,7 @@ class OAuthApplicationServiceTest {
     @Test
     void scopesDenyAdministrationAndGateEmailExposure() {
         var db = mock(JdbcTemplate.class);
-        var service = new OAuthApplicationService(db);
+        var service = service(db);
         when(db.queryForList(startsWith("SELECT scopes"), eq("oauth_test")))
                 .thenReturn(List.of(Map.of("scopes", "profile:read,files:read")));
         assertTrue(service.allows("oauth_test", "GET", "/api/v1/auth/me"));
@@ -80,7 +105,7 @@ class OAuthApplicationServiceTest {
 
     @Test
     void deletedOrDisabledClientsCannotExchangeSecrets() {
-        var service = new OAuthApplicationService(mock(JdbcTemplate.class));
+        var service = service(mock(JdbcTemplate.class));
         assertThrows(BizException.class, () -> service.verifySecret("oauth_unknown", "wrong"));
     }
 
@@ -98,7 +123,7 @@ class OAuthApplicationServiceTest {
     @Test
     void consentRejectsMismatchedCallbackBeforeGranting() {
         var db = mock(JdbcTemplate.class);
-        var service = new OAuthApplicationService(db);
+        var service = service(db);
         when(db.queryForList(startsWith("SELECT client_code AS clientId"), eq("oauth_test")))
                 .thenReturn(
                         List.of(
@@ -120,7 +145,7 @@ class OAuthApplicationServiceTest {
     @Test
     void consentBindsOnlyTheVerifiedUserAndRegisteredCallback() {
         var db = mock(JdbcTemplate.class);
-        var service = new OAuthApplicationService(db);
+        var service = service(db);
         when(db.queryForList(startsWith("SELECT id FROM auth_oauth_application"), eq("oauth_test")))
                 .thenReturn(List.of(Map.of("id", 1)));
         when(db.queryForList(startsWith("SELECT client_code AS clientId"), eq("oauth_test")))

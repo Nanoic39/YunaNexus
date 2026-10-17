@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.auth.service;
 
+import cc.nanoic.yunanexus.auth.config.SecurityProperties;
 import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
 import cc.nanoic.yunanexus.common.web.exception.BizException;
 
@@ -16,9 +17,11 @@ import java.util.*;
 @Service
 public class OAuthApplicationService {
     private final JdbcTemplate db;
+    private final SecurityProperties security;
 
-    public OAuthApplicationService(JdbcTemplate db) {
+    public OAuthApplicationService(JdbcTemplate db, SecurityProperties security) {
         this.db = db;
+        this.security = security;
     }
 
     public record Save(
@@ -77,7 +80,7 @@ public class OAuthApplicationService {
         return view(rows.getFirst());
     }
 
-    public static void validate(Save b) {
+    public void validate(Save b) {
         if (b == null
                 || b.appName() == null
                 || b.appName().isBlank()
@@ -95,7 +98,7 @@ public class OAuthApplicationService {
         if (b.logo() != null && !b.logo().isBlank()) safeUri(b.logo(), false);
     }
 
-    static void safeUri(String value, boolean callback) {
+    void safeUri(String value, boolean callback) {
         try {
             URI u = URI.create(value);
             if (value.toLowerCase(Locale.ROOT).contains("%0d")
@@ -107,7 +110,8 @@ public class OAuthApplicationService {
                     || u.getFragment() != null
                     || !("https".equals(u.getScheme())
                             || ("http".equals(u.getScheme())
-                                    && Set.of("localhost", "127.0.0.1").contains(u.getHost()))))
+                                    && (Set.of("localhost", "127.0.0.1").contains(u.getHost())
+                                            || security.isTemporaryHttpOrigin(u)))))
                 throw new IllegalArgumentException();
             String q = u.getRawQuery();
             if (callback && q != null)
@@ -118,7 +122,7 @@ public class OAuthApplicationService {
                     if (Set.of("code", "state").contains(key)) throw new IllegalArgumentException();
                 }
         } catch (Exception e) {
-            throw bad("地址需为HTTPS（本机回环允许HTTP），且不可含身份、片段或code/state参数");
+            throw bad("地址需为HTTPS（本机回环或受信临时HTTP源允许HTTP），且不可含身份、片段或code/state参数");
         }
     }
 
