@@ -52,7 +52,7 @@ public class AuthAdminController {
             @PathVariable("id") long id,
             @Valid @RequestBody(required = false) AppealAuditRequest request) {
         AppealAuditRequest body = request == null ? new AppealAuditRequest() : request;
-        adminService.approveAppeal(id, body.getAuditor(), body.getRemark());
+        adminService.approveAppeal(id, currentAuditor(), body.getRemark());
         return Result.success();
     }
 
@@ -61,8 +61,23 @@ public class AuthAdminController {
             @PathVariable("id") long id,
             @Valid @RequestBody(required = false) AppealAuditRequest request) {
         AppealAuditRequest body = request == null ? new AppealAuditRequest() : request;
-        adminService.rejectAppeal(id, body.getAuditor(), body.getRemark());
+        adminService.rejectAppeal(id, currentAuditor(), body.getRemark());
         return Result.success();
+    }
+
+    private String currentAuditor() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated())
+            throw new cc.nanoic.yunanexus.common.web.exception.BizException(
+                    cc.nanoic.yunanexus.common.web.constant.ErrorCode.FORBIDDEN, "缺少管理员身份");
+        if (auth.getPrincipal() instanceof cc.nanoic.yunanexus.auth.security.AuthenticatedIdentity actor) {
+            var user = adminService.getUser(actor.userId());
+            return user.getUsername();
+        }
+        if ("admin".equals(auth.getPrincipal()) && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()))) return "ops:emergency";
+        throw new cc.nanoic.yunanexus.common.web.exception.BizException(
+                cc.nanoic.yunanexus.common.web.constant.ErrorCode.FORBIDDEN, "无管理权限");
     }
 
     // ---------- 用户管理 ----------
