@@ -26,9 +26,9 @@ const imageUrl = new URL(data.publicUrl, platformApiOrigin).href;
 
 ### 响应和浏览器行为
 
-PNG/JPEG/GIF/WebP 按文件头识别并允许内联，适合博客 img 标签。其他类型强制附件下载，包含 HTML、SVG 等主动内容，防止在平台域运行脚本。响应使用 nosniff、跨域资源允许及 no-store；撤销后后续访问重新校验，已下载到第三方的副本无法收回。
+PNG/JPEG/GIF/WebP 按文件头识别并允许内联，适合博客 img 标签。其他类型强制附件下载，包含 HTML、SVG 等主动内容，防止在平台域运行脚本。响应使用 nosniff、跨域资源允许；公开资产返回 `Cache-Control: public, max-age=604800, immutable`，私有与分享响应仍为 `no-store`。撤销后服务端仍会重新校验元数据，但浏览器已缓存的副本在 7 天内不会重新请求，已下载到第三方的副本无法收回。
 
-本批暂不提供 CDN 缓存、图片缩略图和媒体 Range；这些不影响博客图片直接展示，后续单独验收后扩展。
+公开 token 每次发布重新生成，URL 与内容一一对应，因此可以长缓存。本批暂不提供 CDN 缓存、图片缩略图和媒体 Range；这些不影响博客图片直接展示，后续单独验收后扩展。
 
 ## 状态
 

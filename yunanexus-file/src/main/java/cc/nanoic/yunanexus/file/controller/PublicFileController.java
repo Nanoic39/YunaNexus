@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets;
 @RequestMapping("/api/v1/file")
 public class PublicFileController {
     @ModelAttribute
-    public void noCache(jakarta.servlet.http.HttpServletResponse response){response.setHeader("Cache-Control","no-store");response.setHeader("Referrer-Policy","no-referrer");}
+    public void hardening(jakarta.servlet.http.HttpServletResponse response){response.setHeader("Cache-Control","no-store");response.setHeader("Referrer-Policy","no-referrer");}
     private final PublicFileService files;
     public PublicFileController(PublicFileService files){this.files=files;}
     public record Change(boolean publicAccess) {}
@@ -38,8 +38,11 @@ public class PublicFileController {
         try { stream.mark(16); byte[] prefix=stream.readNBytes(12); stream.reset(); type=rasterType(prefix); }
         catch(IOException|RuntimeException e){stream.close();throw e;}
         boolean inline=type!=null;
+        // Published tokens are regenerated on every publish, so the URL content is immutable.
+        // Cache publicly for 7 days to avoid re-downloading images on every page visit;
+        // visibility endpoints keep the no-store header from @ModelAttribute.
         return ResponseEntity.ok()
-            .header(HttpHeaders.CACHE_CONTROL,"no-store")
+            .header(HttpHeaders.CACHE_CONTROL,"public, max-age=604800, immutable")
             .header("X-Content-Type-Options","nosniff")
             .header("Content-Security-Policy","sandbox; default-src 'none'")
             .header("Cross-Origin-Resource-Policy","cross-origin")
