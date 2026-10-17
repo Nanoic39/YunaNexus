@@ -80,6 +80,9 @@ public class SecurityConfig {
             .csrf(csrf -> csrf
                 .csrfTokenRepository(csrfTokenRepository)
                 .csrfTokenRequestHandler(csrfHandler)
+                // Bearer 每次请求均重新认证，不能按新的 Session 登录清除浏览器令牌。
+                // 仅关闭 Session 登录时的令牌清除；CsrfFilter 的写请求校验保持开启。
+                .sessionAuthenticationStrategy(new org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy())
                 .ignoringRequestMatchers("/internal/auth/api-key/verify", "/api/v1/auth/sso/token", AdminAuthenticationFilter.ADMIN_PATH_PREFIX + "/**")
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
