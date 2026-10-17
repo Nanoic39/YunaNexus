@@ -49,7 +49,9 @@ public class OAuthApplicationService {
         v.put("scopes", List.of(row.get("scopes").toString().split(",")));
         v.replaceAll(
                 (k, value) ->
-                        value instanceof java.sql.Timestamp t
+                        value instanceof java.time.LocalDateTime dateTime
+                                ? dateTime.atOffset(java.time.ZoneOffset.UTC).toString()
+                                : value instanceof java.sql.Timestamp t
                                 ? t.toLocalDateTime().atOffset(java.time.ZoneOffset.UTC).toString()
                                 : value);
         v.put("clientSecret", null);

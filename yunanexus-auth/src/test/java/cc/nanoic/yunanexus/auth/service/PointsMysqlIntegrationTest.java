@@ -38,6 +38,11 @@ class PointsMysqlIntegrationTest {
  Map<String,Object> check(PointsService s){return tx.execute(status->s.checkIn(web));}
  Map<String,Object> change(String key,long amount,boolean credit){return tx.execute(status->service.change(app,new PointsService.Change(key,amount,credit,"business",SECRET)));}
  long balance(){return db.queryForObject("SELECT balance FROM auth_points_account WHERE user_id=91",Long.class);}
+ @Test void jdbcLedgerTimestampsHaveExplicitUtcOffset(){
+  change("utc-contract",10,true);
+  var rows=service.ledger(web,0,20);assertEquals(1,rows.size());
+  assertEquals(Instant.parse("2026-10-17T15:59:00Z"),Instant.parse(rows.getFirst().get("createdAt").toString()));
+ }
  @Test void repeatedAndConcurrentCheckInCreditsOnce()throws Exception{
   var pool=Executors.newFixedThreadPool(8);
   try{var calls=new ArrayList<Callable<Map<String,Object>>>();for(int i=0;i<20;i++)calls.add(()->check(service));for(var f:pool.invokeAll(calls))assertEquals(10L,((Number)f.get().get("balance")).longValue());}finally{pool.shutdownNow();}

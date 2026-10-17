@@ -68,6 +68,6 @@ public class PointsService {
   String scope="web".equals(actor.clientCode())?"":" AND client_code=?";
   List<Object> args=new ArrayList<>();args.add(uid);if(!scope.isEmpty())args.add(actor.clientCode());args.add(before==0?Long.MAX_VALUE:before);args.add(size);
   var rows=db.queryForList("SELECT id,client_code AS clientCode,business_key AS businessKey,delta,balance,reason,created_at AS createdAt FROM auth_points_ledger WHERE user_id=?"+scope+" AND id<? ORDER BY id DESC LIMIT ?",args.toArray());
-  rows.forEach(row->row.replaceAll((k,v)->v instanceof java.sql.Timestamp t?t.toLocalDateTime().atOffset(ZoneOffset.UTC).toString():v));return rows;
+  rows.forEach(row->row.replaceAll((k,v)->v instanceof LocalDateTime dateTime?dateTime.atOffset(ZoneOffset.UTC).toString():v instanceof java.sql.Timestamp t?t.toLocalDateTime().atOffset(ZoneOffset.UTC).toString():v));return rows;
  }
 }
