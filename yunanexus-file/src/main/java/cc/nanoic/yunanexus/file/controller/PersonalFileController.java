@@ -23,6 +23,8 @@ public class PersonalFileController {
         response.setHeader("Referrer-Policy", "no-referrer");
     }
 
+    @jakarta.annotation.Resource private PublicFileService publicFiles;
+
     private final PersonalFileService personal;
     private final FileService files;
     private final AvatarService avatars;
@@ -45,14 +47,25 @@ public class PersonalFileController {
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "20") int size,
             @RequestParam(value = "search", defaultValue = "") String search) {
-        return Result.success(personal.list(user(id), page, size, search.trim()));
+        var result=personal.list(user(id),page,size,search.trim());
+        for(var file:result.getRecords()) {
+            var visibility=publicFiles.visibility(file.getFileId(),user(id));
+            file.setPublicAccess(visibility.publicAccess());file.setPublicUrl(visibility.publicUrl());
+        }
+        return Result.success(result);
     }
 
     @PostMapping("/upload")
     public Result<FileView> upload(
             @RequestHeader(value = "X-User-Id", required = false) Long id,
-            @RequestParam("file") MultipartFile file) {
-        return Result.success(files.upload(file, user(id)));
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value="publicAccess",defaultValue="false") boolean publicAccess) {
+        var view=files.upload(file,user(id));
+        if(publicAccess){
+            var visibility=publicFiles.set(view.getFileId(),user(id),true);
+            view.setPublicAccess(true); view.setPublicUrl(visibility.publicUrl());
+        }
+        return Result.success(view);
     }
 
     @PostMapping("/avatar")

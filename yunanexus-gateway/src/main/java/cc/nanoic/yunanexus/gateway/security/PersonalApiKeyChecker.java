@@ -30,11 +30,11 @@ public class PersonalApiKeyChecker {
                 "GET".equals(method)
                                 && ("/api/v1/user/profile".equals(path)
                                         || "/api/v1/file/me".equals(path)
-                                        || path.matches("/api/v1/file/me/[1-9][0-9]*/download"))
+                                        || path.matches("/api/v1/file/me/[1-9][0-9]*/(download|visibility)"))
                         || "POST".equals(method)
                                 && ("/api/v1/file/me/upload".equals(path)
                                         || path.matches(
-                                                "/api/v1/file/me/[1-9][0-9]*/(delete|rename)"));
+                                                "/api/v1/file/me/[1-9][0-9]*/(delete|rename|visibility)"));
         if (!allowed) return Mono.error(new IllegalArgumentException("Route forbidden"));
         return client.post()
                 .uri(url)

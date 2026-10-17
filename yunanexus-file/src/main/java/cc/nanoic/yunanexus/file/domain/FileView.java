@@ -13,6 +13,10 @@ import java.time.LocalDateTime;
 @Data
 public class FileView {
 
+    /** Anonymous access is opt-in; URLs are relative to the public API origin. */
+    private boolean publicAccess;
+    private String publicUrl;
+
     /** 全局文件 ID */
     private Long fileId;
 

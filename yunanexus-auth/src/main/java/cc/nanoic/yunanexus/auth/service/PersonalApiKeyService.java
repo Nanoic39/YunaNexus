@@ -149,12 +149,12 @@ public class PersonalApiKeyService {
         if ("GET".equals(method)) {
             if ("/api/v1/user/profile".equals(path)) return scopes.contains("profile:read");
             if ("/api/v1/file/me".equals(path)
-                    || path.matches("/api/v1/file/me/[1-9][0-9]*/download"))
+                    || path.matches("/api/v1/file/me/[1-9][0-9]*/(download|visibility)"))
                 return scopes.contains("files:read");
         }
         if ("POST".equals(method)
                 && ("/api/v1/file/me/upload".equals(path)
-                        || path.matches("/api/v1/file/me/[1-9][0-9]*/(delete|rename)")))
+                        || path.matches("/api/v1/file/me/[1-9][0-9]*/(delete|rename|visibility)")))
             return scopes.contains("files:write");
         return false;
     }
