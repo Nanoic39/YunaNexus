@@ -41,6 +41,17 @@ jobs:
         run: python3 scripts/scan-publication.py
       - name: Test and build production
         run: mvn -B -ntp -Pprd -Dyunanexus.redis.it=true clean verify
+      - name: Annotate test failures
+        if: failure()
+        run: python3 scripts/report-test-failures.py
+      - name: Preserve test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: backend-test-reports
+          path: '**/target/surefire-reports/TEST-*.xml'
+          retention-days: 2
+          if-no-files-found: ignore
       - name: Package release
         run: python3 scripts/package-release.py backend
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
