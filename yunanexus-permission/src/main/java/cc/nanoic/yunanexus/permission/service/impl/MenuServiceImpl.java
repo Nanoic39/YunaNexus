@@ -32,6 +32,8 @@ import java.util.Map;
 @Service
 public class MenuServiceImpl implements MenuService {
 
+    private final cc.nanoic.yunanexus.permission.security.CatalogMutationGuard catalog;
+
     private final PermMenuMapper menuMapper;
     private final PermRoleMenuMapper roleMenuMapper;
     private final PermUserRoleMapper userRoleMapper;
@@ -40,7 +42,9 @@ public class MenuServiceImpl implements MenuService {
     public MenuServiceImpl(PermMenuMapper menuMapper,
                            PermRoleMenuMapper roleMenuMapper,
                            PermUserRoleMapper userRoleMapper,
-                           PermRoleMapper roleMapper) {
+                           PermRoleMapper roleMapper,
+            cc.nanoic.yunanexus.permission.security.CatalogMutationGuard catalog) {
+        this.catalog = catalog;
         this.menuMapper = menuMapper;
         this.roleMenuMapper = roleMenuMapper;
         this.userRoleMapper = userRoleMapper;
@@ -75,6 +79,7 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     public PermMenu update(long id, MenuSaveRequest request) {
+        catalog.menu(id);
         PermMenu menu = requireMenu(id);
         menu.setMenuName(request.getMenuName());
         menu.setPath(request.getPath());
@@ -91,6 +96,7 @@ public class MenuServiceImpl implements MenuService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(long id) {
+        catalog.menu(id);
         requireMenu(id);
         if (menuMapper.selectCount(new LambdaQueryWrapper<PermMenu>().eq(PermMenu::getParentId, id)) > 0) {
             throw new BizException(ErrorCode.MENU_HAS_CHILDREN);

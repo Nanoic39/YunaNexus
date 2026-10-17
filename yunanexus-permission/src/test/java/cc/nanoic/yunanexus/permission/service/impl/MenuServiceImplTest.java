@@ -44,7 +44,7 @@ class MenuServiceImplTest {
         roleMenuMapper = mock(PermRoleMenuMapper.class);
         userRoleMapper = mock(PermUserRoleMapper.class);
         roleMapper = mock(PermRoleMapper.class);
-        service = new MenuServiceImpl(menuMapper, roleMenuMapper, userRoleMapper, roleMapper);
+        service = new MenuServiceImpl(menuMapper, roleMenuMapper, userRoleMapper, roleMapper, mock(cc.nanoic.yunanexus.permission.security.CatalogMutationGuard.class));
     }
 
     private MenuSaveRequest request(String code, Long parentId) {

@@ -32,7 +32,7 @@ class PermissionServiceImplTest {
     void setUp() {
         permissionMapper = mock(PermPermissionMapper.class);
         rolePermissionMapper = mock(PermRolePermissionMapper.class);
-        service = new PermissionServiceImpl(permissionMapper, rolePermissionMapper);
+        service = new PermissionServiceImpl(permissionMapper, rolePermissionMapper, mock(cc.nanoic.yunanexus.permission.security.CatalogMutationGuard.class));
     }
 
     private PermissionSaveRequest request(String code) {

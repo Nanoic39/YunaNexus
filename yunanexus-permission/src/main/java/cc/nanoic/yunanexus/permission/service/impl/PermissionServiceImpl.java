@@ -23,11 +23,15 @@ import java.util.List;
 @Service
 public class PermissionServiceImpl implements PermissionService {
 
+    private final cc.nanoic.yunanexus.permission.security.CatalogMutationGuard catalog;
+
     private final PermPermissionMapper permissionMapper;
     private final PermRolePermissionMapper rolePermissionMapper;
 
     public PermissionServiceImpl(PermPermissionMapper permissionMapper,
-                                 PermRolePermissionMapper rolePermissionMapper) {
+                                 PermRolePermissionMapper rolePermissionMapper,
+            cc.nanoic.yunanexus.permission.security.CatalogMutationGuard catalog) {
+        this.catalog = catalog;
         this.permissionMapper = permissionMapper;
         this.rolePermissionMapper = rolePermissionMapper;
     }
@@ -53,6 +57,7 @@ public class PermissionServiceImpl implements PermissionService {
 
     @Override
     public PermPermission update(long id, PermissionSaveRequest request) {
+        catalog.permission(id);
         PermPermission permission = requirePermission(id);
         permission.setResource(request.getResource());
         permission.setAction(request.getAction());
@@ -67,6 +72,7 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(long id) {
+        catalog.permission(id);
         requirePermission(id);
         rolePermissionMapper.delete(new LambdaQueryWrapper<PermRolePermission>()
                 .eq(PermRolePermission::getPermissionId, id));

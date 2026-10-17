@@ -77,6 +77,7 @@ public class RoleDelegationGuard {
                 rolePermissions.selectPermissionIdsByRoleId(roleId),
                 permissionIds(a.userId()),
                 "不能编辑或分配权限高于自己的角色");
+        subset(roleMenus.selectMenuIdsByRoleId(roleId), menuIds(a.userId()), "不能编辑或分配菜单范围高于自己的角色");
         scope(role.getDataScope());
         if (Objects.equals(role.getDataScope(), PermRole.DATA_SCOPE_CUSTOM))
             departments(roleDepts.selectDeptIdsByRoleId(roleId));
@@ -108,13 +109,17 @@ public class RoleDelegationGuard {
         manage(roleId);
         var a = actor();
         if (a.superAdmin()) return;
+        subset(targets, menuIds(a.userId()), "不能授予自己未持有的菜单");
+    }
+
+    private Set<Long> menuIds(long userId) {
         Set<Long> allowed = new HashSet<>();
-        for (long id : userRoles.selectRoleIdsByUserId(a.userId())) {
+        for (long id : userRoles.selectRoleIdsByUserId(userId)) {
             var role = roles.selectById(id);
             if (role != null && Objects.equals(role.getStatus(), 1))
                 allowed.addAll(roleMenus.selectMenuIdsByRoleId(id));
         }
-        subset(targets, allowed, "不能授予自己未持有的菜单");
+        return allowed;
     }
 
     public void assignment(long userId, List<Long> targets) {

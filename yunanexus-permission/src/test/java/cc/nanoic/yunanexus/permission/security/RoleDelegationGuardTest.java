@@ -107,4 +107,10 @@ class RoleDelegationGuardTest {
         when(verifier.actor("Bearer actor")).thenReturn(new AdminBearerVerifier.Actor(1, true));
         assertDoesNotThrow(() -> guard.permissions(9, List.of(11L)));
     }
+    @Test
+    void cannotAssignRoleWithMenusOutsideOperatorScope() {
+        when(roleMenus.selectMenuIdsByRoleId(9)).thenReturn(List.of(20L));
+        assertEquals(403, assertThrows(BizException.class, () -> guard.assignment(2, List.of(9L))).getCode());
+    }
+
 }
