@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets;
 @RequestMapping("/api/v1/file")
 public class PublicFileController {
     @ModelAttribute
-    public void noCache(jakarta.servlet.http.HttpServletResponse response){response.setHeader("Cache-Control","no-store");}
+    public void noCache(jakarta.servlet.http.HttpServletResponse response){response.setHeader("Cache-Control","no-store");response.setHeader("Referrer-Policy","no-referrer");}
     private final PublicFileService files;
     public PublicFileController(PublicFileService files){this.files=files;}
     public record Change(boolean publicAccess) {}

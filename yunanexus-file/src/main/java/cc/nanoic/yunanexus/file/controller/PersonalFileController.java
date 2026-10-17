@@ -48,10 +48,7 @@ public class PersonalFileController {
             @RequestParam(value = "size", defaultValue = "20") int size,
             @RequestParam(value = "search", defaultValue = "") String search) {
         var result=personal.list(user(id),page,size,search.trim());
-        for(var file:result.getRecords()) {
-            var visibility=publicFiles.visibility(file.getFileId(),user(id));
-            file.setPublicAccess(visibility.publicAccess());file.setPublicUrl(visibility.publicUrl());
-        }
+        publicFiles.fill(result.getRecords(),user(id));
         return Result.success(result);
     }
 

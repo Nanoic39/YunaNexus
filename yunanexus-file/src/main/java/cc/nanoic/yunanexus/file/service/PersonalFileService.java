@@ -26,6 +26,7 @@ public class PersonalFileService {
     private final FileStorage storage;
     private final FileService files;
     private final cc.nanoic.yunanexus.file.mapper.FileShareMapper shares;
+    private final cc.nanoic.yunanexus.file.mapper.PublicFileMapper publications;
 
     public PersonalFileService(
             FileMetaMapper mapper,
@@ -33,13 +34,15 @@ public class PersonalFileService {
             FileProperties properties,
             FileStorage storage,
             FileService files,
-            cc.nanoic.yunanexus.file.mapper.FileShareMapper shares) {
+            cc.nanoic.yunanexus.file.mapper.FileShareMapper shares,
+            cc.nanoic.yunanexus.file.mapper.PublicFileMapper publications) {
         this.mapper = mapper;
         this.router = router;
         this.properties = properties;
         this.storage = storage;
         this.files = files;
         this.shares = shares;
+        this.publications = publications;
     }
 
     public <T> T inShard(int shard, Supplier<T> action) {
@@ -112,7 +115,16 @@ public class PersonalFileService {
             if (changed == 0) throw new BizException(ErrorCode.FILE_NOT_FOUND);
             meta.setFileName(name);
         }
-        return FileView.from(meta);
+        FileView view = FileView.from(meta);
+        var publication = inShard(0, () -> publications.find(fileId, userId));
+        view.setPublicAccess(publication != null);
+        view.setPublicUrl(publication == null ? null : publicPath(publication.token()));
+        return view;
+    }
+
+    /** 匿名资产地址；调用方负责与本站域名拼接为绝对地址。 */
+    public static String publicPath(String token) {
+        return "/api/v1/file/public/assets/" + token;
     }
 
     private String extension(String name) {
@@ -154,6 +166,13 @@ public class PersonalFileService {
     public void delete(long fileId, long userId) {
         requireOwned(fileId, userId);
         files.deleteOwned(fileId, userId);
-        inShard(0, () -> shares.revokeFile(fileId, userId));
+        // 分享与匿名发布都指向文件本体，删除时一并撤销，避免留下失效记录。
+        inShard(
+                0,
+                () -> {
+                    shares.revokeFile(fileId, userId);
+                    publications.revoke(fileId, userId);
+                    return null;
+                });
     }
 }

@@ -10,6 +10,7 @@ import cc.nanoic.yunanexus.file.domain.ChunkUploadStatus;
 import cc.nanoic.yunanexus.file.domain.FileRange;
 import cc.nanoic.yunanexus.file.domain.FileView;
 import cc.nanoic.yunanexus.file.service.FileService;
+import cc.nanoic.yunanexus.file.service.PublicFileService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.core.io.InputStreamResource;
@@ -53,15 +54,27 @@ public class FileController {
     @Resource
     private FileService fileService;
 
+    @Resource
+    private PublicFileService publicFileService;
+
     /**
      * 上传文件（单次上传，受 {@code yunanexus.file.upload.max-size} 限制）。
      *
+     * @param publicAccess 是否同时发布为可匿名访问的公开文件
      * @return 文件元数据（含全局文件 ID）
      */
     @PostMapping("/upload")
     public Result<FileView> upload(@RequestParam("file") MultipartFile file,
+                                   @RequestParam(value = "publicAccess", defaultValue = "false") boolean publicAccess,
                                    @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
-        return Result.success(fileService.upload(file, requireUserId(userId)));
+        long owner = requireUserId(userId);
+        FileView view = fileService.upload(file, owner);
+        if (publicAccess) {
+            var visibility = publicFileService.set(view.getFileId(), owner, true);
+            view.setPublicAccess(true);
+            view.setPublicUrl(visibility.publicUrl());
+        }
+        return Result.success(view);
     }
 
     /**
@@ -134,8 +147,16 @@ public class FileController {
      */
     @PostMapping("/chunk/complete")
     public Result<FileView> chunkComplete(@RequestParam("uploadId") String uploadId,
+                                          @RequestParam(value = "publicAccess", defaultValue = "false") boolean publicAccess,
                                           @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
-        return Result.success(fileService.completeChunkUpload(uploadId, requireUserId(userId)));
+        long owner = requireUserId(userId);
+        FileView view = fileService.completeChunkUpload(uploadId, owner);
+        if (publicAccess) {
+            var visibility = publicFileService.set(view.getFileId(), owner, true);
+            view.setPublicAccess(true);
+            view.setPublicUrl(visibility.publicUrl());
+        }
+        return Result.success(view);
     }
 
     /**
@@ -170,7 +191,10 @@ public class FileController {
             @RequestHeader(value = USER_ID_HEADER, required = false) Long userId,
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "20") int size) {
-        return Result.success(fileService.listVisible(requireUserId(userId), page, size));
+        long owner = requireUserId(userId);
+        var result = fileService.listVisible(owner, page, size);
+        publicFileService.fill(result.getRecords(), owner);
+        return Result.success(result);
     }
 
     /**

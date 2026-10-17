@@ -2,12 +2,18 @@ package cc.nanoic.yunanexus.file.mapper;
 
 import org.apache.ibatis.annotations.*;
 
+import java.util.Collection;
+import java.util.List;
+
 /** Publication records live in physical database zero; content remains in its original shard. */
 public interface PublicFileMapper {
     record Publication(long fileId, long userId, String token) {}
 
     @Select("SELECT file_id AS fileId,user_id AS userId,token FROM file_publication WHERE file_id=#{fileId} AND user_id=#{userId}")
     Publication find(@Param("fileId") long fileId, @Param("userId") long userId);
+
+    @Select("<script>SELECT file_id AS fileId,user_id AS userId,token FROM file_publication WHERE user_id=#{userId} AND file_id IN <foreach collection='fileIds' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>")
+    List<Publication> findMany(@Param("userId") long userId, @Param("fileIds") Collection<Long> fileIds);
 
     @Select("SELECT file_id AS fileId,user_id AS userId,token FROM file_publication WHERE token=#{token}")
     Publication resolve(@Param("token") String token);

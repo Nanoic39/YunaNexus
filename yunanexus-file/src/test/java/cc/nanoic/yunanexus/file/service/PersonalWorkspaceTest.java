@@ -30,7 +30,8 @@ class PersonalWorkspaceTest {
                     new FileProperties(),
                     storage,
                     legacy,
-                    mock(FileShareMapper.class));
+                    mock(FileShareMapper.class),
+                    mock(PublicFileMapper.class));
     FileShareMapper shares = mock(FileShareMapper.class);
     FileShareService service = new FileShareService(personal, shares);
 
