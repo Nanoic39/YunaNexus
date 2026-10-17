@@ -340,7 +340,7 @@ class FileServiceImplTest {
 
     @Test
     void chunkSessionsAreOnlyAccessibleToTheirCreator() {
-        var session=session("up1",2,LocalDateTime.now());
+        var session=session("up1",2,LocalDateTime.now(java.time.ZoneOffset.UTC));
         when(fileStorage.loadChunkSession("up1")).thenReturn(sessionBytes(session));
         service.requireChunkOwner("up1",session.getUserId());
         assertThrows(BizException.class,()->service.requireChunkOwner("up1",session.getUserId()+1));
@@ -367,7 +367,7 @@ class FileServiceImplTest {
     @Test
     void uploadChunkRejectsOutOfRangeIndex() {
         when(fileStorage.loadChunkSession("up1"))
-                .thenReturn(sessionBytes(session("up1", 2, LocalDateTime.now())));
+                .thenReturn(sessionBytes(session("up1", 2, LocalDateTime.now(java.time.ZoneOffset.UTC))));
 
         BizException ex = assertThrows(BizException.class,
                 () -> service.uploadChunk("up1", 5, txtFile("hello")));
@@ -378,7 +378,7 @@ class FileServiceImplTest {
     @Test
     void uploadChunkStoresContent() {
         when(fileStorage.loadChunkSession("up1"))
-                .thenReturn(sessionBytes(session("up1", 2, LocalDateTime.now())));
+                .thenReturn(sessionBytes(session("up1", 2, LocalDateTime.now(java.time.ZoneOffset.UTC))));
 
         service.uploadChunk("up1", 1, txtFile("hello"));
 
@@ -388,7 +388,7 @@ class FileServiceImplTest {
     @Test
     void chunkStatusReturnsUploadedIndexes() {
         when(fileStorage.loadChunkSession("up1"))
-                .thenReturn(sessionBytes(session("up1", 3, LocalDateTime.now())));
+                .thenReturn(sessionBytes(session("up1", 3, LocalDateTime.now(java.time.ZoneOffset.UTC))));
         when(fileStorage.listChunks("up1")).thenReturn(new TreeSet<>(Set.of(2, 0)));
 
         ChunkUploadStatus status = service.chunkStatus("up1");
@@ -400,7 +400,7 @@ class FileServiceImplTest {
     @Test
     void completeChunkUploadMergesAndPersists() {
         when(fileStorage.loadChunkSession("up1"))
-                .thenReturn(sessionBytes(session("up1", 2, LocalDateTime.now())));
+                .thenReturn(sessionBytes(session("up1", 2, LocalDateTime.now(java.time.ZoneOffset.UTC))));
         when(fileStorage.mergeChunks("up1", 2, "txt"))
                 .thenReturn(new FileStorage.StoredObject("2026/10/13/new.txt", 5L, "sha"));
         when(fileMetaMapper.selectBySha256AndSize("sha", 5L)).thenReturn(null);
@@ -417,7 +417,7 @@ class FileServiceImplTest {
     @Test
     void completeChunkUploadReusesDuplicateStorage() {
         when(fileStorage.loadChunkSession("up1"))
-                .thenReturn(sessionBytes(session("up1", 2, LocalDateTime.now())));
+                .thenReturn(sessionBytes(session("up1", 2, LocalDateTime.now(java.time.ZoneOffset.UTC))));
         when(fileStorage.mergeChunks("up1", 2, "txt"))
                 .thenReturn(new FileStorage.StoredObject("2026/10/13/new.txt", 5L, "sha"));
         FileMeta duplicate = normalMeta(16L, 99L, 1L);
@@ -437,7 +437,7 @@ class FileServiceImplTest {
     @Test
     void abortChunkUploadClearsTempChunks() {
         when(fileStorage.loadChunkSession("up1"))
-                .thenReturn(sessionBytes(session("up1", 2, LocalDateTime.now())));
+                .thenReturn(sessionBytes(session("up1", 2, LocalDateTime.now(java.time.ZoneOffset.UTC))));
 
         service.abortChunkUpload("up1");
 
@@ -446,7 +446,7 @@ class FileServiceImplTest {
 
     @Test
     void cleanupRemovesExpiredSessions() {
-        UploadSession expired = session("old", 2, LocalDateTime.now().minusDays(2));
+        UploadSession expired = session("old", 2, LocalDateTime.now(java.time.ZoneOffset.UTC).minusDays(2));
         when(fileStorage.listChunkUploads()).thenReturn(List.of("old", "broken"));
         when(fileStorage.loadChunkSession("old")).thenReturn(sessionBytes(expired));
         when(fileStorage.loadChunkSession("broken")).thenReturn(null);

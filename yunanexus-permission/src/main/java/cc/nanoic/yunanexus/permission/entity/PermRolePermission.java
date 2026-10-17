@@ -25,5 +25,6 @@ public class PermRolePermission {
     /** 权限 ID */
     private Long permissionId;
 
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
 }

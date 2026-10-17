@@ -23,8 +23,11 @@ public class AppealView {
     private Integer status;
     private String auditor;
     private String auditRemark;
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime auditTime;
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime updateTime;
 
     /**

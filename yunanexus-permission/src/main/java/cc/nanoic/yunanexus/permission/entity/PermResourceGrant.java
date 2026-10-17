@@ -61,12 +61,15 @@ public class PermResourceGrant {
     private Integer effect;
 
     /** 过期时间（null 表示永久） */
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime expireTime;
 
     /** 状态：1-启用 0-禁用 */
     private Integer status;
 
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
 
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime updateTime;
 }

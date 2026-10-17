@@ -221,7 +221,7 @@ public class FileServiceImpl implements FileService {
         session.setDeptId(deptId);
         session.setFileId(fileId);
         session.setShardIndex(shardIndex);
-        session.setCreateTime(LocalDateTime.now());
+        session.setCreateTime(LocalDateTime.now(java.time.ZoneOffset.UTC));
         fileStorage.storeChunkSession(uploadId, encodeSession(session));
         log.info("分片上传初始化 uploadId={} fileId={} totalChunks={} user={}", uploadId, fileId, request.getTotalChunks(), userId);
         return new ChunkInitResult(uploadId, false, List.of(), null);
@@ -308,7 +308,7 @@ public class FileServiceImpl implements FileService {
     @Override
     public int cleanupExpiredChunkUploads() {
         long ttl = properties.getChunk().getSessionTtlSeconds();
-        LocalDateTime deadline = LocalDateTime.now().minusSeconds(ttl);
+        LocalDateTime deadline = LocalDateTime.now(java.time.ZoneOffset.UTC).minusSeconds(ttl);
         int removed = 0;
         for (String uploadId : fileStorage.listChunkUploads()) {
             try {

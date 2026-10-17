@@ -26,8 +26,10 @@ public class PortalPageView extends PortalPageContent {
     /** 状态：1-已发布 0-草稿 */
     private Integer status;
 
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
 
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime updateTime;
 
     public static PortalPageView from(PortalPage page, List<PortalSection> sections) {

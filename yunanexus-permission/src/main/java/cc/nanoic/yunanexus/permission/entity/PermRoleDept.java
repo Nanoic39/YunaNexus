@@ -25,5 +25,6 @@ public class PermRoleDept {
     /** 部门 ID */
     private Long deptId;
 
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
 }

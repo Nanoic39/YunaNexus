@@ -50,7 +50,9 @@ public class PermRole {
     /** 状态：1-启用 0-禁用 */
     private Integer status;
 
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
 
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime updateTime;
 }

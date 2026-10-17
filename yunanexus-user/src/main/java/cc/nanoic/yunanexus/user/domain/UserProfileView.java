@@ -25,7 +25,9 @@ public class UserProfileView {
     private String mobileCountry;
     private String mobile;
     private Integer status;
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime updateTime;
 
     public static UserProfileView from(SysUser user) {

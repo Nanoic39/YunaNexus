@@ -83,10 +83,10 @@ class PersonalApiKeyServiceTest {
         String token = "ynk_" + "a".repeat(43);
         assertThrows(BizException.class, () -> service.verify(token, "GET", "/api/v1/file/me"));
         var key = key();
-        key.setExpiresAt(LocalDateTime.now().minusDays(1));
+        key.setExpiresAt(LocalDateTime.now(java.time.ZoneOffset.UTC).minusDays(1));
         when(mapper.find(anyString())).thenReturn(key);
         assertThrows(BizException.class, () -> service.verify(token, "GET", "/api/v1/file/me"));
-        key.setExpiresAt(LocalDateTime.now().plusDays(1));
+        key.setExpiresAt(LocalDateTime.now(java.time.ZoneOffset.UTC).plusDays(1));
         key.setRevoked(1);
         assertThrows(BizException.class, () -> service.verify(token, "GET", "/api/v1/file/me"));
         verifyNoInteractions(users);
@@ -130,7 +130,21 @@ class PersonalApiKeyServiceTest {
         k.setUserId(9L);
         k.setRevoked(0);
         k.setScopes("files:read");
-        k.setExpiresAt(LocalDateTime.now().plusDays(1));
+        k.setExpiresAt(LocalDateTime.now(java.time.ZoneOffset.UTC).plusDays(1));
         return k;
+    }
+    @Test
+    void creationAndExpiryUseUtcEvenOnNonUtcHost() {
+        var original = java.util.TimeZone.getDefault();
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Shanghai"));
+            when(mapper.lockOwner(9)).thenReturn(9L);
+            when(mapper.list(9)).thenReturn(List.of());
+            var before = java.time.Instant.now();
+            var result = service.create(9, "clock-test", List.of("files:read"), 7).key();
+            var instant = result.createdAt().toInstant(java.time.ZoneOffset.UTC);
+            assertTrue(Math.abs(java.time.Duration.between(before, instant).toSeconds()) < 5);
+            assertEquals(result.createdAt().plusDays(7), result.expiresAt());
+        } finally { java.util.TimeZone.setDefault(original); }
     }
 }

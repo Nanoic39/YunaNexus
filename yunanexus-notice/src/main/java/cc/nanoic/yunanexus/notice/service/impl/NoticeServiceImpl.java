@@ -146,7 +146,7 @@ public class NoticeServiceImpl implements NoticeService {
             NoticeSender sender = senderRegistry.get(NoticeChannel.of(record.getChannel()));
             sender.send(record);
             record.setStatus(NoticeRecord.STATUS_SENT);
-            record.setSendTime(LocalDateTime.now());
+            record.setSendTime(LocalDateTime.now(java.time.ZoneOffset.UTC));
             record.setErrorMsg(null);
             recordMapper.updateById(record);
             log.info(

@@ -19,8 +19,10 @@ public class PortalSiteView extends PortalSiteMeta {
 
     private Integer status;
 
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
 
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime updateTime;
 
     public static PortalSiteView from(PortalSite site) {

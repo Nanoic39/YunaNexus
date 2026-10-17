@@ -24,8 +24,10 @@ public class NoticeRecordView {
     private String params;
     private Integer status;
     private Integer retryCount;
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime sendTime;
     private String errorMsg;
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
 
     public static NoticeRecordView from(NoticeRecord record) {

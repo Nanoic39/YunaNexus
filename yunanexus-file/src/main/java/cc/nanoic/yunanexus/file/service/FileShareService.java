@@ -36,8 +36,8 @@ public class FileShareService {
             Long fileId,
             String fileName,
             boolean protectedByCode,
-            LocalDateTime createdAt,
-            LocalDateTime expiresAt,
+            @cc.nanoic.yunanexus.common.web.time.UtcDateTime LocalDateTime createdAt,
+            @cc.nanoic.yunanexus.common.web.time.UtcDateTime LocalDateTime expiresAt,
             boolean revoked) {}
 
     public View view(FileShare s) {
@@ -87,7 +87,7 @@ public class FileShareService {
                     s.setUserId(userId);
                     s.setFileId(fileId);
                     s.setFileName(file.getFileName());
-                    s.setCreatedAt(LocalDateTime.now());
+                    s.setCreatedAt(LocalDateTime.now(java.time.ZoneOffset.UTC));
                     s.setExpiresAt(s.getCreatedAt().plusDays(days));
                     s.setRevoked(0);
                     if (code != null && !code.isEmpty()) s.setCodeHash(hash(code, s.getShareId()));
@@ -107,7 +107,7 @@ public class FileShareService {
         FileShare s = index(() -> mapper.find(shareId));
         if (s == null
                 || Integer.valueOf(1).equals(s.getRevoked())
-                || !s.getExpiresAt().isAfter(LocalDateTime.now())) throw unavailable();
+                || !s.getExpiresAt().isAfter(LocalDateTime.now(java.time.ZoneOffset.UTC))) throw unavailable();
         if (s.getCodeHash() != null) {
             if (index(() -> mapper.failure(shareId)) == 0)
                 throw new BizException(ErrorCode.BAD_REQUEST, "尝试次数过多，请 15 分钟后重试");

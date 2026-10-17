@@ -25,5 +25,6 @@ public class PermRoleMenu {
     /** 菜单 ID */
     private Long menuId;
 
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
 }

@@ -42,9 +42,9 @@ public class PersonalApiKeyService {
             String name,
             String prefix,
             List<String> scopes,
-            LocalDateTime createdAt,
-            LocalDateTime expiresAt,
-            LocalDateTime lastUsedAt,
+            @cc.nanoic.yunanexus.common.web.time.UtcDateTime LocalDateTime createdAt,
+            @cc.nanoic.yunanexus.common.web.time.UtcDateTime LocalDateTime expiresAt,
+            @cc.nanoic.yunanexus.common.web.time.UtcDateTime LocalDateTime lastUsedAt,
             boolean revoked) {}
 
     public record Created(View key, String token) {}
@@ -96,7 +96,7 @@ public class PersonalApiKeyService {
                                         k ->
                                                 Integer.valueOf(0).equals(k.getRevoked())
                                                         && k.getExpiresAt()
-                                                                .isAfter(LocalDateTime.now()))
+                                                                .isAfter(LocalDateTime.now(java.time.ZoneOffset.UTC)))
                                 .count()
                         >= 20)
             throw new BizException(ErrorCode.BAD_REQUEST, "最多 20 个有效密钥、100 条近期记录");
@@ -110,7 +110,7 @@ public class PersonalApiKeyService {
         key.setTokenHash(hash(token));
         key.setTokenPrefix(token.substring(0, 12));
         key.setScopes(String.join(",", new TreeSet<>(scopes)));
-        key.setCreatedAt(LocalDateTime.now());
+        key.setCreatedAt(LocalDateTime.now(java.time.ZoneOffset.UTC));
         key.setExpiresAt(key.getCreatedAt().plusDays(days));
         key.setRevoked(0);
         mapper.insert(key);
@@ -125,7 +125,7 @@ public class PersonalApiKeyService {
         if (token == null || !token.matches("ynk_[A-Za-z0-9_-]{43}")) throw denied();
         PersonalApiKey key = mapper.find(hash(token));
         if (key == null
-                || !key.getExpiresAt().isAfter(LocalDateTime.now())
+                || !key.getExpiresAt().isAfter(LocalDateTime.now(java.time.ZoneOffset.UTC))
                 || !Integer.valueOf(0).equals(key.getRevoked())
                 || !allows(Set.of(key.getScopes().split(",")), method, path)) throw denied();
         var user = users.selectByUserId(key.getUserId());
@@ -135,7 +135,7 @@ public class PersonalApiKeyService {
                 || Integer.valueOf(1).equals(user.getPasswordResetRequired())
                 || !Integer.valueOf(1).equals(user.getStatus())
                 || (user.getLockedUntil() != null
-                        && user.getLockedUntil().isAfter(LocalDateTime.now()))
+                        && user.getLockedUntil().isAfter(LocalDateTime.now(java.time.ZoneOffset.UTC)))
                 || grant == null
                 || !Integer.valueOf(1).equals(grant.getStatus())
                 || client == null

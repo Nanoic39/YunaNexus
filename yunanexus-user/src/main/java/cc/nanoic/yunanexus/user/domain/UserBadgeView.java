@@ -18,6 +18,7 @@ public class UserBadgeView {
     private Integer badgeLevel;
     private String description;
     private String icon;
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime grantedTime;
 
     public static UserBadgeView from(UserBadge badge) {

@@ -38,6 +38,7 @@ public class FileView {
     private Long deptId;
 
     /** 上传时间 */
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
 
     public static FileView from(FileMeta meta) {

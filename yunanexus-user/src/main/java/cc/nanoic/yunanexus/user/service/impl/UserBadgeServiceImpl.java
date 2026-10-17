@@ -63,7 +63,7 @@ public class UserBadgeServiceImpl implements UserBadgeService {
         badge.setBadgeLevel(resolveLevel(request));
         badge.setDescription(request.getDescription());
         badge.setIcon(request.getIcon());
-        badge.setGrantedTime(LocalDateTime.now());
+        badge.setGrantedTime(LocalDateTime.now(java.time.ZoneOffset.UTC));
         try { userBadgeMapper.insert(badge); }
         catch(org.springframework.dao.DuplicateKeyException e) {
             // Concurrent idempotent grants may race on user_id + badge_code.

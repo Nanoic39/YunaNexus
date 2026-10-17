@@ -25,5 +25,6 @@ public class PermUserRole {
     /** 角色 ID */
     private Long roleId;
 
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
 }

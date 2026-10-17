@@ -101,9 +101,9 @@ class PersonalWorkspaceTest {
         s.setRevoked(1);
         assertThrows(BizException.class, () -> service.redeem(s.getShareId(), ""));
         s.setRevoked(0);
-        s.setExpiresAt(LocalDateTime.now().minusSeconds(1));
+        s.setExpiresAt(LocalDateTime.now(java.time.ZoneOffset.UTC).minusSeconds(1));
         assertThrows(BizException.class, () -> service.redeem(s.getShareId(), ""));
-        s.setExpiresAt(LocalDateTime.now().plusDays(1));
+        s.setExpiresAt(LocalDateTime.now(java.time.ZoneOffset.UTC).plusDays(1));
         when(files.selectByFileId(4)).thenReturn(null);
         assertThrows(BizException.class, () -> service.redeem(s.getShareId(), ""));
     }
@@ -216,7 +216,20 @@ class PersonalWorkspaceTest {
         s.setUserId(9L);
         s.setFileId(4L);
         s.setRevoked(0);
-        s.setExpiresAt(LocalDateTime.now().plusDays(1));
+        s.setExpiresAt(LocalDateTime.now(java.time.ZoneOffset.UTC).plusDays(1));
         return s;
+    }
+    @Test
+    void creationAndExpiryUseUtcEvenOnNonUtcHost() {
+        var original = java.util.TimeZone.getDefault();
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Shanghai"));
+            when(files.selectByFileId(4)).thenReturn(file(4, 9));
+            var before = java.time.Instant.now();
+            var result = service.create(9, 4, 7, "");
+            var instant = result.createdAt().toInstant(java.time.ZoneOffset.UTC);
+            assertTrue(Math.abs(java.time.Duration.between(before, instant).toSeconds()) < 5);
+            assertEquals(result.createdAt().plusDays(7), result.expiresAt());
+        } finally { java.util.TimeZone.setDefault(original); }
     }
 }

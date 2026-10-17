@@ -22,7 +22,9 @@ public class NoticeTemplateView {
     private String content;
     private Integer status;
     private String remark;
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
+    @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime updateTime;
 
     public static NoticeTemplateView from(NoticeTemplate template) {
