@@ -121,6 +121,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout", "/api/v1/auth/logout-all").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
                 .requestMatchers("/api/v1/auth/account/**").authenticated()
+                .requestMatchers(HttpMethod.POST,"/api/v1/auth/application/permissions/check").authenticated()
                 .requestMatchers(HttpMethod.POST,"/internal/auth/api-key/verify").permitAll()
                 .requestMatchers(AdminAuthenticationFilter.ADMIN_PATH_PREFIX + "/**").hasRole("ADMIN")
                 .anyRequest().denyAll()
