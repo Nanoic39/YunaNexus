@@ -389,7 +389,8 @@ public class SecurityRedisMvcIntegrationTest {
         assertNotNull(setCookie);
         assertTrue(setCookie.contains("YunaSSO_LOCAL"), "Missing YunaSSO_LOCAL in cookie attributes: " + setCookie.replaceFirst("=[^;]*", "=<redacted>"));
         assertTrue(setCookie.contains("HttpOnly"), "Missing HttpOnly in cookie attributes: " + setCookie.replaceFirst("=[^;]*", "=<redacted>"));
-        assertTrue(setCookie.contains("Lax"), "Missing Lax in cookie attributes: " + setCookie.replaceFirst("=[^;]*", "=<redacted>"));
+        assertNotNull(result.getResponse().getCookie("YunaSSO_LOCAL"));
+        assertEquals("Lax", result.getResponse().getCookie("YunaSSO_LOCAL").getAttribute("SameSite"));
         assertTrue(setCookie.contains("Path=/"), "Missing Path=/ in cookie attributes: " + setCookie.replaceFirst("=[^;]*", "=<redacted>"));
 
         String ssoCookie = extractCookieValue(setCookie, "YunaSSO_LOCAL");
@@ -1283,7 +1284,8 @@ public class SecurityRedisMvcIntegrationTest {
         String setCookie = result.getResponse().getHeader("Set-Cookie");
         assertNotNull(setCookie);
         assertFalse(setCookie.contains("Secure"));
-        assertTrue(setCookie.contains("SameSite=Lax"));
+        assertNotNull(result.getResponse().getCookie("YunaCsrf_LOCAL"));
+        assertEquals("Lax", result.getResponse().getCookie("YunaCsrf_LOCAL").getAttribute("SameSite"));
         assertTrue(setCookie.contains("HttpOnly"), "Missing HttpOnly in cookie attributes: " + setCookie.replaceFirst("=[^;]*", "=<redacted>"));
         assertTrue(setCookie.contains("Path=/"), "Missing Path=/ in cookie attributes: " + setCookie.replaceFirst("=[^;]*", "=<redacted>"));
     }

@@ -335,6 +335,9 @@ public class RedisSessionService implements SessionService {
         if (current.getExpireAtMillis() > current.getRefreshExpiresAtMillis()) {
             throw new IllegalStateException("当前会话 expireAt 大于 refreshExpiresAt，数据异常");
         }
+        if (!java.util.Objects.equals(current.getAccountEpoch(), updated.getAccountEpoch())) {
+            throw new IllegalArgumentException("轮转不能变更账户撤销标识");
+        }
         if (!java.util.Objects.equals(sid, updated.getSid())
             || current.getUserId() != updated.getUserId()
             || !java.util.Objects.equals(current.getExternalId(), updated.getExternalId())
@@ -342,7 +345,6 @@ public class RedisSessionService implements SessionService {
             || !java.util.Objects.equals(current.getClientCode(), updated.getClientCode())
             || !java.util.Objects.equals(current.getDeviceId(), updated.getDeviceId())
             || current.getLoginTimeMillis() != updated.getLoginTimeMillis()
-            || !java.util.Objects.equals(current.getAccountEpoch(), updated.getAccountEpoch())
             || !java.util.Objects.equals(expectedRefreshJti, current.getRefreshJti())) {
             return false;
         }
