@@ -38,6 +38,8 @@ PNG/JPEG/GIF/WebP 按文件头识别并允许内联，适合博客 img 标签。
 - [已完成] `POST /upload` 与分片 `POST /chunk/complete` 支持 `publicAccess`；`GET /list` 批量回填。
 - [已完成] 生产迁移 `20261017-public-files.sql` 已在 `yunanexus_file_0` 执行。
 - [已完成] 生产部署：release `20261017-public`，切换 `current` 后重建 `file` 与 `gateway`。
-- [已完成] 匿名资源验证：经 gateway 与 edge 均返回 `200`，`Content-Type: image/jpeg|image/png`、`Content-Disposition: inline`，含 `nosniff` / `CORP cross-origin` / `no-store` / `Referrer-Policy: no-referrer`；无效 token 返回 `50101 文件不存在`。
+- [已完成] 匿名资源验证：经 gateway 与 edge 均返回 `200`，`Content-Type: image/jpeg|image/png`、`Content-Disposition: inline`，含 `nosniff` / `CORP cross-origin` / `no-store` / `Referrer-Policy: no-referrer`；无效或撤销 token 返回真实 HTTP 404。
 - [已完成] 博客历史文件一次性回填：按博客已引用的 `fileId`（8004、8005）由运维显式发布，并把库内旧代理地址改写为公开地址；该操作不改变“默认私有”策略，新文件仍走 `publicAccess` 显式发布。
 - [待完成] 图片缩略图与媒体 Range 支持。
+
+最终前后端已更新：文件页提供公开/私有标记、上传后公开、复制外链和撤销确认；后端9aec0e4、前端b8f8ac2的匿名访问与既有博客图片均完成生产复验，见 [验收记录](20261017-verification.md)。

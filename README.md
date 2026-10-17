@@ -15,7 +15,7 @@ YunaNexus 是一个面向生产设计、持续开发中的微服务中控平台�
 | 全局唯一 ID | `yunanexus-meta` | 调用接口获取 ID / 网关自动注入 |
 | 用户资料 | `yunanexus-user` | 调用接口查询 |
 | 权限判定 | `yunanexus-permission` | 调用鉴权接口 |
-| 文件存储与个人分享 | `yunanexus-file` | 本人文件管理、头像上传、有效期与提取码分享 |
+| 文件存储与个人分享 | `yunanexus-file` | 本人文件管理、头像上传、有效期与提取码分享、可撤销匿名外链 |
 | 个人 API Key 与应用授权 | `yunanexus-auth` | 最小权限脚本密钥、已授权平台查询与撤销 |
 | 操作审计 | `yunanexus-audit` | 异步上报日志 |
 | 门户内容与运行状态 | `yunanexus-notice` | 发布门户内容、查询单服务和平台状态 |
@@ -80,6 +80,7 @@ YunaNexusServer/
 | [开发规范](docs/standards.md) | 命名/响应/异常/错误码/包结构/提交规范 |
 | [数据库设计](docs/database.md) | 数据库命名规范、表结构约定、数据保留 |
 | [OAuth 外部应用接入](docs/oauth-integration-zh.md) | 中文流程、PKCE、真实地址、权限范围与后端示例 |
+| [积分与多应用改造进度](process/README.md) | 签到、共享积分、应用分类、隔离 RBAC 与线上验收 |
 | [API 契约](docs/api-contract.md) | OpenAPI 3.0 接口契约（请求/响应/错误码） |
 | [用户行为分析](docs/analytics.md) | 无侵入采集 SDK + ClickHouse 画像分析 |
 | [生产部署与 CI/CD](deploy/production/README.md) | 数据盘隔离、生产环境、发布与回滚 |
@@ -211,3 +212,10 @@ bash /YunaNexus/platform/ops/start.sh
 默认角色为普通用户 `user`、管理员 `admin` 与超级管理员 `super_admin`。注册用户由持久化同步流程绑定普通用户角色；系统角色和根角色分配受服务端保护。
 账号支持邮箱验证码找回与本人改密，管理员只读查看密码重置审计。密码始终单向哈希存储，无读取原密码接口。
 增量数据库迁移、邮件私密配置和升级顺序见 [生产部署说明](deploy/production/README.md#管理工作流增量部署)。
+
+
+## 积分与多应用接入
+
+认证服务维护统一积分账户与事务流水，支持北京时间每日签到和连签奖励。其他三方只允许扣减，官方应用增加积分仍需要经过审核的 scope、用户授权和服务端客户端凭证。
+
+接入应用区分官方原生、官方三方、其他三方，只有官方类别允许平台专有密码登录并同步 SSO；所有类别均可使用授权码和刷新令牌。应用自定义权限、角色和成员绑定使用独立应用命名空间，不能授予平台管理员权限。详细接口、数据库升级顺序、问题记录和验证结果统一维护在 [process](process/README.md)。

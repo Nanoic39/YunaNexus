@@ -17,7 +17,7 @@
 - 浏览器入口为 `/oauth/authorize`，采用下文列出的查询参数。
 - 换码端点为 `POST /api/v1/auth/sso/token`，请求是 JSON，字段为 `clientCode`、`redirectUri`、`codeVerifier`、`clientSecret`。
 - 不提供 OIDC Discovery、JWKS、ID Token、标准 `/userinfo` 或标准 token introspection 接口；不要把 access token 当作 ID Token。
-- 不支持隐式流、密码流、客户端凭证流、无后端的公共客户端或任意第三方动态注册。
+- 不支持隐式流、标准 OAuth 密码授权（grant_type=password）、客户端凭证流或无后端的外部公共客户端。经超级管理员认证的官方原生/官方三方，可使用平台专有账号密码登录并同步 SSO；其他三方只能走授权码。分类、参数和隔离权限见 [多应用接入方案](../process/20261017-integration-design.md)。
 - 外部应用必须有后端保管 clientSecret、verifier、accessToken 和 refreshToken；不要放入网页构建产物、URL 或移动端安装包。
 
 ## 2. 申请应用与上线准备
@@ -40,12 +40,16 @@
 | `profile:read` | `GET /api/v1/auth/me`，基础身份、昵称和头像引用 | 不包含密码、管理权限或内部用户 ID |
 | `email:read` | 配合 `profile:read` 读取 `GET /api/v1/user/profile` | 返回的是个人资料联系邮箱，不是找回密码邮箱 |
 | `files:read` | `GET /api/v1/file/me`、`GET /api/v1/file/me/{id}/download` | 只能访问令牌所属用户的文件 |
-| `files:write` | `POST /api/v1/file/me/upload`、`POST /api/v1/file/me/{id}/rename`、`POST /api/v1/file/me/{id}/delete` | 不隐含读取权限；上传与删除可能改变用户数据 |
+| `files:write` | `POST /api/v1/file/me/upload`、`POST /api/v1/file/me/{id}/rename`、`POST /api/v1/file/me/{id}/delete`、`POST /api/v1/file/me/{id}/visibility` | 不隐含读取权限；上传与删除可能改变用户数据 |
 | `notice:read` | `GET /api/v1/notice/inbox`、`GET /api/v1/notice/inbox/summary`、`GET /api/v1/notice/inbox/{noticeId}` | 不能标记已读、发送通知或读取其他用户记录 |
+
+新增范围：`points:read` 读取本人余额和本应用流水，`points:write` 由应用服务端提交积分交易（非官方只允许扣减），`permissions:read` 查询本人在当前应用中的自定义业务权限。端点、幂等约束和批量检查示例见 [积分与权限接入](../process/20261017-integration-design.md)。修改申请范围后必须重新审核并由用户重新授权。
+
+博客图片外链请使用 `POST /api/v1/file/me/upload` 的 multipart `publicAccess=true`，或由文件所有者显式设置 visibility；返回的 publicUrl 无需 Cookie、Bearer 或提取码即可展示。旧文件保持私有，公开可撤销，说明见 [公开文件接入](../process/20261017-public-files.md)。不要把用户令牌或客户端密钥拼进图片 URL。
 
 目前授权页展示该应用经审核的完整范围，用户选择整体同意或拒绝；请求方不能通过追加 scope 参数扩大授权。建议只申请业务必需的最少范围。
 
-即使授权用户是超级管理员，外部 OAuth 令牌也不能访问管理接口、个人 API Key 管理、账号安全设置或权限中心。`externalId` 用作外部应用的稳定用户关联键，昵称、邮箱可变，不能作为唯一账号主键。头像可能是 `file:ID` 文件引用，不能直接当作图片 URL；没有文件读取权限时不要尝试绕过下载校验。
+即使授权用户是超级管理员，外部 OAuth 令牌也不能访问管理接口、个人 API Key 管理、账号安全设置或平台权限中心管理接口；应用业务权限通过独立的应用隔离接口管理和检查。`externalId` 用作外部应用的稳定用户关联键，昵称、邮箱可变，不能作为唯一账号主键。头像可能是 `file:ID` 文件引用，不能直接当作图片 URL；没有文件读取权限时不要尝试绕过下载校验。
 
 ## 4. 完整时序
 
@@ -143,7 +147,7 @@ GET /api/v1/auth/me
 Authorization: Bearer {accessToken}
 ```
 
-按 `data.externalId` 关联自己的用户表，再给浏览器设置自己应用的随机 HttpOnly 会话 Cookie。生产 Cookie 使用 Secure、SameSite=Lax 和合理的有效期。自己的业务权限由自己的后端判断，不从昵称或未验证的 JWT 解码结果推断管理员身份。
+按 `data.externalId` 关联自己的用户表，再给浏览器设置自己应用的随机 HttpOnly 会话 Cookie。生产 Cookie 使用 Secure、SameSite=Lax 和合理的有效期。自己的业务权限由自己的后端执行检查，可调用平台按应用隔离的批量权限检查接口；业务资源归属仍由应用自己验证，不从昵称或未验证的 JWT 解码结果推断管理员身份。
 
 ## 5. 最小 Node.js 后端流程示例
 

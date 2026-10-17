@@ -184,7 +184,7 @@ python3 /YunaNexus/platform/ops/configure-integration.py --admin-user nanoic --c
 `/YunaNexus/platform/ops/`，先执行 `python3 /YunaNexus/platform/ops/configure-workspace.py`。
 脚本仅新增认证库的个人密钥表、文件物理库 0 的分享索引，并配置私网密钥验证地址与本人接口权限例外。
 随后发布后端、更新 Nginx 配置并发布前端。头像预览需要 CSP 的 `img-src blob:`；Nginx 请求体上限 21MB 为 20MB 文件预留 multipart 开销。
-所有文件下载和分享响应禁止缓存，入口不记录查询参数，分享标识只出现在前端 fragment 与 POST 请求体。
+私有文件下载和分享响应禁止缓存，入口不记录查询参数，分享标识只出现在前端 fragment 与 POST 请求体。公开资产（`/api/v1/file/public/assets/{token}`）因 token 每次发布重新生成，返回 `Cache-Control: public, max-age=604800, immutable`。
 
 
 ## 管理工作流增量部署
@@ -216,3 +216,16 @@ python3 /YunaNexus/platform/ops/configure-integration.py --admin-user nanoic --c
 
 
 CI 的生产构建使用固定摘要的临时 Redis 容器，执行 `-Dyunanexus.redis.it=true`，会话并发、账户撤销和 MVC 安全集成测试必须通过后才发布包。该 Redis 仅存在于 GitHub 执行器，不使用生产地址或生产凭据；测试数据使用随机 `auth-it-` 前缀隔离并清理。普通本地构建未启用此开关时会显示相应跳过项，不代表集成测试已执行。
+
+
+### 原子替换后的边缘配置加载
+
+Nginx 配置使用单文件 Docker bind mount。宿主机原子替换 nginx.conf 后，容器可能仍引用旧 inode；此时仅执行 nginx -s reload 不会应用新文件。更新后执行：
+
+```bash
+python3 /YunaNexus/platform/ops/reload-edge-config.py
+```
+
+脚本通过本项目的 compose.sh 使用已有镜像创建无端口的一次性容器检查新挂载配置，再重建本项目 edge，校验宿主机与容器内配置 SHA256 一致并再次 nginx -t。不会操作全局 Docker 或其他业务。重建会短暂中断 edge 连接，应在变更窗口执行。其他单文件挂载的应用配置采用相同原则，配置变更后重建对应项目容器。
+
+登录限流保持原有5次/分钟与突发配置；超限返回429 JSON及Retry-After，前端能够展示可读文案，不能用降低限流强度来让测试通过。
