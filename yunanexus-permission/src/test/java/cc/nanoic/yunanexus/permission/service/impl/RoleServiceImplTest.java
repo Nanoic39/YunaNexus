@@ -15,6 +15,7 @@ import cc.nanoic.yunanexus.permission.domain.RoleSaveRequest;
 import cc.nanoic.yunanexus.permission.entity.PermRole;
 import cc.nanoic.yunanexus.permission.mapper.PermRoleDeptMapper;
 import cc.nanoic.yunanexus.permission.mapper.PermRoleMapper;
+import cc.nanoic.yunanexus.permission.mapper.PermRoleMenuMapper;
 import cc.nanoic.yunanexus.permission.mapper.PermRolePermissionMapper;
 import cc.nanoic.yunanexus.permission.mapper.PermUserRoleMapper;
 
@@ -32,6 +33,7 @@ class RoleServiceImplTest {
     private PermUserRoleMapper userRoleMapper;
     private PermRolePermissionMapper rolePermissionMapper;
     private PermRoleDeptMapper roleDeptMapper;
+    private PermRoleMenuMapper roleMenuMapper;
     private RoleServiceImpl service;
 
     @BeforeEach
@@ -40,12 +42,14 @@ class RoleServiceImplTest {
         userRoleMapper = mock(PermUserRoleMapper.class);
         rolePermissionMapper = mock(PermRolePermissionMapper.class);
         roleDeptMapper = mock(PermRoleDeptMapper.class);
+        roleMenuMapper = mock(PermRoleMenuMapper.class);
         service =
                 new RoleServiceImpl(
                         roleMapper,
                         userRoleMapper,
                         rolePermissionMapper,
                         roleDeptMapper,
+                        roleMenuMapper,
                         mock(cc.nanoic.yunanexus.permission.security.RoleDelegationGuard.class));
     }
 
@@ -121,6 +125,7 @@ class RoleServiceImplTest {
         verify(userRoleMapper).delete(any());
         verify(rolePermissionMapper).delete(any());
         verify(roleDeptMapper).delete(any());
+        verify(roleMenuMapper).delete(any());
         verify(roleMapper).deleteById(1L);
     }
 

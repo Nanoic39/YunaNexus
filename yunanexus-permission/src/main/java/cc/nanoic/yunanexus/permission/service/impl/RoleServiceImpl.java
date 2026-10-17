@@ -5,10 +5,12 @@ import cc.nanoic.yunanexus.common.web.exception.BizException;
 import cc.nanoic.yunanexus.permission.domain.RoleSaveRequest;
 import cc.nanoic.yunanexus.permission.entity.PermRole;
 import cc.nanoic.yunanexus.permission.entity.PermRoleDept;
+import cc.nanoic.yunanexus.permission.entity.PermRoleMenu;
 import cc.nanoic.yunanexus.permission.entity.PermRolePermission;
 import cc.nanoic.yunanexus.permission.entity.PermUserRole;
 import cc.nanoic.yunanexus.permission.mapper.PermRoleDeptMapper;
 import cc.nanoic.yunanexus.permission.mapper.PermRoleMapper;
+import cc.nanoic.yunanexus.permission.mapper.PermRoleMenuMapper;
 import cc.nanoic.yunanexus.permission.mapper.PermRolePermissionMapper;
 import cc.nanoic.yunanexus.permission.mapper.PermUserRoleMapper;
 import cc.nanoic.yunanexus.permission.service.RoleService;
@@ -34,18 +36,21 @@ public class RoleServiceImpl implements RoleService {
     private final PermUserRoleMapper userRoleMapper;
     private final PermRolePermissionMapper rolePermissionMapper;
     private final PermRoleDeptMapper roleDeptMapper;
+    private final PermRoleMenuMapper roleMenuMapper;
 
     public RoleServiceImpl(
             PermRoleMapper roleMapper,
             PermUserRoleMapper userRoleMapper,
             PermRolePermissionMapper rolePermissionMapper,
             PermRoleDeptMapper roleDeptMapper,
+            PermRoleMenuMapper roleMenuMapper,
             cc.nanoic.yunanexus.permission.security.RoleDelegationGuard delegation) {
         this.delegation = delegation;
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
         this.rolePermissionMapper = rolePermissionMapper;
         this.roleDeptMapper = roleDeptMapper;
+        this.roleMenuMapper = roleMenuMapper;
     }
 
     @Override
@@ -107,6 +112,8 @@ public class RoleServiceImpl implements RoleService {
                 new LambdaQueryWrapper<PermRolePermission>().eq(PermRolePermission::getRoleId, id));
         roleDeptMapper.delete(
                 new LambdaQueryWrapper<PermRoleDept>().eq(PermRoleDept::getRoleId, id));
+        roleMenuMapper.delete(
+                new LambdaQueryWrapper<PermRoleMenu>().eq(PermRoleMenu::getRoleId, id));
         roleMapper.deleteById(id);
     }
 
