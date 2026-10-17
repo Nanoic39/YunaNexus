@@ -666,8 +666,6 @@ public class SecurityRedisMvcIntegrationTest {
     @Test
     void test6_fullSsoCodeFlow() throws Exception {
         CsrfInfo csrf = bootstrapCsrf();
-        LoginResult webLogin = loginWithCsrf(TEST_USERNAME, TEST_PASSWORD, CLIENT_WEB, csrf);
-        String ssoCookie = getSsoCookieFromResponse(null);
 
         // Need to get the cookie from the login response
         MvcResult loginResult = mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/auth/login")
@@ -677,7 +675,7 @@ public class SecurityRedisMvcIntegrationTest {
                         .cookie(new Cookie("YunaCsrf_LOCAL", csrf.cookieValue())))
                 .andExpect(status().isOk())
                 .andReturn();
-        ssoCookie = getSsoCookieFromResponse(loginResult);
+        String ssoCookie = getSsoCookieFromResponse(loginResult);
 
         String state = generateState();
         String verifier = generateVerifier();
