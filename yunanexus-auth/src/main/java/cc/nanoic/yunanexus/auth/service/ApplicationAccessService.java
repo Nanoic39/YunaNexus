@@ -50,6 +50,13 @@ public class ApplicationAccessService {
   if(role){db.update("DELETE FROM auth_app_user_role WHERE client_code=? AND role_code=?",app,code);db.update("DELETE FROM auth_app_role_permission WHERE client_code=? AND role_code=?",app,code);db.update("DELETE FROM auth_app_role WHERE client_code=? AND role_code=?",app,code);}
   else {db.update("DELETE FROM auth_app_role_permission WHERE client_code=? AND permission_code=?",app,code);db.update("DELETE FROM auth_app_permission WHERE client_code=? AND permission_code=?",app,code);}
  }
+ @Transactional public Map<String,Object> memberRoles(AuthenticatedIdentity actor,long id,String externalId){
+  String app=owner(actor,id);if(externalId==null||externalId.length()>64)throw new BizException(ErrorCode.BAD_REQUEST);
+  var users=db.queryForList("SELECT u.user_id FROM auth_user u JOIN auth_platform p ON p.user_id=u.user_id AND p.client_code=? AND p.status=1 WHERE u.external_id=? AND u.status=1",app,externalId);
+  if(users.size()!=1)throw new BizException(ErrorCode.NOT_FOUND,"用户未授权本应用");
+  long uid=((Number)users.getFirst().get("user_id")).longValue();
+  return Map.of("externalId",externalId,"roles",db.queryForList("SELECT role_code FROM auth_app_user_role WHERE client_code=? AND user_id=? ORDER BY role_code",String.class,app,uid));
+ }
  public record Member(String externalId,List<String> roles){}
  @Transactional public void member(AuthenticatedIdentity actor,long id,Member body){
   String app=owner(actor,id);

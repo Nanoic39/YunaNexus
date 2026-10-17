@@ -42,7 +42,7 @@ YunaNexus 门户 web 迁移为 OFFICIAL_NATIVE。YunaBLOG 应先创建接入应�
 1. `POST /api/v1/auth/account/oauth-apps/{id}/access/permissions`：`{"code":"posts:publish","name":"发布文章"}`。
 2. `POST /api/v1/auth/account/oauth-apps/{id}/access/roles`：`{"code":"editor","name":"编辑","permissions":["posts:publish"]}`，保存完整权限集合。
 3. 用户先通过 OAuth 授权应用，再 `POST /api/v1/auth/account/oauth-apps/{id}/access/members`：`{"externalId":"目标用户外部标识","roles":["editor"]}`，保存该用户完整应用角色集合；空数组撤销所有应用角色。
-4. `GET /api/v1/auth/account/oauth-apps/{id}/access` 返回本应用权限、角色、角色权限绑定。
+4. `GET /api/v1/auth/account/oauth-apps/{id}/access/members?externalId=...` 先读取成员当前角色，避免盲目覆盖。`GET /api/v1/auth/account/oauth-apps/{id}/access` 返回本应用权限、角色、角色权限绑定。
 5. `DELETE .../access/roles/{code}` 或 `DELETE .../access/permissions/{code}` 删除定义并清理相关绑定。
 
 每应用最多 200 项权限、200 个角色，每次批量检查最多 100 项。成员必须是已启用且已授权该应用的用户。应用所有者不能跨应用引用角色或权限，也不能通过该接口变更平台角色。
@@ -88,3 +88,5 @@ async function requirePermission(userAccessToken, permission) {
 ## 当前限制与待验收
 
 后端实现和真实数据库测试已编写，尚未完成本批 CI、生产验收及前端入口；不应视为全部已上线。当前应用 RBAC 管理走门户所有者身份，未开放独立 client_credentials 管理令牌；无需共享平台管理员凭证。后续如需多个应用维护者，应增加应用成员的管理权限，而非让其成为平台管理员。
+
+补充：公开浏览器客户端不能安全保存 clientSecret，clientCode 本身不是应用来源证明。web 密码登录应在平台托管登录页面完成，使用现有 Origin、CSRF 与会话策略；官方三方若自建密码入口，须由自己的服务端持有客户端凭证，仍优先采用平台 SSO 授权跳转。

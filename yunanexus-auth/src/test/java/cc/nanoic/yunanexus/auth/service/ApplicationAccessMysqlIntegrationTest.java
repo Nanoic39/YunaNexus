@@ -35,6 +35,7 @@ class ApplicationAccessMysqlIntegrationTest {
  @Test void rolesAndPermissionsAreIsolatedAndRevocationImmediate(){
   fixture.tx.execute(s->{access.permission(owner,a,new ApplicationAccessService.Permission("posts:read","read"));access.role(owner,a,new ApplicationAccessService.Role("reader","reader",List.of("posts:read")));access.member(owner,a,new ApplicationAccessService.Member("member",List.of("reader")));return null;});
   var check=new ApplicationAccessService.Check(List.of("posts:read","system:admin"),PointsMysqlIntegrationTest.SECRET);
+  assertEquals(List.of("reader"),fixture.tx.execute(s->access.memberRoles(owner,a,"member")).get("roles"));
   assertEquals(Map.of("posts:read",true,"system:admin",false),access.check(userA,check));
   assertFalse(access.check(userB,check).get("posts:read"));
   fixture.tx.execute(s->{access.delete(owner,a,"reader",true);return null;});assertFalse(access.check(userA,check).get("posts:read"));

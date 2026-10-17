@@ -29,7 +29,10 @@ public class PointsService {
   var previous=date(row.get("last_check_in"));result.put("lastCheckIn",previous);result.put("today",today());result.put("timeZone",BUSINESS_ZONE.getId());
   result.put("checkedInToday",today().equals(previous));result.put("nextReward",CheckInPolicy.reward(CheckInPolicy.nextStreak(previous,((Number)row.get("streak")).intValue(),today())));return result;
  }
- @Transactional public Map<String,Object> account(AuthenticatedIdentity actor){return view(lock(user(actor)));}
+ private long readUser(AuthenticatedIdentity actor){
+  long uid=user(actor);if(!"web".equals(actor.clientCode())&&(actor.clientCode()==null||!actor.clientCode().startsWith("oauth_")||!applications.allows(actor.clientCode(),"GET","/api/v1/auth/account/points")))throw new BizException(ErrorCode.FORBIDDEN);return uid;
+ }
+ @Transactional public Map<String,Object> account(AuthenticatedIdentity actor){return view(lock(readUser(actor)));}
  @Transactional public Map<String,Object> checkIn(AuthenticatedIdentity actor){
   long uid=user(actor);if(!"web".equals(actor.clientCode()))throw new BizException(ErrorCode.FORBIDDEN,"请在门户签到");
   var account=lock(uid);LocalDate day=today(),previous=date(account.get("last_check_in"));
@@ -40,11 +43,11 @@ public class PointsService {
   db.update("UPDATE auth_points_account SET balance=?,streak=?,last_check_in=? WHERE user_id=?",balance,streak,day,uid);
   account.put("balance",balance);account.put("streak",streak);account.put("last_check_in",day);return view(account);
  }
- public record Change(String businessKey,long amount,boolean credit,String reason,String clientSecret){}
+ public record Change(String businessKey,long amount,Boolean credit,String reason,String clientSecret){}
  @Transactional public Map<String,Object> change(AuthenticatedIdentity actor,Change change){
   long uid=user(actor);String app=actor.clientCode();
   if(app==null||!app.startsWith("oauth_"))throw new BizException(ErrorCode.FORBIDDEN,"仅应用服务端可进行积分交易");
-  if(change==null||change.businessKey()==null||!change.businessKey().matches("[A-Za-z0-9._:-]{1,96}")||change.amount()<1||change.amount()>1_000_000||change.reason()==null||change.reason().isBlank()||change.reason().length()>200)throw new BizException(ErrorCode.BAD_REQUEST,"积分交易参数无效");
+  if(change==null||change.credit()==null||change.businessKey()==null||!change.businessKey().matches("[A-Za-z0-9._:-]{1,96}")||change.amount()<1||change.amount()>1_000_000||change.reason()==null||change.reason().isBlank()||change.reason().length()>200)throw new BizException(ErrorCode.BAD_REQUEST,"积分交易参数无效");
   applications.verifySecret(app,change.clientSecret());
   if(!applications.allows(app,"POST","/api/v1/auth/account/points/transactions"))throw new BizException(ErrorCode.FORBIDDEN);
   var clients=db.queryForList("SELECT application_category FROM auth_client WHERE client_code=? AND status=1",app);
@@ -61,7 +64,7 @@ public class PointsService {
   return db.queryForMap("SELECT id,delta,balance,reason FROM auth_points_ledger WHERE user_id=? AND client_code=? AND business_key=?",uid,app,change.businessKey());
  }
  public List<Map<String,Object>> ledger(AuthenticatedIdentity actor,long before,int size){
-  long uid=user(actor);if(before<0||size<1||size>100)throw new BizException(ErrorCode.BAD_REQUEST);
+  long uid=readUser(actor);if(before<0||size<1||size>100)throw new BizException(ErrorCode.BAD_REQUEST);
   String scope="web".equals(actor.clientCode())?"":" AND client_code=?";
   List<Object> args=new ArrayList<>();args.add(uid);if(!scope.isEmpty())args.add(actor.clientCode());args.add(before==0?Long.MAX_VALUE:before);args.add(size);
   var rows=db.queryForList("SELECT id,client_code AS clientCode,business_key AS businessKey,delta,balance,reason,created_at AS createdAt FROM auth_points_ledger WHERE user_id=?"+scope+" AND id<? ORDER BY id DESC LIMIT ?",args.toArray());
