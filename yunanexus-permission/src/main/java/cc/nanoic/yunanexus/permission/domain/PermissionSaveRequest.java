@@ -1,6 +1,8 @@
 package cc.nanoic.yunanexus.permission.domain;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -32,5 +34,7 @@ public class PermissionSaveRequest {
     private String description;
 
     /** 状态：1-启用 0-禁用（为空时新增默认启用） */
+    @Min(0)
+    @Max(1)
     private Integer status;
 }
