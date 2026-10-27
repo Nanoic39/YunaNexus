@@ -1,11 +1,16 @@
 package cc.nanoic.yunanexus.audit.controller;
 
 import cc.nanoic.yunanexus.audit.entity.AuditLog;
+import cc.nanoic.yunanexus.audit.domain.AuditQueryFilter;
+import cc.nanoic.yunanexus.audit.entity.AuditLog;
 import cc.nanoic.yunanexus.audit.service.AuditService;
 import cc.nanoic.yunanexus.common.core.model.PageResult;
 import cc.nanoic.yunanexus.common.core.model.Result;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -63,5 +68,36 @@ public class AuditQueryController {
             @RequestParam(value = "toId", required = false) Long toId,
             @RequestParam(value = "limit", defaultValue = "1000") int limit) {
         return Result.success(auditService.verifyIntegrity(userId, fromId, toId, limit));
+    }
+
+    /**
+     * 多条件检索（分页）。
+     *
+     * @param filter 检索条件（userId/username/service/module/action/status/ip/keyword/时间区间）
+     * @param page   页码
+     * @param size   每页条数
+     * @return 分页结果
+     */
+    @GetMapping("/logs/search")
+    public Result<PageResult<AuditLog>> searchLogs(AuditQueryFilter filter,
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        return Result.success(auditService.searchLogs(filter, page, size));
+    }
+
+    /**
+     * 按同一套检索条件导出 CSV（上限 10000 行）。
+     *
+     * @param filter 检索条件
+     * @return CSV 文件
+     */
+    @GetMapping("/logs/export.csv")
+    public ResponseEntity<byte[]> exportCsv(AuditQueryFilter filter) {
+        byte[] body = auditService.exportCsv(filter);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"audit-logs.csv\"")
+                .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .body(body);
     }
 }

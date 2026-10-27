@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.audit.service;
 
 import cc.nanoic.yunanexus.audit.domain.AuditMessage;
+import cc.nanoic.yunanexus.audit.domain.AuditQueryFilter;
 import cc.nanoic.yunanexus.audit.domain.AuditReportRequest;
 import cc.nanoic.yunanexus.audit.entity.AuditLog;
 import cc.nanoic.yunanexus.common.core.model.PageResult;
@@ -65,6 +66,24 @@ public interface AuditService {
      */
     record ChainReport(int verified, boolean intact, List<String> breaks) {
     }
+
+    /**
+     * 多条件检索（分页）。
+     *
+     * @param filter 检索条件（内部会规范化）
+     * @param page   页码（1 起）
+     * @param size   每页条数
+     * @return 分页结果
+     */
+    PageResult<AuditLog> searchLogs(AuditQueryFilter filter, int page, int size);
+
+    /**
+     * 导出检索结果为 CSV（上限见实现，防拖库）。
+     *
+     * @param filter 检索条件
+     * @return UTF-8 带 BOM 的 CSV 字节
+     */
+    byte[] exportCsv(AuditQueryFilter filter);
 
     PageResult<AuditLog> queryLogs(Long userId, String service, Long startTime, Long endTime, int page, int size);
 }

@@ -6,6 +6,7 @@ import cc.nanoic.yunanexus.audit.domain.AuditMessage;
 import cc.nanoic.yunanexus.audit.domain.AuditReportRequest;
 import cc.nanoic.yunanexus.audit.chain.AuditChainHasher;
 import cc.nanoic.yunanexus.audit.chain.AuditChainVerifier;
+import cc.nanoic.yunanexus.audit.domain.AuditQueryFilter;
 import cc.nanoic.yunanexus.audit.entity.AuditLog;
 import cc.nanoic.yunanexus.audit.mapper.AuditLogMapper;
 import cc.nanoic.yunanexus.audit.mq.AuditProducer;
@@ -20,8 +21,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.Comparator;
 import java.util.List;
@@ -59,6 +62,12 @@ public class AuditServiceImpl implements AuditService {
     private static final int DEFAULT_PAGE_SIZE = 20;
     /** 每页大小上限 */
     private static final int MAX_PAGE_SIZE = 100;
+
+    /** 导出上限：一次最多吐多少行，防"一个空条件把分片库拖死" */
+    private static final int MAX_EXPORT_ROWS = 10000;
+    /** 导出时间格式 */
+    private static final DateTimeFormatter CSV_TIME_FORMAT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /** 链校验默认/最大条数 */
     private static final int DEFAULT_VERIFY_SIZE = 1000;
@@ -159,6 +168,87 @@ public class AuditServiceImpl implements AuditService {
             }
         }
         return new ChainReport(verified, breaks.isEmpty(), List.copyOf(breaks));
+    }
+
+    @Override
+    public PageResult<AuditLog> searchLogs(AuditQueryFilter filter, int page, int size) {
+        AuditQueryFilter condition = filter == null ? new AuditQueryFilter() : filter.normalize();
+        int p = normalizePage(page);
+        int s = normalizeSize(size);
+        int offset = (p - 1) * s;
+        int window = Math.min(offset + s, MAX_EXPORT_ROWS);
+        long total = 0L;
+        List<AuditLog> merged = new ArrayList<>();
+        for (int shardIndex : resolveShards(condition.getUserId())) {
+            ShardContextHolder.set(shardIndex);
+            try {
+                total += auditLogMapper.countByFilter(condition);
+                merged.addAll(auditLogMapper.selectByFilter(condition, window, 0));
+            } finally {
+                ShardContextHolder.clear();
+            }
+        }
+        if (total == 0L) {
+            return PageResult.empty(p, s);
+        }
+        merged.sort(LOG_ORDER);
+        List<AuditLog> records = offset >= merged.size()
+                ? List.of()
+                : List.copyOf(merged.subList(offset, Math.min(window, merged.size())));
+        return PageResult.of(records, total, p, s);
+    }
+
+    @Override
+    public byte[] exportCsv(AuditQueryFilter filter) {
+        AuditQueryFilter condition = filter == null ? new AuditQueryFilter() : filter.normalize();
+        List<AuditLog> merged = new ArrayList<>();
+        for (int shardIndex : resolveShards(condition.getUserId())) {
+            ShardContextHolder.set(shardIndex);
+            try {
+                merged.addAll(auditLogMapper.selectByFilter(condition, MAX_EXPORT_ROWS, 0));
+            } finally {
+                ShardContextHolder.clear();
+            }
+        }
+        merged.sort(LOG_ORDER);
+        if (merged.size() > MAX_EXPORT_ROWS) {
+            merged = merged.subList(0, MAX_EXPORT_ROWS);
+        }
+        StringBuilder csv = new StringBuilder(merged.size() * 160);
+        // 带 BOM，避免 Excel 打开中文乱码
+        csv.append('\uFEFF');
+        csv.append("id,操作时间,操作人,用户ID,服务,模块,动作,方法,URI,结果,耗时(ms),IP,TraceId,摘要\n");
+        for (AuditLog item : merged) {
+            appendCsvRow(csv, item);
+        }
+        return csv.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** 写一行 CSV：所有字段按 RFC 4180 加引号并转义内部引号，杜绝逗号/换行注入 */
+    private void appendCsvRow(StringBuilder csv, AuditLog item) {
+        csv.append(item.getId()).append(',');
+        csv.append(csvCell(item.getCreateTime() == null ? null
+                : item.getCreateTime().format(CSV_TIME_FORMAT))).append(',');
+        csv.append(csvCell(item.getUsername())).append(',');
+        csv.append(csvCell(item.getUserId())).append(',');
+        csv.append(csvCell(item.getService())).append(',');
+        csv.append(csvCell(item.getModule())).append(',');
+        csv.append(csvCell(item.getAction())).append(',');
+        csv.append(csvCell(item.getMethod())).append(',');
+        csv.append(csvCell(item.getUri())).append(',');
+        csv.append(csvCell(item.getResult())).append(',');
+        csv.append(csvCell(item.getDurationMs())).append(',');
+        csv.append(csvCell(item.getIp())).append(',');
+        csv.append(csvCell(item.getTraceId())).append(',');
+        csv.append(csvCell(item.getRecordHash())).append('\n');
+    }
+
+    private static String csvCell(Object value) {
+        if (value == null) {
+            return "";
+        }
+        String text = String.valueOf(value);
+        return '"' + text.replace("\"", "\"\"") + '"';
     }
 
     @Override

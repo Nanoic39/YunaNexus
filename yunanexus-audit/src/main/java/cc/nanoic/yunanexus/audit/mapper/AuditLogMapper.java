@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.audit.mapper;
 
+import cc.nanoic.yunanexus.audit.domain.AuditQueryFilter;
 import cc.nanoic.yunanexus.audit.entity.AuditLog;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
@@ -91,6 +92,45 @@ public interface AuditLogMapper extends BaseMapper<AuditLog> {
                                       @Param("fromId") long fromId,
                                       @Param("toId") long toId,
                                       @Param("limit") int limit);
+
+    /** 过滤器 WHERE 片段（多条件检索与导出共用，避免两处各写一份条件导致查出的和导出的不一致） */
+    String FILTER_WHERE = "<where>"
+            + "<if test='f.userId != null'> AND user_id = #{f.userId}</if>"
+            + "<if test='f.username != null'> AND username = #{f.username}</if>"
+            + "<if test='f.service != null'> AND service = #{f.service}</if>"
+            + "<if test='f.module != null'> AND module = #{f.module}</if>"
+            + "<if test='f.action != null'> AND action = #{f.action}</if>"
+            + "<if test='f.status != null'> AND status = #{f.status}</if>"
+            + "<if test='f.ip != null'> AND ip = #{f.ip}</if>"
+            + "<if test='f.keyword != null'> AND (uri LIKE CONCAT('%', #{f.keyword}, '%')"
+            + " OR params LIKE CONCAT('%', #{f.keyword}, '%')"
+            + " OR error_msg LIKE CONCAT('%', #{f.keyword}, '%'))</if>"
+            + "<if test='f.start != null'> AND create_time &gt;= #{f.start}</if>"
+            + "<if test='f.end != null'> AND create_time &lt;= #{f.end}</if>"
+            + "</where>";
+
+    /**
+     * 按过滤器统计条数。
+     *
+     * @param f 已规范化的过滤器
+     * @return 条数
+     */
+    @Select("<script>SELECT COUNT(*) FROM audit_log " + FILTER_WHERE + "</script>")
+    long countByFilter(@Param("f") AuditQueryFilter f);
+
+    /**
+     * 按过滤器取一页（按时间倒序）。
+     *
+     * @param f      已规范化的过滤器
+     * @param limit  取多少条
+     * @param offset 跳过多少条
+     * @return 记录列表
+     */
+    @Select("<script>SELECT * FROM audit_log " + FILTER_WHERE
+            + " ORDER BY create_time DESC, id DESC LIMIT #{limit} OFFSET #{offset}</script>")
+    List<AuditLog> selectByFilter(@Param("f") AuditQueryFilter f,
+                                  @Param("limit") int limit,
+                                  @Param("offset") int offset);
 
     long countByCondition(@Param("userId") Long userId,
                           @Param("service") String service,
