@@ -57,6 +57,34 @@ public class AuditProperties {
 
         /** 连接超时（毫秒） */
         private int timeoutMillis = 2000;
+
+        /** QQ 机器人（OneBot 11 / NapCat）通道；启用后优先于 webhook */
+        private Qq qq = new Qq();
+    }
+
+    /**
+     * QQ 机器人通道（OneBot 11 HTTP API，兼容 NapCat）。
+     */
+    @Data
+    public static class Qq {
+
+        /** 是否启用 */
+        private boolean enabled = false;
+
+        /** OneBot HTTP 根地址，如 http://127.0.0.1:3000 */
+        private String baseUrl = "";
+
+        /** 访问令牌（NapCat 配置了 token 时必填） */
+        private String accessToken = "";
+
+        /** 群号；为空则发私聊 */
+        private String groupId = "";
+
+        /** 私聊目标 QQ（groupId 为空时使用） */
+        private String userId = "";
+
+        /** 是否 @全体成员（默认否：告警不该打扰所有人） */
+        private boolean atAll = false;
     }
 
     /**

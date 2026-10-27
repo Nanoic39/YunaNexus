@@ -37,6 +37,7 @@ public class AuditRiskNotifier {
 
     private final HttpClient client;
     private final String webhookUrl;
+    private final AuditProperties.Qq qq;
     private final boolean enabled;
     private final long windowMillis;
     /** 规则名 → 上次发送时间（毫秒） */
@@ -46,6 +47,7 @@ public class AuditRiskNotifier {
         AuditProperties.Risk risk = properties.getRisk();
         this.enabled = risk.isEnabled();
         this.webhookUrl = risk.getWebhookUrl();
+        this.qq = risk.getQq();
         this.windowMillis = Math.max(0L, risk.getWindowSeconds()) * 1000L;
         this.client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(Math.max(500, risk.getTimeoutMillis())))
@@ -71,13 +73,82 @@ public class AuditRiskNotifier {
             return;
         }
         lastSent.put(risk.rule(), now);
-        String payload = toJson(risk, entity);
+        if (qq != null && qq.isEnabled() && qq.getBaseUrl() != null && !qq.getBaseUrl().isBlank()) {
+            sendQq(toText(risk, entity));
+            return;
+        }
         if (webhookUrl == null || webhookUrl.isBlank()) {
+            // 无可用通道时降级为结构化日志，绝不静默丢弃
             log.warn("{} level={} rule={} user={} uri={} reason={}", MARKER, risk.level(),
                     risk.rule(), entity.getUsername(), entity.getUri(), risk.reason());
             return;
         }
-        send(payload);
+        send(toJson(risk, entity));
+    }
+
+    /**
+     * 通过 OneBot 11 HTTP API 发送到 QQ（群或私聊）。<p>
+     *
+     * 选 OneBot 而不是官方 QQ 开放平台的原因：服务器上已有 NapCat，
+     * 走 OneBot 不需要公网回调、不需要过审，告警能立刻可用；
+     * 官方 API 的适配位可以通过再实现一个通道补上，不影响本类。
+     */
+    private void sendQq(String text) {
+        String base = qq.getBaseUrl().endsWith("/")
+                ? qq.getBaseUrl().substring(0, qq.getBaseUrl().length() - 1)
+                : qq.getBaseUrl();
+        boolean toGroup = qq.getGroupId() != null && !qq.getGroupId().isBlank();
+        String action = toGroup ? "/send_group_msg" : "/send_private_msg";
+        String targetKey = toGroup ? "group_id" : "user_id";
+        String targetValue = toGroup ? qq.getGroupId() : qq.getUserId();
+        String body = "{\"" + targetKey + "\":" + quoteIfNumeric(targetValue)
+                + ",\"message\":\"" + escape(text) + "\""
+                + (toGroup && qq.isAtAll() ? ",\"auto_escape\":false" : "")
+                + "}";
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(base + action))
+                .timeout(Duration.ofSeconds(5))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+        if (qq.getAccessToken() != null && !qq.getAccessToken().isBlank()) {
+            builder.header("Authorization", "Bearer " + qq.getAccessToken());
+        }
+        try {
+            client.sendAsync(builder.build(), HttpResponse.BodyHandlers.discarding())
+                    .whenComplete((response, error) -> {
+                        if (error != null) {
+                            log.warn("{} QQ 投递失败：{}", MARKER, error.toString());
+                        } else if (response.statusCode() >= 300) {
+                            log.warn("{} QQ 投递被拒：status={}", MARKER, response.statusCode());
+                        }
+                    });
+        } catch (RuntimeException error) {
+            log.warn("{} QQ 投递异常：{}", MARKER, error.toString());
+        }
+    }
+
+    /** 数字串不加引号（OneBot 要求 int），非数字加引号兜底 */
+    private static String quoteIfNumeric(String value) {
+        if (value == null || value.isBlank()) {
+            return "0";
+        }
+        return value.chars().allMatch(Character::isDigit) ? value : "\"" + escape(value) + "\"";
+    }
+
+    /** 面向 QQ 的可读文案：先看级别与原因，再看谁做的，不用解析 JSON */
+    private String toText(AuditRiskClassifier.Risk risk, AuditLog entity) {
+        String icon = risk.level() == AuditRiskClassifier.Level.CRITICAL ? "[严重]" : "[高危]";
+        return icon + " YunaNexus 审计告警\n"
+                + "规则：" + risk.rule() + "\n"
+                + "原因：" + risk.reason() + "\n"
+                + "操作人：" + safeText(entity.getUsername()) + " (id=" + entity.getUserId() + ")\n"
+                + "服务/模块：" + safeText(entity.getService()) + "/" + safeText(entity.getModule()) + "\n"
+                + "动作：" + safeText(entity.getMethod()) + " " + safeText(entity.getUri()) + "\n"
+                + "IP：" + safeText(entity.getIp()) + "\n"
+                + "审计ID：" + entity.getId() + " trace=" + safeText(entity.getTraceId());
+    }
+
+    private static String safeText(String value) {
+        return value == null ? "-" : value;
     }
 
     private void send(String payload) {
@@ -129,7 +200,7 @@ public class AuditRiskNotifier {
         json.append('"').append(key).append("\":\"").append(escape(value)).append('"');
     }
 
-    private String escape(String value) {
+    private static String escape(String value) {
         if (value == null) {
             return "";
         }
