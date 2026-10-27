@@ -188,6 +188,24 @@ python3 ops/vulnscan.py --gate         # 有未接受的 critical/high 时退出
 `ops/vuln-ignore.txt`，每行 `<OSV id> [理由]`。被列出的条目不计入告警数、也不阻断 `--gate`。
 **理由必填**——否则下一个接手的人得从头再判断一遍。
 
+### 容量预测（第 12 轮）
+
+```bash
+python3 ops/capacity.py            # 采集一次并输出预测表
+python3 ops/capacity.py --seed     # 先从指标后端导入历史，再采集
+python3 ops/capacity.py --json     # 完整数据
+```
+
+阈值告警回答"满了没有"，等到那会儿只剩应急一条路。这个工具回答"还能撑几天"。
+
+- 跟踪 2 个文件系统 + 10 个目录（docker / mysql / rocketmq / nacos / releases / backups / logs …）
+- 目录体积没有 exporter 覆盖，所以自己记 JSONL 快照（保留 30 天）
+- 文件系统历史来自指标后端，并可用 `--seed` 导入，工具部署后立刻有趋势
+- **趋势用逐区间差值的中位数，不用最小二乘**：一次 2 GiB 清理会让最小二乘算出"每天涨 5 GiB"的假趋势
+- 同时发布"已删除但仍被进程占用"的字节数——`df` 与 `du` 对不上的典型原因，别的组件都不报这个
+
+预测只在数据够时给数：至少 3 个点、跨度 ≥1 小时，否则 `forecast_ready=0`，不给结论。
+
 ### 合成探测（第 11 轮）
 
 ```bash

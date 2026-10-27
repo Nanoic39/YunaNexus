@@ -40,6 +40,40 @@ if not log.handlers:
 
 # Each rule yields series of (labels, value); the key is used for de-duplication.
 RULES = [
+    # Capacity rules answer "when", not "is it full yet": the threshold rule above only
+    # buys a few hours of warning, a forecast buys weeks.
+    {
+        "name": "capacity_filling_soon",
+        "severity": "critical",
+        "query": "yunanexus_capacity_days_to_full",
+        "compare": ("<", 7),
+        "summary": "文件系统按当前增速将在 7 天内写满",
+        "runbook": "runtime/capacity/history.jsonl 看增长来源；先清临时文件与 release 旧版本，再考虑扩容",
+    },
+    {
+        "name": "capacity_filling",
+        "severity": "warning",
+        "query": "yunanexus_capacity_days_to_full",
+        "compare": ("<", 21),
+        "summary": "文件系统按当前增速将在 21 天内写满",
+        "runbook": "同上；确认增长来自业务数据还是日志/备份堆积",
+    },
+    {
+        "name": "capacity_growth_spike",
+        "severity": "warning",
+        "query": "yunanexus_capacity_growth_bytes_per_day",
+        "compare": (">", 1073741824),
+        "summary": "某个目录每天增长超过 1 GiB",
+        "runbook": "labels 里 target 指明目录；查是否有临时文件或日志未轮转",
+    },
+    {
+        "name": "deleted_files_held_open",
+        "severity": "warning",
+        "query": "yunanexus_capacity_deleted_open_bytes",
+        "compare": (">", 1073741824),
+        "summary": "超过 1 GiB 空间被已删除但仍被进程占用的文件持有",
+        "runbook": "重启持有所在进程即可释放；这是 df 与 du 对不上时的典型原因",
+    },
     # Probes test the path a user takes: edge routing, firewall, TLS - things internal
     # metrics cannot see. 5 minutes down is a real outage, not a blip.
     {
