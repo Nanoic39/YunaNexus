@@ -98,3 +98,23 @@ yunanexus:
       enabled: ${AUDIT_ARCHIVE_ENABLED:true}
       # 归档执行计划（默认每日 03:30）
       cron: ${AUDIT_ARCHIVE_CRON:0 30 3 * * ?}
+
+# 高危动作告警：通道 QQ（NoneBot/OneBot）> webhook > 结构化日志
+# 敏感项一律走环境变量，不写进仓库
+yunanexus:
+  audit:
+    risk:
+      enabled: ${AUDIT_RISK_ENABLED:true}
+      window-seconds: ${AUDIT_RISK_WINDOW_SECONDS:60}
+      qq:
+        enabled: ${AUDIT_QQ_ENABLED:false}
+        mode: ${AUDIT_QQ_MODE:nonebot}
+        hook-url: ${AUDIT_QQ_HOOK_URL:}
+        base-url: ${AUDIT_QQ_BASE_URL:}
+        access-token: ${AUDIT_QQ_TOKEN:}
+        group-id: ${AUDIT_QQ_GROUP_ID:}
+        user-id: ${AUDIT_QQ_USER_ID:}
+        at-all: false
+    anchor:
+      enabled: ${AUDIT_ANCHOR_ENABLED:true}
+      dir: ${AUDIT_ANCHOR_DIR:/YunaNexus/platform/backups/audit-anchor}

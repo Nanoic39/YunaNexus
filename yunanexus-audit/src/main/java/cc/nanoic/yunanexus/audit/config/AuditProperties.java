@@ -71,6 +71,20 @@ public class AuditProperties {
         /** 是否启用 */
         private boolean enabled = false;
 
+        /**
+         * 通道类型：
+         * <ul>
+         *   <li>{@code onebot}：直连 OneBot 11 实现（NapCat/LLOneBot），调用
+         *       {@code /send_group_msg} 或 {@code /send_private_msg}；</li>
+         *   <li>{@code nonebot}：POST 到自建 NoneBot 的 HTTP 接口，
+         *       由插件负责发送（适配 SnowLuma 这类已有 bot 环境）。</li>
+         * </ul>
+         */
+        private String mode = "onebot";
+
+        /** nonebot 模式下插件接口的完整 URL（如 http://127.0.0.1:8081/yuna/alert） */
+        private String hookUrl = "";
+
         /** OneBot HTTP 根地址，如 http://127.0.0.1:3000 */
         private String baseUrl = "";
 

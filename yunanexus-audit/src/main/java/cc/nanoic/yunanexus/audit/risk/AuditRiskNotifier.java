@@ -73,9 +73,17 @@ public class AuditRiskNotifier {
             return;
         }
         lastSent.put(risk.rule(), now);
-        if (qq != null && qq.isEnabled() && qq.getBaseUrl() != null && !qq.getBaseUrl().isBlank()) {
-            sendQq(toText(risk, entity));
-            return;
+        if (qq != null && qq.isEnabled()) {
+            String text = toText(risk, entity);
+            if ("nonebot".equalsIgnoreCase(qq.getMode())) {
+                if (qq.getHookUrl() != null && !qq.getHookUrl().isBlank()) {
+                    sendNoneBot(text, risk, entity);
+                    return;
+                }
+            } else if (qq.getBaseUrl() != null && !qq.getBaseUrl().isBlank()) {
+                sendQq(text);
+                return;
+            }
         }
         if (webhookUrl == null || webhookUrl.isBlank()) {
             // 无可用通道时降级为结构化日志，绝不静默丢弃
@@ -123,6 +131,42 @@ public class AuditRiskNotifier {
                     });
         } catch (RuntimeException error) {
             log.warn("{} QQ 投递异常：{}", MARKER, error.toString());
+        }
+    }
+
+    /**
+     * 投递到自建 NoneBot 的 HTTP 接口。<p>
+     *
+     * 契约刻意保持极简：{@code {"target":"...","text":"...","level":"...","rule":"..."}}，
+     * 由对端插件决定发群还是发私聊。这样换 bot 框架（NoneBot/Lagrange/官方）时，
+     * 审计侧一行都不用改。
+     */
+    private void sendNoneBot(String text, AuditRiskClassifier.Risk risk, AuditLog entity) {
+        String body = "{\"target\":\"" + escape(qq.getGroupId() != null && !qq.getGroupId().isBlank()
+                ? qq.getGroupId() : qq.getUserId())
+                + "\",\"text\":\"" + escape(text)
+                + "\",\"level\":\"" + risk.level().name()
+                + "\",\"rule\":\"" + escape(risk.rule())
+                + "\",\"auditId\":\"" + (entity.getId() == null ? "" : entity.getId())
+                + "\"}";
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(qq.getHookUrl()))
+                .timeout(Duration.ofSeconds(5))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+        if (qq.getAccessToken() != null && !qq.getAccessToken().isBlank()) {
+            builder.header("Authorization", "Bearer " + qq.getAccessToken());
+        }
+        try {
+            client.sendAsync(builder.build(), HttpResponse.BodyHandlers.discarding())
+                    .whenComplete((response, error) -> {
+                        if (error != null) {
+                            log.warn("{} NoneBot 投递失败：{}", MARKER, error.toString());
+                        } else if (response.statusCode() >= 300) {
+                            log.warn("{} NoneBot 投递被拒：status={}", MARKER, response.statusCode());
+                        }
+                    });
+        } catch (RuntimeException error) {
+            log.warn("{} NoneBot 投递异常：{}", MARKER, error.toString());
         }
     }
 
