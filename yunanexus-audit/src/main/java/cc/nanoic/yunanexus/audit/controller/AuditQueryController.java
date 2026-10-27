@@ -46,4 +46,22 @@ public class AuditQueryController {
             @RequestParam(value = "size", defaultValue = "20") int size) {
         return Result.success(auditService.queryLogs(userId, service, startTime, endTime, page, size));
     }
+
+    /**
+     * 校验审计链完整性（防篡改证据链）。
+     *
+     * @param userId 指定用户则只校验其分片
+     * @param fromId 起始 id（含）
+     * @param toId   结束 id（含）
+     * @param limit  单分片最多校验条数（默认 1000，上限 5000）
+     * @return 校验报告
+     */
+    @GetMapping("/integrity/verify")
+    public Result<AuditService.ChainReport> verifyIntegrity(
+            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "fromId", required = false) Long fromId,
+            @RequestParam(value = "toId", required = false) Long toId,
+            @RequestParam(value = "limit", defaultValue = "1000") int limit) {
+        return Result.success(auditService.verifyIntegrity(userId, fromId, toId, limit));
+    }
 }

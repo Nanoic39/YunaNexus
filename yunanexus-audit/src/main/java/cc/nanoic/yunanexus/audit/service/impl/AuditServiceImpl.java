@@ -4,6 +4,8 @@ import cc.nanoic.yunanexus.audit.config.AuditProperties;
 import cc.nanoic.yunanexus.audit.config.ShardContextHolder;
 import cc.nanoic.yunanexus.audit.domain.AuditMessage;
 import cc.nanoic.yunanexus.audit.domain.AuditReportRequest;
+import cc.nanoic.yunanexus.audit.chain.AuditChainHasher;
+import cc.nanoic.yunanexus.audit.chain.AuditChainVerifier;
 import cc.nanoic.yunanexus.audit.entity.AuditLog;
 import cc.nanoic.yunanexus.audit.mapper.AuditLogMapper;
 import cc.nanoic.yunanexus.audit.mq.AuditProducer;
@@ -20,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.Comparator;
 import java.util.List;
 
@@ -57,6 +60,13 @@ public class AuditServiceImpl implements AuditService {
     /** 每页大小上限 */
     private static final int MAX_PAGE_SIZE = 100;
 
+    /** 链校验默认/最大条数 */
+    private static final int DEFAULT_VERIFY_SIZE = 1000;
+    private static final int MAX_VERIFY_SIZE = 5000;
+
+    /** 链锁分段数（按 shardIndex 取模） */
+    private static final int CHAIN_LOCK_STRIPES = 16;
+
     /** 查询结果排序：操作时间倒序，同一时间按主键倒序 */
     private static final Comparator<AuditLog> LOG_ORDER =
             Comparator.comparing(AuditLog::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder()))
@@ -67,6 +77,15 @@ public class AuditServiceImpl implements AuditService {
     private final ShardRouter shardRouter;
     /** 物理库数量（跨分片查询时逐库扫描的范围上界） */
     private final int physicalCount;
+    /**
+     * 分片级链锁：同一分片的"读链头 → 算摘要 → 插入"必须是原子段，
+     * 否则并发写入会读到同一个链头导致分叉。
+     *
+     * <p>注意：这是<b>单实例内</b>的保护。若将来审计消费者多实例部署，
+     * 必须改为数据库级串行化（如对链头行 SELECT ... FOR UPDATE），
+     * 这一点写在类注释里而不是悄悄忽略。
+     */
+    private final ReentrantLock[] chainLocks = new ReentrantLock[CHAIN_LOCK_STRIPES];
 
     public AuditServiceImpl(AuditLogMapper auditLogMapper,
                             AuditProducer auditProducer,
@@ -76,6 +95,9 @@ public class AuditServiceImpl implements AuditService {
         this.auditProducer = auditProducer;
         this.shardRouter = shardRouter;
         this.physicalCount = properties.getShard().getPhysicalCount();
+        for (int index = 0; index < chainLocks.length; index++) {
+            chainLocks[index] = new ReentrantLock();
+        }
     }
 
     @Override
@@ -92,11 +114,51 @@ public class AuditServiceImpl implements AuditService {
         int shardIndex = shardRouter.route(userId);
         AuditLog entity = toEntity(message, userId, shardIndex);
         ShardContextHolder.set(shardIndex);
+        ReentrantLock lock = chainLocks[Math.floorMod(shardIndex, CHAIN_LOCK_STRIPES)];
+        lock.lock();
         try {
+            // 先取链头再算摘要：两步必须与插入同处一个临界区，否则并发写会分叉
+            String head = auditLogMapper.selectHeadHash(shardIndex);
+            String prevHash = (head == null || head.isEmpty()) ? AuditChainHasher.GENESIS : head;
+            entity.setPrevHash(prevHash);
+            entity.setRecordHash(AuditChainHasher.chainDigest(prevHash, entity));
             auditLogMapper.insert(entity);
         } finally {
+            lock.unlock();
             ShardContextHolder.clear();
         }
+    }
+
+    @Override
+    public ChainReport verifyIntegrity(Long userId, Long fromId, Long toId, int limit) {
+        int max = limit <= 0 || limit > MAX_VERIFY_SIZE ? DEFAULT_VERIFY_SIZE : limit;
+        long lower = fromId == null ? 0L : fromId;
+        long upper = toId == null ? Long.MAX_VALUE : toId;
+        int verified = 0;
+        List<String> breaks = new ArrayList<>();
+        for (int shardIndex : resolveShards(userId)) {
+            ShardContextHolder.set(shardIndex);
+            try {
+                List<AuditLog> segment =
+                        auditLogMapper.selectChainSegment(shardIndex, lower, upper, max);
+                if (segment.isEmpty()) {
+                    continue;
+                }
+                // 分段校验以首条记录自带的 prev_hash 为边界：区间外部无法验证，
+                // 区间内部逐条验证；这是"分段可校验"与"不误报"之间的必要取舍。
+                AuditChainVerifier.Result result =
+                        AuditChainVerifier.verify(segment, segment.get(0).getPrevHash());
+                verified += result.total();
+                if (!result.intact()) {
+                    breaks.add(shardIndex + ":" + result.brokenAt() + ":" + result.reason());
+                    log.error("审计链断裂 shard={} id={} reason={}",
+                            shardIndex, result.brokenAt(), result.reason());
+                }
+            } finally {
+                ShardContextHolder.clear();
+            }
+        }
+        return new ChainReport(verified, breaks.isEmpty(), List.copyOf(breaks));
     }
 
     @Override

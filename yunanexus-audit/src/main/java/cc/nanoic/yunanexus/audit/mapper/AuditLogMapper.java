@@ -66,6 +66,32 @@ public interface AuditLogMapper extends BaseMapper<AuditLog> {
             + "<if test='endTime != null'> AND create_time &lt;= #{endTime}</if>"
             + "</where>"
             + "</script>")
+    /**
+     * 取该分片当前的链头摘要（最后一条记录的 record_hash）。
+     *
+     * @param shardIndex 逻辑分片编号
+     * @return 链头摘要；分片内尚无记录时返回 {@code null}
+     */
+    @Select("SELECT record_hash FROM audit_log WHERE shard_index = #{shardIndex} "
+            + "ORDER BY id DESC LIMIT 1")
+    String selectHeadHash(@Param("shardIndex") int shardIndex);
+
+    /**
+     * 按 id 升序取一段记录用于链校验。
+     *
+     * @param shardIndex 逻辑分片编号
+     * @param fromId     起始 id（含）
+     * @param toId       结束 id（含）
+     * @param limit      最多返回条数
+     * @return 记录列表
+     */
+    @Select("SELECT * FROM audit_log WHERE shard_index = #{shardIndex} "
+            + "AND id &gt;= #{fromId} AND id &lt;= #{toId} ORDER BY id ASC LIMIT #{limit}")
+    List<AuditLog> selectChainSegment(@Param("shardIndex") int shardIndex,
+                                      @Param("fromId") long fromId,
+                                      @Param("toId") long toId,
+                                      @Param("limit") int limit);
+
     long countByCondition(@Param("userId") Long userId,
                           @Param("service") String service,
                           @Param("startTime") LocalDateTime startTime,

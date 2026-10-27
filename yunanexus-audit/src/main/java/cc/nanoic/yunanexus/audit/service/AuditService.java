@@ -5,6 +5,8 @@ import cc.nanoic.yunanexus.audit.domain.AuditReportRequest;
 import cc.nanoic.yunanexus.audit.entity.AuditLog;
 import cc.nanoic.yunanexus.common.core.model.PageResult;
 
+import java.util.List;
+
 /**
  * 审计日志采集与查询服务（roadmap 8.2 / 8.3）。<p>
  *
@@ -43,5 +45,26 @@ public interface AuditService {
      * @param size      每页大小
      * @return 分页结果（按操作时间倒序）
      */
+    /**
+     * 校验审计链完整性。
+     *
+     * @param userId 指定用户则只校验其所在分片；为空则遍历全部物理库
+     * @param fromId 起始 id（含），为空表示从头
+     * @param toId   结束 id（含），为空表示到最新
+     * @param limit  单分片最多校验条数
+     * @return 校验报告
+     */
+    ChainReport verifyIntegrity(Long userId, Long fromId, Long toId, int limit);
+
+    /**
+     * 链校验报告。
+     *
+     * @param verified    实际校验条数
+     * @param intact      是否全部完整
+     * @param breaks      断裂明细（分片:记录id:原因），完整时为空
+     */
+    record ChainReport(int verified, boolean intact, List<String> breaks) {
+    }
+
     PageResult<AuditLog> queryLogs(Long userId, String service, Long startTime, Long endTime, int page, int size);
 }
