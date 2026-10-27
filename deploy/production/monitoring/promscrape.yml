@@ -1,0 +1,41 @@
+# Scrape configuration for VictoriaMetrics (Prometheus-compatible).
+#
+# Targets use compose DNS names on the platform network, so a redeploy that
+# recreates containers with new IPs does not need a config change.
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  external_labels:
+    env: production
+
+scrape_configs:
+  - job_name: host
+    static_configs:
+      # node_exporter runs in the monitoring project with host /proc mounted, so
+      # the values are the host's while the address stays inside the docker network.
+      - targets: ['node-exporter:9100']
+        labels:
+          instance: host-103-39-66-135
+
+  - job_name: yunanexus-services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - 'meta:8001'
+          - 'permission:8301'
+          - 'user:8201'
+          - 'file:8401'
+          - 'notice:8501'
+          - 'audit:8601'
+          - 'analytics:8701'
+          - 'gateway:8081'
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '([a-z]+):[0-9]+'
+        target_label: service
+        replacement: '$1'
+    # auth:8101 is intentionally absent: its SecurityFilterChain ends with
+    # anyRequest().denyAll() and only permits /actuator/health, so /actuator/prometheus
+    # returns 401. Enabling it needs a one-line code change plus a rebuild of the
+    # auth jar (see the monitoring report); container-level metrics for auth are
+    # still collected through the node_exporter textfile collector.

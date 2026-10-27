@@ -19,7 +19,16 @@ services:
     - --max-connections=80
     - --performance-schema=OFF
     - --mysqlx=OFF
-    - --skip-log-bin
+    # Binary logging is required for point-in-time recovery (RPO 24h -> seconds).
+    # --skip-log-bin was previously set to save disk; the binlogs below are archived
+    # into every backup and purged once two copies exist.
+    - --server-id=1
+    - --log-bin=/var/lib/mysql/binlog
+    - --binlog-format=ROW
+    - --binlog-row-image=MINIMAL
+    - --sync-binlog=1
+    - --max-binlog-size=256M
+    - --binlog-expire-logs-seconds=604800
     volumes:
     - /YunaNexus/platform/data/mysql:/var/lib/mysql
     - /YunaNexus/platform/data/sqlinit:/docker-entrypoint-initdb.d:ro

@@ -1,0 +1,5 @@
+# Alerting is intentionally disabled in Grafana: rules run in alerts.py against the
+# same metrics so that notifications keep working when Grafana itself is down.
+apiVersion: 1
+contactPoints: []
+policies: []

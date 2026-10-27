@@ -1,0 +1,8 @@
+# Accepted vulnerabilities. One per line: <OSV id> [reason]
+#
+# Anything listed here is excluded from the alert counts and from `vulnscan.py --gate`.
+# Write the reason so the next person can re-judge it; an entry without a reason is a
+# finding someone will have to re-investigate from scratch.
+#
+# Example:
+# GHSA-xxxx-yyyy-zzzz not reachable: the affected codec is never used by this service

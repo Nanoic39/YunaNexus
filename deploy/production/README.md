@@ -124,6 +124,312 @@ CI/CD 不保存服务器 root 密码或 SSH 私钥；Git 推送使用操作者�
 
 ---
 
+## 发布可靠性（R2）
+
+`poll-releases.py` 与 `deploy-release.py` 在 2026-10-27 做过一轮可靠性加固，要点：
+
+| 能力 | 说明 |
+| :--- | :--- |
+| 失败原因可读 | 脚本输出异常类型、完整消息与 traceback；旧版只记录异常类名（日志里出现 `ValueError:` 后无内容） |
+| 网络重试 | GitHub 连接中断按 5s/10s 退避重试，最多 3 次 |
+| 失败退避与阻断 | 同一 revision 连续失败按 300s→600s→…→3600s 退避；累计 5 次自动阻断，需 `--clear-block` 恢复，避免坏包每 5 分钟重启生产 |
+| 崩溃循环快速失败 | 容器 `restarting` 或 `RestartCount>0` 立即判定失败，并输出状态与最近 20 行日志（实测 186s → 14.5s） |
+| 自动回滚并验证 | 激活失败切回 previous 后重新校验全部服务健康；回滚失败会写 CRITICAL 日志并保留现场 |
+| 业务探针 | 激活成功后请求 `http://127.0.0.1:3000/` 与 `/api/v1/status`，不再以健康接口代替业务正确性（`YUNANEXUS_SKIP_SMOKE=1` 可跳过） |
+| 内存预检 | 可用内存低于 256 MiB 拒绝发布，低于 768 MiB 告警（`--force` 可覆盖），避免在压力下重启九个 JVM |
+| 试运行 | `--dry-run` 只校验归档与安全规则，不动 current |
+| 原地重启 | `deploy-release.py restart [--kind backend|frontend] [--service auth]`，不改版本、按依赖顺序重建并验证 |
+| 状态可查 | `poll-releases.py --status` 打印当前部署版本与失败退避状态；`runtime/cd-state.json` 为持久状态 |
+
+运维命令：
+
+```bash
+python3 /YunaNexus/platform/ops/poll-releases.py --status
+python3 /YunaNexus/platform/ops/poll-releases.py --once --kind backend
+python3 /YunaNexus/platform/ops/poll-releases.py --clear-block --kind backend
+python3 /YunaNexus/platform/ops/deploy-release.py backend <archive> <sha40> --dry-run
+python3 /YunaNexus/platform/ops/deploy-release.py restart --kind backend
+python3 -m unittest discover -s /YunaNexus/platform/ops/tests   # 28 项沙箱测试
+```
+
+**Swap 池**：主机内存 4.9 GiB，单个 2 GiB swap.img 曾被完全打满，导致发布重启期间大量换页与健康检查超时。
+`engine.sh` 现在维护 `swap.img` + `swap-2.img` 共 4 GiB（不修改 fstab，不 swapoff 已有文件）。
+
+## 供应链安全（第 7 轮）
+
+### 依赖清单（SBOM）
+
+```bash
+python3 ops/sbom.py --save                       # 解析当前发布的所有 fat jar，落一份快照
+python3 ops/sbom.py --revision <40位提交> --save  # 指定发布
+python3 ops/sbom.py --compare runtime/sbom/<上一个>.json   # 这次发布改变了哪些依赖
+```
+
+读的是 `BOOT-INF/lib/*.jar` 里的真实条目，坐标优先取嵌套的 `pom.properties`（拿不到才退回文件名）。
+实测当前发布：**275 个组件**、耗时约 1 秒、零网络依赖。
+
+`--compare` 是给发布评审用的：它直接回答"这个提交把依赖树改成了什么样"，
+并会把"同一个 artifact 在不同服务里版本不一致"单独列成 warning（当前就有：`jctools-core` 4.0.5 / 4.0.6）。
+
+### 漏洞匹配（OSV）
+
+```bash
+python3 ops/vulnscan.py                # 扫描最新快照，输出摘要 + 写指标
+python3 ops/vulnscan.py --json         # 完整报告
+python3 ops/vulnscan.py --gate         # 有未接受的 critical/high 时退出码 2
+```
+
+**为什么不用 trivy**：官方二进制在这台机器上下载后被截断（13 MB vs 应有 ~60 MB），执行即段错误；
+本地漏洞库还要另占 1 GB。改为直接查 **OSV API**：坐标就是 `sbom.py` 里的精确 Maven 坐标，
+一次批量请求覆盖整个发布，CVSS 3.1 基分在本地按规范计算（含 spec 特有的"向上取整到一位小数"）。
+
+### 接受风险要写下来
+
+`ops/vuln-ignore.txt`，每行 `<OSV id> [理由]`。被列出的条目不计入告警数、也不阻断 `--gate`。
+**理由必填**——否则下一个接手的人得从头再判断一遍。
+
+### 容器运行时基线（第 9 轮）
+
+```bash
+python3 ops/runtimeaudit.py          # 只读审计，不改任何配置
+python3 ops/runtimeaudit.py --json   # 完整报告
+python3 ops/runtimeaudit.py --gate   # 出现 critical 时退出码 2
+```
+
+"本来配对了"是会退化的：有人手工 `docker run` 一个容器、或改一次 compose，
+`read_only`、`cap_drop`、日志轮转就悄悄没了。这个脚本把线上真实配置和明确写下的基线对比，
+漂移就变成指标变化，而不是事故里的意外发现。
+
+15 项检查：特权容器、docker socket 挂载、`no-new-privileges`、能力是否 `drop ALL`、
+内存/CPU 上限、是否 root、根文件系统只读、pids 上限、日志轮转、健康检查、重启策略、
+host pid、密钥是否走环境变量、是否属于受管项目。
+
+两点设计取向：
+
+- **只读**：只 `docker inspect`，从不改配置
+- **例外要写理由**：`EXCEPTIONS` 里每条都必须带原因（如 node-exporter 需要 host pid），
+  例外是评审过的决定，不是没人管的漏洞；`exceptions_applied` 会列出真正生效的条目，
+  失效的例外不会假装还在生效
+- 环境变量只记**名字**不记值；`*_FILE` / `*_PATH` 这类指向文件的引用**不算泄密**
+  （它本身就是修法）
+
+### 容器镜像与 OS 包（第 8 轮追加）
+
+```bash
+python3 ops/imagescan.py          # 扫描运行中容器的基础镜像 OS 包
+python3 ops/imagescan.py --json   # 完整报告，含每容器清单
+python3 ops/imagescan.py --gate   # 未接受的 critical/high 时退出码 2
+```
+
+`sbom.py` 回答"Java 代码里有什么"，`imagescan.py` 回答另一半：容器实际跑的发行版、
+包版本、镜像是否按 digest 固定、以及容器是否属于受管 compose 项目。
+
+- 包清单从**运行中的容器里读**（`dpkg-query` / `apk info -v` / `rpm -qa`），不拉镜像、不建本地库
+- 生态名按发行版映射（`Ubuntu:24.04`、`Alpine:v3.23.3`、`Debian:12`）；
+  **OSV 没有包库的发行版（如 Oracle Linux）会明确报"未扫描"，绝不静默跳过**
+- 同一告警只报一行，并列出承载它的全部容器
+- 严重度优先用 CVSS；发行版自己的等级（Ubuntu/Alpine 写在 `severity` 数组里，
+  不在 `database_specific`）作为兜底——否则约三分之一的 OS 包发现会是 "unknown"
+
+镜像卫生两项指标：`yunanexus_image_unmanaged_containers`（不在受管项目内的容器）、
+`yunanexus_image_unscanned_containers`（无法匹配发行版的容器）。
+
+### 周期巡检与告警
+
+`maintenance.py` 每 7 天跑一次 `sbom.py --save` + `vulnscan.py` + `imagescan.py`，
+指标进 node_exporter 文本文件。七条告警：Java 依赖与 OS 包各自的未接受 critical
+（critical）、未接受高危（warning）、扫描失败（warning）、扫描超 8 天未跑（warning）、
+以及"存在不受管容器"（warning）。
+
+## 数据库迁移（第 6 轮）
+
+### 为什么不是 Flyway
+
+Flyway/Liquibase 要打进 jar 里，而这台机器没有 JDK、jar 在别处构建。所以版本历史只能跟着
+部署工具走，语义沿用 Flyway 的那一套：
+
+```
+ops/migrations/<service>/<版本号>__<描述>.sql
+```
+
+每个文件会应用到该服务的**所有物理分片**（如 `user` → `yunanexus_user_0/_1`）。
+分片是惰性建表的，两个分片本来就可能表不一样，所以记录粒度是 (服务, 库)，且语句必须**幂等**。
+
+### 命令
+
+```bash
+python3 ops/migrate.py --status                 # 已应用 / 待应用 / 漂移；有待应用时退出码 1
+python3 ops/migrate.py --apply                  # 应用；遇漂移拒绝执行（退出码 2）
+python3 ops/migrate.py --apply --dry-run        # 只打印将要执行的 SQL
+python3 ops/migrate.py --baseline               # 接管既有库：只登记，不执行
+python3 ops/migrate.py --service user --forget 2  # 撤销一条记录，使其可重跑（会大声记日志）
+```
+
+### 三条硬约束
+
+1. **发布闸门**：`deploy-release.py` 的 preflight 会先问迁移状态，有 pending/drift 就**拒绝发布**——
+   代码不能落在落后于它的库上（`--force` 可越过，但会留告警日志）。前端发布不查库。
+2. **一个文件一次会话**：整个文件交给同一个 mysql 会话执行。曾按语句逐条执行，结果会话变量
+   （`SET @x := ...`）和 `PREPARE` 在进程之间全部丢失，守卫式 ALTER 静默失效。
+3. **探针校验**：每次执行前先跑一条 `SELECT '__yunanexus_migration_probe__'`，没看到输出就报错。
+   `docker exec` 少了 `-i` 时 stdin 根本不会进容器，若不校验，**整个迁移会变成静默空操作却报成功**。
+
+### 幂等 ALTER 的写法
+
+MySQL 没有 `ADD COLUMN IF NOT EXISTS`，用 `information_schema` + 预处理语句：
+
+```sql
+SET @present := (SELECT COUNT(*) FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 'demo_item'
+                   AND column_name = 'created_at');
+SET @ddl := IF(@present = 0,
+               'ALTER TABLE `demo_item` ADD COLUMN created_at DATETIME NOT NULL',
+               'DO 0');
+PREPARE guarded FROM @ddl; EXECUTE guarded; DEALLOCATE PREPARE guarded;
+```
+
+### 巡检与告警
+
+`maintenance.py` 每小时跑一次 `migration-metrics.py`，把状态写进 node_exporter 文本文件：
+`yunanexus_migration_pending`、`yunanexus_migration_drift`、`yunanexus_migration_check_success`。
+对应三条告警：漂移（critical）、待应用（warning）、巡检停摆超过 2 小时（warning）。
+漂移因此会在**发布之前**被发现，而不是等到发布失败。
+
+## 日志聚合（第 5 轮）
+
+### 为什么先不装 Loki
+
+Loki + Promtail 常驻约 100 MiB，而这台 4.9 GiB 的机器已经在换出（见监控报告的换出数据）。
+本轮改为自建轻量采集（`logship.py`，实测 **15 MiB**），把日志写成**每行一个 JSON 对象**的
+JSONL —— Promtail 可以直接原样投递，等内存扩容后换成 Loki 时**不需要改数据格式**。
+
+### 组成
+
+| 文件 | 作用 |
+| :--- | :--- |
+| `logship.py` | 守护进程（10s 一轮），轮询 `docker logs --since`，落盘 + 导出指标 + 轮转 |
+| `logquery.py` | 检索工具：按服务 / 级别 / 时间窗 / 关键字查历史日志 |
+| `logs/aggregated/<service>/<YYYY-MM-DD>.jsonl` | 数据；48 小时后转 `.gz`，保留 7 天，目录总量上限 2 GiB |
+
+采集启动方式：`start.sh` 启动 + `maintenance.py` 每轮检查 pid 存活（进程死了会在 60s 内被拉起）。
+
+### 关键语义（踩过的坑都固化在这里）
+
+- **水位以"抓取时刻"推进**，不是以"最新一行的时间"推进：否则空闲容器会每轮重读同一窗口，日志成倍重复
+- **`--since` 必须带 UTC 偏移**：Docker 把不带时区的时间当作 UTC，在 +08:00 主机上会算成"8 小时后"，静默返回空
+- **级别只认结构化标记**，不做关键字猜测：`JAVA_TOOL_OPTIONS` 行含 `HeapDumpOnOutOfMemoryError`、
+  nginx 访问日志里文件名带 `error` 的 200 请求，都会被关键字匹配误判成 ERROR（已实测复现并修正）
+- 首次见到某个容器时**只回填最近 1 小时**，既不丢上下文，也不会把历史全量灌进来
+
+### 导出指标
+
+`yunanexus_log_lines_total{service,level}`、`yunanexus_log_bytes_total{service}`、
+`yunanexus_log_last_line_timestamp_seconds{service}`、`yunanexus_logship_last_cycle_timestamp_seconds`。
+新增告警规则：日志采集器停摆（>5 分钟）、15 分钟内错误日志 >5 条、宿主机指标断层、
+以及 VictoriaMetrics 查询全失败时的"监控自身失明"告警。
+
+### 用法
+
+```bash
+python3 ops/logquery.py --services                        # 有哪些服务、占多少空间
+python3 ops/logquery.py --service auth --level ERROR --since 2h
+python3 ops/logquery.py --grep 登录失败 --since 30m --limit 20
+python3 ops/logquery.py --level WARN --since 1d --json     # 机器可读
+```
+
+## 监控与告警（第 4 轮）
+
+监控栈与业务栈**分开编排**（`compose-monitoring.yaml`，project `yunanexus-monitoring`），
+只作为外部网络成员加入平台网络，因此业务发布不会重建监控、监控故障也不会挡住发布。
+
+| 组件 | 作用 | 实测占用 |
+| :--- | :--- | :--- |
+| node-exporter | 宿主机 CPU/内存/swap/磁盘/负载 | 16 MiB |
+| VictoriaMetrics 单实例 | 抓取（30s）+ 存储，保留 30 天 | 55 MiB |
+| Grafana OSS 11.3 | 仪表盘（数据源与看板均为文件供给） | 64 MiB（`GOMEMLIMIT=140MiB` 压下来，未设时 194 MiB） |
+| container-metrics.py | 用 `docker stats` 生成 textfile 指标，补齐 MySQL/Redis/Nacos/文件服务等无 actuator 的容器 | 随维护进程运行 |
+
+合计约 **135 MiB**。
+
+**访问方式**（只绑 127.0.0.1，绝不直接对公网）：
+
+```bash
+ssh -L 3030:127.0.0.1:3030 root@<host>   # 然后打开 http://127.0.0.1:3030
+ssh -L 8428:127.0.0.1:8428 root@<host>   # VictoriaMetrics /vmui 直接查 PromQL
+```
+
+Grafana 管理员口令在 `secrets/monitoring.env`（0600，安装时随机生成，不落日志）。
+
+### 覆盖范围
+
+- **8 个服务**的 `/actuator/prometheus`（JVM 堆/GC、HTTP 请求量与 5xx、Hikari 连接池）
+- **宿主机**全量 node 指标 + **全部容器**的内存/CPU/内存上限比/重启次数
+- `auth` 目前只有容器级指标：它的 `SecurityFilterChain` 以 `anyRequest().denyAll()` 收尾且只放行
+  `/actuator/health`，开放 `/actuator/prometheus` 需要改一行代码并重建 auth jar
+
+### 告警
+
+`alerts.py` 每 2 分钟按 PromQL 求值，规则见文件内 `RULES`：内存不足、swap 压力、磁盘安全线、
+磁盘使用率、服务抓取失败、JVM 堆过高、容器内存逼近上限、容器重启、备份过期/缺失、自动发布熔断、证书临期。
+关键设计取舍：**告警不在 Grafana 里做**，避免 Grafana 挂了告警一起哑掉。
+
+投递目标用 `YUNANEXUS_ALERT_WEBHOOK` 指定（飞书/钉钉/企微机器人或中转服务）；
+未配置时仍写 `logs/alerts.log` 与 `runtime/alerts-state.json`，且重复提醒有 30/60 分钟冷却、恢复时会发 resolved。
+
+## 备份与恢复（第 3 轮）
+
+平台此前**没有任何备份**。`backup.py` 现在提供每日全量备份 + 每周真实恢复演练：
+
+| 项目 | 内容 |
+| :--- | :--- |
+| 范围 | 10 个 `yunanexus_*` 库（逻辑转储，逐库独立可恢复）、账号权限快照 `grants.sql.gz`、上传存储 `data/file`、`config/`、`ops/` |
+| 产物 | `backups/<时间戳>/`：`db/*.sql.gz`、`grants.sql.gz`、`files.tar.gz`、`manifest.json`（版本号/表数/行数/字节/摘要）、`SHA256SUMS` |
+| 调度 | `maintenance.py` 每日 03:30 备份、每周日 04:30 恢复演练；失败后 30 分钟退避，不会每分钟重试 |
+| 保留 | 最近 7 份 + 每月 1 份（共 4 个月） |
+| 跨盘镜像 | 自动复制到 `/var/backups/yunanexus`（系统盘，与数据盘 `/YunaNexus` 不同设备），防数据盘损坏 |
+| 恢复演练 | 把每份备份还原到 `yunanexus_verify_*` 草稿库，逐表比对行数，结束后销毁草稿库；校验不通过即报错 |
+| 权限 | 备份目录 0700、文件 0600；MySQL 口令通过容器内 `/dev/shm` 的 0600 临时凭据文件传入，不出现在命令行或 `ps` |
+| 密钥 | 默认不备份 `secrets/`，需要时设 `YUNANEXUS_BACKUP_SECRETS=1`（此时备份本身即敏感材料） |
+
+运维命令：
+
+```bash
+python3 /YunaNexus/platform/ops/backup.py                    # 立即备份（含跨盘镜像）
+python3 /YunaNexus/platform/ops/backup.py --verify            # 对最新备份做恢复演练
+python3 /YunaNexus/platform/ops/backup.py --verify 20261027-160750
+python3 /YunaNexus/platform/ops/backup.py --list              # 备份清单
+python3 /YunaNexus/platform/ops/backup.py --prune             # 仅执行保留策略
+python3 /YunaNexus/platform/ops/backup.py --mirror            # 把现存备份补镜像到系统盘
+```
+
+### 时间点恢复（PITR）
+
+MySQL 已开启 binlog（ROW 格式，`--sync-binlog=1`，7 天自动过期兜底）：
+
+- 每份备份在转储前后各 `FLUSH BINARY LOGS` 一次，把**完整关闭的 binlog 文件**压缩归档到 `binlog/`
+- 转储内嵌快照坐标（`--source-data=2`），`PITR.txt` 写明按坐标回放的具体命令
+- 镜像成功后才 `PURGE BINARY LOGS`，且只清理已归档的旧文件（保证任何时刻都有两份）
+- 月度演练 `pitr-drill.py`：造数据 → 备份 → 再写数据 → `DROP TABLE` 制造灾难 → 还原转储 → 按 `--stop-position` 回放到事发前 → 断言行都在；演练在一次性探针库中进行并自清理
+
+回放工具 `mysqlbinlog` 不在 MySQL 容器镜像内（该镜像只带 mysql/mysqldump/mysqlsh），已从 Ubuntu 的
+`mysql-server-core-8.0` 包中**只抽二进制**安装到 `/usr/local/bin/mysqlbinlog`（未安装该包、未启动任何服务）。
+重建方法：
+
+```bash
+cd /tmp && apt-get download mysql-server-core-8.0 \
+  && dpkg-deb -x mysql-server-core-8.0_*.deb /tmp/x \
+  && install -m0755 /tmp/x/usr/bin/mysqlbinlog /usr/local/bin/mysqlbinlog
+```
+
+### 密钥备份
+
+`secrets/` 已纳入备份，使用 OpenSSL AES-256-CBC（PBKDF2 20 万轮）加密为 `secrets.tar.gz.enc`，
+口令文件位于 `/root/.yunanexus-backup.passphrase`（0600，首次运行自动生成）。
+**请把该口令另存到密码管理器**——没有它，加密的密钥无法恢复。演练会解密并校验其中确实含 `compose.env`。
+
+已知边界（尚未覆盖）：无异地副本（数据盘 + 系统盘在同一台 VM）；恢复演练在**同一台 MySQL 实例**上验证，
+未在干净主机上做过整机重建演练；上传文件与数据库非严格同一时刻快照。
+
 ## 日志、容量与证书
 
 Docker 日志每容器最多 3 × 10 MiB；维护进程会限制项目文件日志大小并清理过期下载包。

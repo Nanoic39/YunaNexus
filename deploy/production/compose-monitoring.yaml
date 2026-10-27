@@ -1,0 +1,130 @@
+# Monitoring stack for YunaNexus.
+#
+# Deliberately separate from the release-managed compose.yaml so monitoring can
+# be started, stopped or upgraded without touching the application stack. It
+# joins the platform network as an external network, which lets the scraper use
+# compose DNS names instead of container IPs that change on every deploy.
+services:
+  victoriametrics:
+    image: m.daocloud.io/docker.io/victoriametrics/victoria-metrics:v1.106.1
+    restart: unless-stopped
+    mem_limit: 192m
+    cpus: 0.3
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '2'
+    command:
+      - -storageDataPath=/victoria-metrics-data
+      - -retentionPeriod=30d
+      - -promscrape.config=/etc/vm/promscrape.yml
+      - -httpListenAddr=:8428
+      # Leave headroom for the application stack on a 4.9 GiB host.
+      - -memory.allowedPercent=25
+    volumes:
+      - /YunaNexus/platform/data/victoriametrics:/victoria-metrics-data
+      - /YunaNexus/platform/ops/monitoring/promscrape.yml:/etc/vm/promscrape.yml:ro
+    ports:
+      # Loopback only: reach it through an SSH tunnel or the edge proxy, never publicly.
+      - 127.0.0.1:8428:8428
+    networks:
+      - platform
+
+  node-exporter:
+    # Runs inside the platform network because the host firewall drops traffic
+    # from the docker bridge to host ports (ufw INPUT policy is DROP). Host
+    # /proc, /sys and / are mounted read-only so the metrics are still the host's.
+    image: m.daocloud.io/docker.io/prom/node-exporter:v1.8.2
+    restart: unless-stopped
+    pid: host
+    # The image defaults to nobody, which cannot read /host/proc even read-only.
+    user: "0:0"
+    mem_limit: 64m
+    cpus: 0.1
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '2'
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/host/root
+      - --collector.textfile.directory=/host/textfile
+      # Keep the default collector set (meminfo/cpu/filesystem/stat/textfile...):
+      # an explicit list does not re-enable them once defaults are disabled.
+      - --no-collector.bcache
+      - --no-collector.nfs
+      - --no-collector.nfsd
+      - --no-collector.hwmon
+      - --no-collector.thermal_zone
+      - --no-collector.rapl
+      - --no-collector.mdadm
+      - --no-collector.zfs
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
+      - /YunaNexus/platform/runtime/node_exporter_textfile:/host/textfile:ro
+    networks:
+      - platform
+
+  grafana:
+    image: m.daocloud.io/docker.io/grafana/grafana-oss:11.3.0
+    restart: unless-stopped
+    mem_limit: 192m
+    pids_limit: 128
+    cpus: 0.3
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '2'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      # A file, not a value: docker inspect shows environment variables to anyone with
+      # access to the engine, and they leak into child processes and crash dumps.
+      # Flat path on purpose: docker creates a missing parent directory (e.g.
+      # /run/secrets) as 0700 root, which uid 472 cannot traverse - grafana then dies
+      # with "Permission denied" and never starts.
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/grafana_admin_password
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_NEWS_NEWS_FEED_ENABLED: 'false'
+      GF_SERVER_ROOT_URL: http://127.0.0.1:3030
+      GF_LOG_MODE: console
+      # Go does not return heap to the OS eagerly; without a soft limit Grafana
+      # sat at ~194 MiB on this 4.9 GiB host.
+      GOMEMLIMIT: 140MiB
+      GOGC: '50'
+    volumes:
+      - /YunaNexus/platform/secrets/grafana-admin-password:/run/grafana_admin_password:ro
+      - /YunaNexus/platform/data/grafana:/var/lib/grafana
+      - /YunaNexus/platform/ops/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - /YunaNexus/platform/ops/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - 127.0.0.1:3030:3000
+    networks:
+      - platform
+
+networks:
+  platform:
+    external: true
+    name: yunanexus-production_default
