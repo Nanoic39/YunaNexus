@@ -96,7 +96,7 @@ public interface AuditLogMapper extends BaseMapper<AuditLog> {
      * @return 记录列表
      */
     @Select("SELECT * FROM audit_log WHERE shard_index = #{shardIndex} "
-            + "AND id &gt;= #{fromId} AND id &lt;= #{toId} ORDER BY id ASC LIMIT #{limit}")
+            + "AND id >= #{fromId} AND id <= #{toId} ORDER BY id ASC LIMIT #{limit}")
     List<AuditLog> selectChainSegment(@Param("shardIndex") int shardIndex,
                                       @Param("fromId") long fromId,
                                       @Param("toId") long toId,
