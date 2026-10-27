@@ -40,6 +40,43 @@ if not log.handlers:
 
 # Each rule yields series of (labels, value); the key is used for de-duplication.
 RULES = [
+    # SLO rules only fire on windows the evaluator could actually judge: `and on(...)`
+    # with the confidence gauge keeps a thin-data window from paging anyone.
+    {
+        "name": "slo_budget_exhausted",
+        "severity": "critical",
+        "query": ('yunanexus_slo_error_budget_remaining_ratio < 0'
+                  ' and on (service, window) yunanexus_slo_confident == 1'),
+        "compare": (">", 0),
+        "summary": "服务错误预算已超支（可用性低于目标）",
+        "runbook": "runtime/slo/report.json 定位服务；查 5xx 来源与最近发布，必要时回滚",
+    },
+    {
+        "name": "slo_burn_fast",
+        "severity": "critical",
+        "query": ('yunanexus_slo_burn_rate{window="1h"} > 14.4'
+                  ' and on (service, window) yunanexus_slo_confident == 1'),
+        "compare": (">", 0),
+        "summary": "服务在 1 小时内烧掉超过 2% 的月度错误预算（快速燃烧）",
+        "runbook": "对照 HTTP 5xx 速率与日志错误速率，确认是否为一次发布或下游故障",
+    },
+    {
+        "name": "slo_burn_slow",
+        "severity": "warning",
+        "query": ('yunanexus_slo_burn_rate{window="6h"} > 6'
+                  ' and on (service, window) yunanexus_slo_confident == 1'),
+        "compare": (">", 0),
+        "summary": "服务持续以 6 倍速率消耗错误预算（缓慢燃烧）",
+        "runbook": "6 小时内按当前速率将耗尽预算；排查持续性错误而非瞬时抖动",
+    },
+    {
+        "name": "slo_evaluation_failed",
+        "severity": "warning",
+        "query": "yunanexus_slo_success",
+        "compare": ("<", 1),
+        "summary": "SLO 评估最近一次执行失败",
+        "runbook": "python3 ops/slo.py 手动确认；检查 VictoriaMetrics 可用性",
+    },
     {
         "name": "runtime_baseline_critical",
         "severity": "critical",

@@ -78,7 +78,8 @@
           "range": true,
           "refId": "A"
         }
-      ]
+      ],
+      "id": 1
     },
     {
       "type": "timeseries",
@@ -139,7 +140,8 @@
           "range": true,
           "refId": "A"
         }
-      ]
+      ],
+      "id": 2
     },
     {
       "type": "timeseries",
@@ -204,7 +206,8 @@
           "range": true,
           "refId": "A"
         }
-      ]
+      ],
+      "id": 3
     },
     {
       "type": "bargauge",
@@ -264,7 +267,8 @@
           "range": true,
           "refId": "A"
         }
-      ]
+      ],
+      "id": 4
     },
     {
       "type": "bargauge",
@@ -324,7 +328,8 @@
           "range": true,
           "refId": "A"
         }
-      ]
+      ],
+      "id": 5
     },
     {
       "type": "timeseries",
@@ -385,7 +390,8 @@
           "range": true,
           "refId": "A"
         }
-      ]
+      ],
+      "id": 6
     },
     {
       "type": "timeseries",
@@ -446,7 +452,8 @@
           "range": true,
           "refId": "A"
         }
-      ]
+      ],
+      "id": 7
     },
     {
       "type": "timeseries",
@@ -503,7 +510,8 @@
           "range": true,
           "refId": "A"
         }
-      ]
+      ],
+      "id": 8
     },
     {
       "type": "timeseries",
@@ -565,7 +573,8 @@
           "refId": "A"
         }
       ],
-      "description": "空/0 表示没有 5xx 响应；非零即代表请求失败。"
+      "description": "空/0 表示没有 5xx 响应；非零即代表请求失败。",
+      "id": 9
     },
     {
       "type": "timeseries",
@@ -622,7 +631,8 @@
           "range": true,
           "refId": "A"
         }
-      ]
+      ],
+      "id": 10
     },
     {
       "type": "timeseries",
@@ -680,7 +690,8 @@
           "range": true,
           "refId": "A"
         }
-      ]
+      ],
+      "id": 11
     },
     {
       "type": "timeseries",
@@ -738,7 +749,214 @@
           "range": true,
           "refId": "A"
         }
-      ]
+      ],
+      "id": 12
+    },
+    {
+      "type": "timeseries",
+      "title": "各服务可用性（1h 窗口）",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "description": "1 - 5xx 比例，仅统计用户流量（已排除 /actuator/*）。目标 99.5%。",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "yunanexus_slo_availability_ratio{window=\"1h\"}",
+          "legendFormat": "{{service}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "id": 13
+    },
+    {
+      "type": "timeseries",
+      "title": "错误预算余量（负值=已超支）",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "description": "未达到样本量与历史覆盖门槛的窗口不会输出结论。",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "yunanexus_slo_error_budget_remaining_ratio{window=\"1h\"}",
+          "legendFormat": "{{service}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "id": 14
+    },
+    {
+      "type": "timeseries",
+      "title": "燃烧率（1.0=按预算速率消耗）",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 48
+      },
+      "description": "超过 14.4 表示 1 小时内烧掉 2% 的月度预算（快速燃烧告警线）。",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "yunanexus_slo_burn_rate{window=\"1h\"}",
+          "legendFormat": "{{service}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "vector(1)",
+          "legendFormat": "预算线",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "id": 15
+    },
+    {
+      "type": "timeseries",
+      "title": "SLO 判定置信度与指标历史",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 48
+      },
+      "description": "历史不足一个窗口时，SLO 结论一律标记为不可判定。",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "yunanexus_slo_history_seconds / 86400",
+          "legendFormat": "指标历史（天）",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "yunanexus_slo_confident{window=\"1h\"}",
+          "legendFormat": "1h 窗口可判定",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "id": 16
     }
   ]
 }
