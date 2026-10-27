@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.audit.controller;
 
 import cc.nanoic.yunanexus.audit.entity.AuditLog;
+import cc.nanoic.yunanexus.audit.chain.AuditAnchorService;
 import cc.nanoic.yunanexus.audit.domain.AuditQueryFilter;
 import cc.nanoic.yunanexus.audit.entity.AuditLog;
 import cc.nanoic.yunanexus.audit.service.AuditService;
@@ -8,6 +9,7 @@ import cc.nanoic.yunanexus.common.core.model.PageResult;
 import cc.nanoic.yunanexus.common.core.model.Result;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +28,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/audit")
 public class AuditQueryController {
+
+    @Resource
+    private AuditAnchorService anchorService;
 
     @Resource
     private AuditService auditService;
@@ -61,6 +66,24 @@ public class AuditQueryController {
      * @param limit  单分片最多校验条数（默认 1000，上限 5000）
      * @return 校验报告
      */
+    /** 立即写入一次锚定（运维手动触发） */
+    @PostMapping("/integrity/anchor")
+    public Result<Integer> anchorNow() {
+        return Result.success(anchorService.anchorNow());
+    }
+
+    /** 查看各分片最新锚定 */
+    @GetMapping("/integrity/anchor")
+    public Result<java.util.List<cc.nanoic.yunanexus.audit.chain.AuditAnchorRecord>> listAnchors() {
+        return Result.success(anchorService.listAnchors());
+    }
+
+    /** 比对锚定与现状，返回不一致项（空数组＝一致） */
+    @GetMapping("/integrity/anchor/verify")
+    public Result<java.util.List<String>> verifyAnchors() {
+        return Result.success(anchorService.verifyAnchors());
+    }
+
     @GetMapping("/integrity/verify")
     public Result<AuditService.ChainReport> verifyIntegrity(
             @RequestParam(value = "userId", required = false) Long userId,

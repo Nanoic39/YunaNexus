@@ -78,6 +78,15 @@ public interface AuditLogMapper extends BaseMapper<AuditLog> {
     String selectHeadHash(@Param("shardIndex") int shardIndex);
 
     /**
+     * 取该分片链头记录的 id。
+     *
+     * @param shardIndex 逻辑分片编号
+     * @return 链头 id；无记录时为 {@code null}
+     */
+    @Select("SELECT id FROM audit_log WHERE shard_index = #{shardIndex} ORDER BY id DESC LIMIT 1")
+    Long selectHeadId(@Param("shardIndex") int shardIndex);
+
+    /**
      * 按 id 升序取一段记录用于链校验。
      *
      * @param shardIndex 逻辑分片编号

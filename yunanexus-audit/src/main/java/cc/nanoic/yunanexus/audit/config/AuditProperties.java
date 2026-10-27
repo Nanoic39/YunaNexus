@@ -24,6 +24,9 @@ public class AuditProperties {
 
     private Archive archive = new Archive();
 
+    /** 外部锚定配置 */
+    private Anchor anchor = new Anchor();
+
     /** 分片参数 */
     @Data
     public static class Shard {
@@ -34,6 +37,19 @@ public class AuditProperties {
     }
 
     /** 分库连接参数 */
+    /**
+     * 外部锚定：链头落库外文件的目录与开关。
+     */
+    @Data
+    public static class Anchor {
+
+        /** 锚定目录（须在审计库之外，建议放只读/可 WORM 的位置） */
+        private String dir = "/YunaNexus/platform/backups/audit-anchor";
+
+        /** 是否启用 */
+        private boolean enabled = true;
+    }
+
     @Data
     public static class Datasource {
         private String host = "localhost";
