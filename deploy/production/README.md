@@ -188,6 +188,24 @@ python3 ops/vulnscan.py --gate         # 有未接受的 critical/high 时退出
 `ops/vuln-ignore.txt`，每行 `<OSV id> [理由]`。被列出的条目不计入告警数、也不阻断 `--gate`。
 **理由必填**——否则下一个接手的人得从头再判断一遍。
 
+### 数据库健康（第 13 轮）
+
+```bash
+python3 ops/dbhealth.py          # 结构、索引、连接、数据目录、增长
+python3 ops/dbhealth.py --json   # 完整数据
+```
+
+只读：所有语句都是 SELECT / SHOW。检查项：
+
+- 引擎、排序规则、主键、冗余索引（`sys.schema_redundant_indexes`）
+- 连接占用、缓冲池命中率、慢查询计数
+- 数据目录构成（`mysql.ibd` / `ibdata1` / binlog / undo）与总量
+- 各库体积与增长（复用 `capacity.py` 的鲁棒趋势）
+- **查询层可见性**：`performance_schema` 与慢查询日志都为 OFF 时明确报告"看不见"
+
+注意：`yunanexus_db_findings` 是多序列指标，告警规则必须带 `{severity="critical"}`，
+否则 high/medium 序列会触发名为 critical 的规则。
+
 ### 容量预测（第 12 轮）
 
 ```bash

@@ -40,6 +40,51 @@ if not log.handlers:
 
 # Each rule yields series of (labels, value); the key is used for de-duplication.
 RULES = [
+    # Database rules. query_visibility is deliberately not an alert: it is a permanent
+    # state until someone decides to turn performance_schema on, and a rule that can
+    # never resolve is noise. It lives in the report and on the dashboard instead.
+    {
+        "name": "db_unavailable",
+        "severity": "critical",
+        "query": "yunanexus_db_up",
+        "compare": ("<", 1),
+        "summary": "数据库无法连接或查询失败",
+        "runbook": "docker ps 看 mysql 容器；python3 ops/dbhealth.py 复现错误",
+    },
+    {
+        "name": "db_connections_high",
+        "severity": "warning",
+        "query": "yunanexus_db_connection_ratio",
+        "compare": (">", 0.8),
+        "summary": "数据库连接数超过上限的 80%",
+        "runbook": "查连接泄漏：SHOW PROCESSLIST；确认连接池上限与应用实例数是否匹配",
+    },
+    {
+        "name": "db_buffer_pool_hit_low",
+        "severity": "warning",
+        "query": "yunanexus_db_buffer_pool_hit_ratio",
+        "compare": ("<", 0.98),
+        "summary": "InnoDB 缓冲池命中率低于 98%",
+        "runbook": "缓冲池 96 MiB 对当前数据量足够；命中率下降通常意味着有全表扫描",
+    },
+    {
+        "name": "db_findings_critical",
+        "severity": "critical",
+        # The severity must be in the query: a rule over the bare metric fires once per
+        # returned series, so high and medium counts would trigger the "critical" rule.
+        "query": 'yunanexus_db_findings{severity="critical"}',
+        "compare": (">", 0),
+        "summary": "数据库存在严重结构问题（无主键等）",
+        "runbook": "python3 ops/dbhealth.py 看具体 finding",
+    },
+    {
+        "name": "db_growth_spike",
+        "severity": "warning",
+        "query": "yunanexus_db_schema_growth_bytes_per_day",
+        "compare": (">", 209715200),
+        "summary": "单个库每天增长超过 200 MiB",
+        "runbook": "labels 里 schema 指明库；查审计日志/大表写入是否失控",
+    },
     # Capacity rules answer "when", not "is it full yet": the threshold rule above only
     # buys a few hours of warning, a forecast buys weeks.
     {

@@ -150,5 +150,19 @@ class AlertTests(unittest.TestCase):
         self.assertEqual(len([e for e in self.delivered if e[0] == "resolved"]), len(resolved))
 
 
+class MultiSeriesRuleTests(unittest.TestCase):
+    def test_severity_scoped_metric_is_filtered_in_the_query(self):
+        """A finding count must carry its severity in the selector, or the rule fires
+        once per severity - including the harmless ones."""
+        module = load_alerts(tempfile.mkdtemp())
+        scoped = [rule for rule in module.RULES
+                  if rule["query"].startswith("yunanexus_db_findings")]
+        self.assertTrue(scoped)
+        for rule in scoped:
+            self.assertIn("{severity=", rule["query"],
+                          "%s selects every severity and will fire on the wrong one"
+                          % rule["name"])
+
+
 if __name__ == "__main__":
     unittest.main()

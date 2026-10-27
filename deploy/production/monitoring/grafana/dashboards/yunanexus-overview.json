@@ -1060,6 +1060,66 @@
         }
       ],
       "id": 18
+    },
+    {
+      "title": "数据库体积与增长",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 64
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "yunanexus_db_schema_bytes",
+          "legendFormat": "{{schema}}",
+          "refId": "A"
+        },
+        {
+          "expr": "yunanexus_db_datadir_bytes",
+          "legendFormat": "datadir",
+          "refId": "B"
+        }
+      ],
+      "id": 19
+    },
+    {
+      "title": "数据库连接与缓冲池命中率",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 64
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "yunanexus_db_connection_ratio",
+          "legendFormat": "连接占用",
+          "refId": "A"
+        },
+        {
+          "expr": "yunanexus_db_buffer_pool_hit_ratio",
+          "legendFormat": "缓冲池命中率",
+          "refId": "B"
+        }
+      ],
+      "id": 20
     }
   ]
 }
