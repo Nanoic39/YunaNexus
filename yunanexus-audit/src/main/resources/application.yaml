@@ -99,10 +99,6 @@ yunanexus:
       # 归档执行计划（默认每日 03:30）
       cron: ${AUDIT_ARCHIVE_CRON:0 30 3 * * ?}
 
-# 高危动作告警：通道 QQ（NoneBot/OneBot）> webhook > 结构化日志
-# 敏感项一律走环境变量，不写进仓库
-yunanexus:
-  audit:
     risk:
       enabled: ${AUDIT_RISK_ENABLED:true}
       window-seconds: ${AUDIT_RISK_WINDOW_SECONDS:60}
