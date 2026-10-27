@@ -78,4 +78,10 @@ public class AuditLog {
 
     /** 操作时间（分区键） */
     private LocalDateTime createTime;
+
+    /** 上一条记录的摘要（防篡改链），链首为 64 个 0 */
+    private String prevHash;
+
+    /** 本条记录摘要 = SHA256(prevHash + 规范化字段) */
+    private String recordHash;
 }
