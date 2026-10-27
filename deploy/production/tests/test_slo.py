@@ -181,6 +181,7 @@ class SampleGateTests(unittest.TestCase):
                    "latency": lambda w: {"api:8081": 0.1}})
         table = self.module.render_table(self.module.summarise(services, "24h"), "24h")
         self.assertIn("insufficient data", table)
+        self.assertIn("need 200", table)
 
 
 class CoverageTests(unittest.TestCase):
@@ -236,6 +237,101 @@ class CoverageTests(unittest.TestCase):
         # the search stops within one step of the boundary, not exactly on it
         self.assertLessEqual(abs(self.module.history_seconds(probe=probe) - 7000), 300)
         self.assertLess(len(asked), 20)
+
+
+class ProbeTests(unittest.TestCase):
+    """Probes carry their own sample volume, so a window can be judged without traffic."""
+
+    def setUp(self):
+        self.module = load(tempfile.mkdtemp())
+
+    def readers(self, ratio=1.0, samples=600):
+        return lambda window: ({"portal": ratio}, {"portal": samples})
+
+    def test_probe_targets_are_prefixed(self):
+        scored = self.module.evaluate_probes(
+            windows={"1h": "1h"}, coverage=28 * 86400, reads=self.readers())
+        self.assertIn("probe:portal", scored)
+
+    def test_probe_slo_is_judgeable_without_user_traffic(self):
+        scored = self.module.evaluate_probes(
+            windows={"1h": "1h"}, coverage=28 * 86400, reads=self.readers(samples=600))
+        state = scored["probe:portal"]["1h"]
+        self.assertTrue(state["confident"])
+        self.assertTrue(state["availability_met"])
+
+    def test_failing_probes_break_the_objective(self):
+        scored = self.module.evaluate_probes(
+            windows={"1h": "1h"}, coverage=28 * 86400,
+            reads=self.readers(ratio=0.90, samples=600))
+        state = scored["probe:portal"]["1h"]
+        self.assertFalse(state["availability_met"])
+        self.assertLess(state["budget_remaining"], 0)
+
+    def test_too_few_probes_is_not_judged(self):
+        scored = self.module.evaluate_probes(
+            windows={"1h": "1h"}, coverage=28 * 86400, reads=self.readers(samples=5))
+        self.assertIsNone(scored["probe:portal"]["1h"]["availability_met"])
+
+    def test_table_shows_the_probe_threshold_not_the_service_one(self):
+        scored = self.module.evaluate_probes(
+            windows={"1h": "1h"}, coverage=28 * 86400, reads=self.readers(samples=5))
+        table = self.module.render_table(self.module.summarise(scored, "1h"), "1h")
+        self.assertIn("need 36", table)
+
+    def test_short_history_blocks_the_verdict(self):
+        scored = self.module.evaluate_probes(
+            windows={"24h": "24h"}, coverage=5400, reads=self.readers(samples=600))
+        self.assertIsNone(scored["probe:portal"]["24h"]["availability_met"])
+
+    def test_latency_is_never_judged_from_probes(self):
+        scored = self.module.evaluate_probes(
+            windows={"1h": "1h"}, coverage=28 * 86400, reads=self.readers())
+        self.assertIsNone(scored["probe:portal"]["1h"]["latency_met"])
+
+    def test_sample_threshold_scales_with_the_window(self):
+        self.assertEqual(self.module.probe_minimum("5m"), 3)
+        self.assertEqual(self.module.probe_minimum("1h"), 36)
+        self.assertEqual(self.module.probe_minimum("24h"), 864)
+
+    def test_five_minute_window_is_judgeable_after_three_samples(self):
+        scored = self.module.evaluate_probes(
+            windows={"5m": "5m"}, coverage=3600, reads=self.readers(samples=3))
+        self.assertTrue(scored["probe:portal"]["5m"]["confident"])
+
+    def test_extrapolated_fraction_does_not_block_a_short_window(self):
+        """increase() can return 4.4 for a fully covered 5 minute window."""
+        scored = self.module.evaluate_probes(
+            windows={"5m": "5m"}, coverage=3600, reads=self.readers(samples=4.4))
+        self.assertTrue(scored["probe:portal"]["5m"]["confident"])
+
+    def test_probes_are_counted_not_scrapes(self):
+        """The textfile gauge is scraped several times per probe cycle."""
+        def fake_query(expression, timeout=20, moment=None):
+            if "probes_total" in expression:
+                return [{"metric": {"target": "portal"}, "value": [0, "10"]}]
+            if "success_total" in expression:
+                return [{"metric": {"target": "portal"}, "value": [0, "9"]}]
+            return []
+
+        self.module.query = fake_query
+        ratio, count = self.module.probe_readers("1h")
+        self.assertEqual(count["portal"], 10.0)
+        self.assertAlmostEqual(ratio["portal"], 0.9)
+
+    def test_probe_queries_use_counters(self):
+        expressions = []
+
+        def fake_query(expression, timeout=20, moment=None):
+            expressions.append(expression)
+            return []
+
+        self.module.query = fake_query
+        self.module.evaluate_probes(windows={"1h": "1h"}, coverage=28 * 86400)
+        self.assertTrue(any("increase(yunanexus_probe_probes_total[1h])" in e
+                            for e in expressions))
+        self.assertTrue(any("increase(yunanexus_probe_success_total[1h])" in e
+                            for e in expressions))
 
 
 class MetricsTests(unittest.TestCase):

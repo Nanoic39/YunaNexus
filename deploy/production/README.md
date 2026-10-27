@@ -188,6 +188,35 @@ python3 ops/vulnscan.py --gate         # 有未接受的 critical/high 时退出
 `ops/vuln-ignore.txt`，每行 `<OSV id> [理由]`。被列出的条目不计入告警数、也不阻断 `--gate`。
 **理由必填**——否则下一个接手的人得从头再判断一遍。
 
+### 合成探测（第 11 轮）
+
+```bash
+python3 ops/synthetic.py            # 常驻，每 60 秒一轮（start.sh 与 maintenance 会拉起）
+python3 ops/synthetic.py --once     # 跑一轮看结果
+tail -f logs/synthetic.jsonl        # 每次探测一行
+```
+
+内部指标说的是"服务回了抓取请求"，它看不见 edge 停止路由、防火墙规则生效、证书过期，
+更没法在只有几百次日请求的平台上评判可用性目标。
+
+每分钟一轮探测同时解决两件事：走真实的公网路径，并且**自己产生样本**——
+一天 1440 个样本，用户来不来都有数据。
+
+| 目标 | 路径 | 说明 |
+| :--- | :--- | :--- |
+| `portal` | 公网 :3000 | 用户门户首页 |
+| `admin` | 公网 :3001 | 管理端首页 |
+| `api_status` | 公网 :3000/api/v1/status | 走同一路径的接口 |
+| `edge_local` | 127.0.0.1:3000 | 区分"edge 挂了"与"外网/防火墙挂了" |
+
+设计要点：
+
+- **只读、不登录**：会登录的探针可能锁账号、烧 token，探针越简单越可靠
+- **只在状态变化时打日志**：目标持续失败不会每分钟刷一行
+- **计数器而不是 gauge 做比例**：textfile 里的 gauge 每次抓取都会新增一个样本，
+  抓取比探测频繁，`count_over_time` 数的是抓取次数不是探测次数
+- 顺带发布 `yunanexus_probe_cert_days_remaining`，将来上 HTTPS 后证书到期自动告警
+
 ### SLO 与错误预算（第 10 轮）
 
 ```bash

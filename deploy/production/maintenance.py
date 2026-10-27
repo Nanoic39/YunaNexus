@@ -115,7 +115,7 @@ def run(script, *args, timeout=3600):
     return result.returncode == 0
 
 
-DAEMONS = {"logship": "logship.py"}
+DAEMONS = {"logship": "logship.py", "synthetic": "synthetic.py"}
 
 
 def ensure_daemon(name):

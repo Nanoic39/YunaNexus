@@ -40,6 +40,48 @@ if not log.handlers:
 
 # Each rule yields series of (labels, value); the key is used for de-duplication.
 RULES = [
+    # Probes test the path a user takes: edge routing, firewall, TLS - things internal
+    # metrics cannot see. 5 minutes down is a real outage, not a blip.
+    {
+        "name": "probe_target_down",
+        "severity": "critical",
+        "query": "min_over_time(yunanexus_probe_up[5m])",
+        "compare": ("==", 0),
+        "summary": "公网入口合成探测连续 5 分钟失败",
+        "runbook": "logs/synthetic.jsonl 看错误类型；先查 edge 容器与 ufw，再查发布是否卡在健康门",
+    },
+    {
+        "name": "probe_availability_low",
+        "severity": "warning",
+        "query": "avg_over_time(yunanexus_probe_up[1h])",
+        "compare": ("<", 0.99),
+        "summary": "公网入口 1 小时内探测成功率低于 99%",
+        "runbook": "看是哪一个 target（labels 里 target 字段）与开始时间，对照发布/重启记录",
+    },
+    {
+        "name": "probe_stale",
+        "severity": "warning",
+        "query": "time() - yunanexus_probe_last_run_timestamp_seconds",
+        "compare": (">", 300),
+        "summary": "合成探测本身超过 5 分钟没有运行",
+        "runbook": "维护进程会自动拉起；若反复出现查 logs/synthetic.log",
+    },
+    {
+        "name": "probe_slow",
+        "severity": "warning",
+        "query": "yunanexus_probe_duration_seconds",
+        "compare": (">", 3),
+        "summary": "公网入口探测响应超过 3 秒",
+        "runbook": "区分是 edge 排队还是后端慢：看同一时刻 gateway 的 http_server_requests_seconds_max",
+    },
+    {
+        "name": "certificate_expiring",
+        "severity": "warning",
+        "query": "yunanexus_probe_cert_days_remaining",
+        "compare": ("<", 21),
+        "summary": "TLS 证书将在 21 天内过期",
+        "runbook": "acme-ip.py 续签并 reload edge；确认 Nginx 已加载新证书",
+    },
     # SLO rules only fire on windows the evaluator could actually judge: `and on(...)`
     # with the confidence gauge keeps a thin-data window from paging anyone.
     {

@@ -957,6 +957,109 @@
         }
       ],
       "id": 16
+    },
+    {
+      "type": "timeseries",
+      "title": "公网合成探测成功率（1h）",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 56
+      },
+      "description": "从公网地址实际访问门户/管理端/状态接口，每分钟一次。这条曲线代表用户视角的可用性。",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time(yunanexus_probe_up[1h])",
+          "legendFormat": "{{target}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "id": 17
+    },
+    {
+      "type": "timeseries",
+      "title": "探测响应时间与新鲜度",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 56
+      },
+      "description": "曲线消失或时间戳不更新，说明探测本身停了（probe_stale 告警）。",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "yunanexus_probe_duration_seconds",
+          "legendFormat": "{{target}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "editorMode": "code",
+          "expr": "time() - yunanexus_probe_last_run_timestamp_seconds",
+          "legendFormat": "最新样本（秒前）",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "id": 18
     }
   ]
 }

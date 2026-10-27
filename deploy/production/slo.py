@@ -47,9 +47,27 @@ MIN_REQUESTS = 200
 # One objective for every service: interactive APIs, so 99.5% is the floor a user
 # would notice. A payment or auth-critical path would warrant 99.9%.
 TARGETS = {"availability": 0.995, "latency_mean_seconds": 0.25}
-WINDOWS = {"1h": "1h", "6h": "6h", "24h": "24h", "7d": "7d", "28d": "28d"}
+WINDOWS = {"5m": "5m", "15m": "15m", "1h": "1h", "6h": "6h", "24h": "24h",
+           "7d": "7d", "28d": "28d"}
 # Burn rate 1.0 spends the budget exactly at the rate that exhausts it over the window.
 BURN_WINDOWS = ("1h", "6h")
+# Synthetic probes publish one sample a minute, so a 30 minute window already holds 30
+# samples - enough to judge availability where the API itself sees too few requests.
+PROBE_PREFIX = "probe:"
+PROBE_SECONDS = 60
+
+
+def probe_minimum(window):
+    """How many samples a probe window needs before its ratio means anything.
+
+    Absolute thresholds would demand 30 samples from a 5 minute window that can only
+    hold five. Requiring most of the window to be covered is the honest rule.
+    """
+    expected = max(1, window_seconds(window) / PROBE_SECONDS)
+    # The floor must sit below a fully covered short window: `increase()` extrapolates and
+    # a 5 minute window can legitimately report 4.4 probes, so requiring 5 would make it
+    # permanently unjudgeable.
+    return max(3, int(expected * 0.6))
 
 log = logging.getLogger("slo")
 log.setLevel(logging.INFO)
@@ -200,6 +218,7 @@ def evaluate(windows=None, targets=None, reads=None, minimum=None, coverage=None
             state["coverage"] = coverage
             # None means "not enough traffic to judge", which must never be reported
             # as either compliant or breached.
+            state["minimum"] = minimum
             enough = state["requests"] >= minimum
             # A window longer than the retained history is not a measurement.
             covered = window_seconds(window) <= coverage * 0.95
@@ -212,6 +231,71 @@ def evaluate(windows=None, targets=None, reads=None, minimum=None, coverage=None
                 state["latency_mean"] <= targets["latency_mean_seconds"]) if judgeable else None
             services.setdefault(service, {})[label] = state
     return services
+
+
+def probe_readers(window):
+    """(success ratio, probe count) per target for one window.
+
+    Ratios come from the prober's counters, not from the `up` gauge: the gauge is
+    rewritten every cycle and scraped several times per cycle, so averaging it would
+    weight probes by scrape frequency and counting it would count scrapes.
+    """
+    probes = by_service(query('increase(yunanexus_probe_probes_total[%s])' % window),
+                        key="target")
+    successes = by_service(query('increase(yunanexus_probe_success_total[%s])' % window),
+                           key="target")
+    count = {}
+    ratio = {}
+    for target, total in probes.items():
+        if total <= 0:
+            continue
+        count[target] = total
+        ratio[target] = min(1.0, successes.get(target, 0.0) / total)
+    return ratio, count
+
+
+def evaluate_probes(windows=None, targets=None, coverage=None, reads=None, minimum=None):
+    """Availability of the public path, scored with the same budget arithmetic.
+
+    Keys are prefixed so a probe target never collides with a service instance name.
+    """
+    windows = windows or WINDOWS
+    targets = targets or TARGETS
+    reads = reads or probe_readers
+    if coverage is None:
+        coverage = 0
+    scored = {}
+    for label, window in windows.items():
+        minimum = probe_minimum(window) if minimum is None else minimum
+        ratios, counts = reads(window)
+        for target in sorted(ratios):
+            total = counts.get(target, 0.0)
+            if not total:
+                continue
+            ratio = ratios[target]
+            state = budget(targets["availability"], total, total * (1 - ratio))
+            if state is None:
+                continue
+            state.update({
+                "window": label,
+                "service": PROBE_PREFIX + target,
+                "latency_mean": 0.0,
+                "availability_target": targets["availability"],
+                "latency_target": targets["latency_mean_seconds"],
+                "coverage": coverage,
+            })
+            state["minimum"] = minimum
+            enough = state["requests"] >= minimum
+            covered = window_seconds(window) <= coverage * 0.95
+            state["confident"] = enough and covered
+            state["covered"] = covered
+            judgeable = enough and covered
+            state["availability_met"] = (
+                state["availability"] >= targets["availability"]) if judgeable else None
+            # Probes say nothing about latency accuracy; leave it out of the verdict.
+            state["latency_met"] = None
+            scored.setdefault(state["service"], {})[label] = state
+    return scored
 
 
 def summarise(services, window="24h"):
@@ -321,8 +405,8 @@ def render_table(rows, window="24h"):
         if not row.get("covered", True):
             note = "  <- history only %.1fh, window too long" % (row["coverage"] / 3600.0)
         elif not row["confident"]:
-            note = "  <- insufficient data (%d requests, need %d)" % (
-                row["requests"], MIN_REQUESTS)
+            note = "  <- insufficient data (%d samples, need %d)" % (
+                row["requests"], row.get("minimum", MIN_REQUESTS))
         elif not row["availability_met"]:
             note = "  <- below objective"
         elif row["latency_met"] is False:
@@ -343,7 +427,10 @@ def main(argv=None):
                         help="window to show in the console table")
     args = parser.parse_args(argv)
     try:
-        services = evaluate()
+        coverage = history_seconds()
+        services = evaluate(coverage=coverage)
+        # Probes exist because the API's own request volume cannot support an objective.
+        services.update(evaluate_probes(coverage=coverage))
     except (urllib.error.URLError, OSError, RuntimeError, ValueError) as error:
         log.error("cannot evaluate SLOs: %s", error)
         write(render_metrics({}, ok=False))
