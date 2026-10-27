@@ -27,6 +27,9 @@ public class AuditProperties {
     /** 外部锚定配置 */
     private Anchor anchor = new Anchor();
 
+    /** 高危动作通知配置 */
+    private Risk risk = new Risk();
+
     /** 分片参数 */
     @Data
     public static class Shard {
@@ -37,6 +40,25 @@ public class AuditProperties {
     }
 
     /** 分库连接参数 */
+    /**
+     * 高危动作实时通知：webhook 投递与限流。
+     */
+    @Data
+    public static class Risk {
+
+        /** 是否启用 */
+        private boolean enabled = true;
+
+        /** webhook 地址；留空则降级为结构化日志（AUDIT_RISK 标记） */
+        private String webhookUrl = "";
+
+        /** 同一规则在多少秒内只发一次（防刷屏） */
+        private int windowSeconds = 60;
+
+        /** 连接超时（毫秒） */
+        private int timeoutMillis = 2000;
+    }
+
     /**
      * 外部锚定：链头落库外文件的目录与开关。
      */

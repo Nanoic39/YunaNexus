@@ -8,6 +8,7 @@ import cc.nanoic.yunanexus.audit.chain.AuditChainHasher;
 import cc.nanoic.yunanexus.audit.chain.AuditChainVerifier;
 import cc.nanoic.yunanexus.audit.domain.AuditQueryFilter;
 import cc.nanoic.yunanexus.audit.entity.AuditLog;
+import cc.nanoic.yunanexus.audit.risk.AuditRiskNotifier;
 import cc.nanoic.yunanexus.audit.mapper.AuditLogMapper;
 import cc.nanoic.yunanexus.audit.mq.AuditProducer;
 import cc.nanoic.yunanexus.audit.service.AuditService;
@@ -84,6 +85,7 @@ public class AuditServiceImpl implements AuditService {
     private final AuditLogMapper auditLogMapper;
     private final AuditProducer auditProducer;
     private final ShardRouter shardRouter;
+    private final AuditRiskNotifier riskNotifier;
     /** 物理库数量（跨分片查询时逐库扫描的范围上界） */
     private final int physicalCount;
     /**
@@ -99,10 +101,12 @@ public class AuditServiceImpl implements AuditService {
     public AuditServiceImpl(AuditLogMapper auditLogMapper,
                             AuditProducer auditProducer,
                             ShardRouter shardRouter,
+                            AuditRiskNotifier riskNotifier,
                             AuditProperties properties) {
         this.auditLogMapper = auditLogMapper;
         this.auditProducer = auditProducer;
         this.shardRouter = shardRouter;
+        this.riskNotifier = riskNotifier;
         this.physicalCount = properties.getShard().getPhysicalCount();
         for (int index = 0; index < chainLocks.length; index++) {
             chainLocks[index] = new ReentrantLock();
@@ -132,6 +136,8 @@ public class AuditServiceImpl implements AuditService {
             entity.setPrevHash(prevHash);
             entity.setRecordHash(AuditChainHasher.chainDigest(prevHash, entity));
             auditLogMapper.insert(entity);
+            // 落库之后才通知：审计本身成功是前提；通知失败也不能影响审计
+            riskNotifier.notifyIfRisky(entity);
         } finally {
             lock.unlock();
             ShardContextHolder.clear();
