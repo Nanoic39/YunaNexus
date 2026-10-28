@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -47,6 +48,36 @@ public interface FileMetaMapper extends BaseMapper<FileMeta> {
      * @param fileId 全局文件 ID
      * @return 文件元数据，不存在返回 {@code null}
      */
+    /**
+     * 引用计数减一（不下溢）。
+     *
+     * @param fileId 文件 ID
+     * @return 影响行数
+     */
+    @Update("UPDATE file_meta SET ref_count = GREATEST(0, ref_count - 1) WHERE file_id = #{fileId}")
+    int decrementRefCount(@Param("fileId") long fileId);
+
+    /**
+     * 读取剩余引用数。
+     *
+     * @param fileId 文件 ID
+     * @return 引用数
+     */
+    @Select("SELECT ref_count FROM file_meta WHERE file_id = #{fileId}")
+    Integer selectRefCount(@Param("fileId") long fileId);
+
+    /**
+     * 取回收站中早于指定时间过期的文件。
+     *
+     * @param before 早于该时间进入回收站
+     * @param limit  最多取多少条
+     * @return 文件列表
+     */
+    @Select("SELECT * FROM file_meta WHERE status = 2 AND deleted_at IS NOT NULL AND deleted_at < #{before} "
+            + "ORDER BY deleted_at ASC LIMIT #{limit}")
+    java.util.List<FileMeta> selectTrashExpired(@Param("before") java.time.LocalDateTime before,
+                                                @Param("limit") int limit);
+
     @Select("SELECT * FROM file_meta WHERE file_id = #{fileId}")
     FileMeta selectByFileId(@Param("fileId") long fileId);
 

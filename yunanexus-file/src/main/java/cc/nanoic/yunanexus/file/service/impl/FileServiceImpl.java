@@ -153,24 +153,28 @@ public class FileServiceImpl implements FileService {
         deleteMeta(meta,userId);
     }
 
+    /** 引用计数减一并返回剩余值 */
+    private int decrementRefCount(FileMeta meta) {
+        fileMetaMapper.decrementRefCount(meta.getFileId());
+        Integer remaining = fileMetaMapper.selectRefCount(meta.getFileId());
+        return remaining == null ? 0 : remaining;
+    }
+
     private void deleteMeta(FileMeta meta,long userId) {
         long fileId=meta.getFileId();
-        meta.setStatus(FileMeta.STATUS_DELETED);
+        // B 阶段：删除先进回收站（30 天可恢复），配额仍计入——否则删进回收站就等于白嫖额度
+        meta.setStatus(FileMeta.STATUS_TRASHED);
+        meta.setDeletedAt(java.time.LocalDateTime.now());
         fileMetaMapper.updateById(meta);
-        // 秒传复用的内容被多条元数据共享：仅当无其他有效引用时才物理删除
-        if (countStoragePathAcrossShards(meta.getStoragePath()) == 0) {
-            if (!fileStorage.delete(meta.getStoragePath())) {
-                log.warn("元数据已逻辑删除，但存储内容删除失败 fileId={} path={}", fileId, meta.getStoragePath());
-            }
-        } else {
-            log.info("存储内容仍被其他文件引用，保留物理内容 fileId={} path={}", fileId, meta.getStoragePath());
+        // 引用计数递减；只有归零才物理删除存储，避免"删一个文件影响其他用户共享的同一份内容"
+        int remaining = decrementRefCount(meta);
+        if (remaining <= 0 && !fileStorage.delete(meta.getStoragePath())) {
+            log.warn("元数据已删除且引用归零，但存储内容删除失败 fileId={} path={}", fileId, meta.getStoragePath());
+        } else if (remaining > 0) {
+            log.info("存储内容仍被 {} 条元数据引用，保留物理内容 fileId={}", remaining, fileId);
         }
-        // 释放配额：只在逻辑删除时扣一次（重复删除会被上面的状态校验挡掉）
-        Long owner = meta.getCreateBy();
-        if (owner != null) {
-            quotaService.removeUsage(owner, meta.getSize() == null ? 0L : meta.getSize());
-        }
-        log.info("文件删除成功 fileId={} user={}", fileId, userId);
+        // 注意：回收站文件仍计入配额（30 天内可恢复），配额在过期清理时才释放
+        log.info("文件移入回收站 fileId={} user={}", fileId, userId);
     }
 
     @Override

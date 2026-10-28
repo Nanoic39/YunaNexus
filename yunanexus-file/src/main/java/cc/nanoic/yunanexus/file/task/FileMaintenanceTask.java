@@ -73,6 +73,45 @@ public class FileMaintenanceTask {
     }
 
     /**
+     * 回收站过期清理（默认每日 04:40）：超过保留期的文件转为物理删除并释放配额。
+     *
+     * <p>保留期内不释放配额：否则"删进回收站"就成了绕过配额的免费通道。
+     */
+    @Scheduled(cron = "${yunanexus.file.trash.purge-cron:0 40 4 * * ?}")
+    public void purgeTrash() {
+        FileProperties.Trash trash = properties.getTrash();
+        if (!trash.isEnabled()) {
+            return;
+        }
+        LocalDateTime before = LocalDateTime.now().minusDays(trash.getRetentionDays());
+        int purged = 0;
+        for (int shard = 0; shard < properties.getShard().getPhysicalCount(); shard++) {
+            ShardContextHolder.set(shard);
+            try {
+                for (var meta : fileMetaMapper.selectTrashExpired(before, trash.getBatchSize())) {
+                    fileMetaMapper.decrementRefCount(meta.getFileId());
+                    Integer remaining = fileMetaMapper.selectRefCount(meta.getFileId());
+                    meta.setStatus(0);
+                    fileMetaMapper.updateById(meta);
+                    Long owner = meta.getCreateBy();
+                    if (owner != null) {
+                        quotaService.removeUsage(owner, meta.getSize() == null ? 0L : meta.getSize());
+                    }
+                    purged++;
+                    log.info("回收站清理 fileId={} refRemaining={}", meta.getFileId(), remaining);
+                }
+            } catch (RuntimeException error) {
+                log.warn("回收站清理失败 shard={}：{}", shard, error.toString());
+            } finally {
+                ShardContextHolder.clear();
+            }
+        }
+        if (purged > 0) {
+            log.info("回收站清理完成，处理 {} 个文件", purged);
+        }
+    }
+
+    /**
      * 补扫调度（默认每 30 分钟）：把超期未扫描的文件挑出来。
      *
      * <p>当前没有接真实扫描服务，所以只做"发现与上报"：超过保留期仍未被扫描的文件

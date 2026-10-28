@@ -275,12 +275,13 @@ class FileServiceImplTest {
         when(fileMetaMapper.selectByFileId(16L)).thenReturn(meta);
         when(permissionClient.dataScope(USER_ID)).thenReturn(scopeResult(true, List.of(), null));
         when(fileMetaMapper.updateById(any(FileMeta.class))).thenReturn(1);
-        when(fileMetaMapper.countByStoragePath("2026/10/13/uuid.txt")).thenReturn(0L);
+        when(fileMetaMapper.selectRefCount(16L)).thenReturn(0);
         when(fileStorage.delete("2026/10/13/uuid.txt")).thenReturn(true);
 
         service.delete(16L, USER_ID);
 
-        assertEquals(FileMeta.STATUS_DELETED, meta.getStatus());
+        // B 阶段：删除先进回收站（30 天可恢复），不再直接置为 DELETED
+        assertEquals(FileMeta.STATUS_TRASHED, meta.getStatus());
         verify(fileMetaMapper).updateById(meta);
         verify(fileStorage).delete("2026/10/13/uuid.txt");
     }
@@ -291,11 +292,11 @@ class FileServiceImplTest {
         when(fileMetaMapper.selectByFileId(16L)).thenReturn(meta);
         when(permissionClient.dataScope(USER_ID)).thenReturn(scopeResult(true, List.of(), null));
         when(fileMetaMapper.updateById(any(FileMeta.class))).thenReturn(1);
-        when(fileMetaMapper.countByStoragePath("2026/10/13/uuid.txt")).thenReturn(1L);
+        when(fileMetaMapper.selectRefCount(16L)).thenReturn(1);
 
         service.delete(16L, USER_ID);
 
-        assertEquals(FileMeta.STATUS_DELETED, meta.getStatus());
+        assertEquals(FileMeta.STATUS_TRASHED, meta.getStatus());
         verify(fileStorage, never()).delete(anyString());
     }
 

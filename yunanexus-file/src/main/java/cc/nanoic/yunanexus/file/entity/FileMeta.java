@@ -23,6 +23,8 @@ public class FileMeta {
     public static final int STATUS_NORMAL = 1;
     /** 状态：已删除 */
     public static final int STATUS_DELETED = 0;
+    /** 回收站：逻辑删除但可恢复，仍占用配额 */
+    public static final int STATUS_TRASHED = 2;
 
     /** 存储类型：本地 */
     public static final int STORAGE_LOCAL = 1;
@@ -79,6 +81,12 @@ public class FileMeta {
 
     /** 可见性：private 私有 / internal 系统内公开（所有登录用户可见） */
     private String visibility;
+
+    /** 物理内容引用计数；归零才允许删除存储 */
+    private Integer refCount;
+
+    /** 进入回收站时间（30 天后物理清理） */
+    private LocalDateTime deletedAt;
 
     private LocalDateTime updateTime;
 }

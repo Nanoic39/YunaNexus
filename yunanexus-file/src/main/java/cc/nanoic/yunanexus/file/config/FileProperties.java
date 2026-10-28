@@ -33,6 +33,19 @@ public class FileProperties {
 
     private Scan scan = new Scan();
 
+    private Trash trash = new Trash();
+
+    /** 回收站 */
+    @Data
+    public static class Trash {
+        /** 是否启用过期清理 */
+        private boolean enabled = true;
+        /** 保留天数（默认 30 天） */
+        private int retentionDays = 30;
+        /** 每轮最多处理条数 */
+        private int batchSize = 200;
+    }
+
     /** 恶意文件扫描（A5） */
     @Data
     public static class Scan {
