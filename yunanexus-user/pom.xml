@@ -54,6 +54,12 @@
             <artifactId>common-web</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>common-audit</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
 
         <!-- 可观测性 -->
         <dependency>

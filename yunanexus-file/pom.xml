@@ -54,6 +54,12 @@
             <artifactId>common-web</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>common-audit</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
 
         <!-- 数据权限拦截器（@DataScope，阶段 7 文件中心试点） -->
         <dependency>

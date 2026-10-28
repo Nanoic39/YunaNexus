@@ -3,6 +3,7 @@ package cc.nanoic.yunanexus.audit.mapper;
 import cc.nanoic.yunanexus.audit.domain.AuditQueryFilter;
 import cc.nanoic.yunanexus.audit.entity.AuditLog;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
@@ -76,6 +77,28 @@ public interface AuditLogMapper extends BaseMapper<AuditLog> {
      */
     @Select("SELECT id FROM audit_log WHERE shard_index = #{shardIndex} ORDER BY id DESC LIMIT 1")
     Long selectHeadId(@Param("shardIndex") int shardIndex);
+
+    /**
+     * 统计同一 traceId 下的"业务语义记录"条数（module 非 gateway）。
+     *
+     * @param shardIndex 逻辑分片
+     * @param traceId    链路 ID
+     * @return 条数
+     */
+    @Select("SELECT COUNT(*) FROM audit_log WHERE shard_index = #{shardIndex} "
+            + "AND trace_id = #{traceId} AND module <> 'gateway'")
+    int countSemanticByTraceId(@Param("shardIndex") int shardIndex, @Param("traceId") String traceId);
+
+    /**
+     * 删除同一 traceId 下的网关兜底记录（业务记录到达后让位，避免一条请求两条审计）。
+     *
+     * @param shardIndex 逻辑分片
+     * @param traceId    链路 ID
+     * @return 删除条数
+     */
+    @Delete("DELETE FROM audit_log WHERE shard_index = #{shardIndex} "
+            + "AND trace_id = #{traceId} AND module = 'gateway'")
+    int deleteGatewayByTraceId(@Param("shardIndex") int shardIndex, @Param("traceId") String traceId);
 
     /**
      * 按 id 升序取一段记录用于链校验。

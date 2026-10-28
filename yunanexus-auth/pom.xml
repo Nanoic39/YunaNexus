@@ -43,6 +43,12 @@
             <artifactId>common-web</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>common-audit</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
 
         <!-- Redis：会话/失败计数/验证码/黑名单 -->
         <dependency>

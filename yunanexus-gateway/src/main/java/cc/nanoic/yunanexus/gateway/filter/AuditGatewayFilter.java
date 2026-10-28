@@ -1,0 +1,123 @@
+package cc.nanoic.yunanexus.gateway.filter;
+
+import cc.nanoic.yunanexus.common.audit.client.AuditClient;
+import cc.nanoic.yunanexus.common.audit.event.AuditEvent;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.core.Ordered;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+import java.util.List;
+
+/**
+ * 网关兜底审计（方案 A）。<p>
+ *
+ * 记录所有经过网关的请求：方法、路径、状态、耗时、操作者、IP、UA、traceId。
+ * 它的价值是<b>覆盖率</b>——任何接口哪怕忘了打 {@code @AuditAction}，也一定留痕。
+ *
+ * <p>与业务侧（方案 B）的关系：网关记录 module 固定为 {@code gateway}，
+ * 业务记录带真实模块与动作；审计服务按 traceId 合并，业务记录优先、网关记录让位，
+ * 因此不会出现"一个请求两条审计"。
+ *
+ * <p>放在响应提交后采集，且只用内存事件（不读 body），对网关吞吐影响可忽略。
+ *
+ * @author yunanexus
+ */
+@Slf4j
+@Component
+public class AuditGatewayFilter implements GlobalFilter, Ordered {
+
+    /** 网关兜底记录的模块标识，审计服务据此识别"可被业务记录替换"的行 */
+    public static final String GATEWAY_MODULE = "gateway";
+    /** 网关兜底记录的动作标识 */
+    public static final String GATEWAY_ACTION = "HTTP";
+
+    private static final String USER_ID_HEADER = "X-User-Id";
+    private static final String USERNAME_HEADER = "X-Username";
+    private static final String TRACE_HEADER = "X-Trace-Id";
+
+    private final AuditClient auditClient;
+
+    public AuditGatewayFilter(AuditClient auditClient) {
+        this.auditClient = auditClient;
+    }
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        long start = System.currentTimeMillis();
+        return chain.filter(exchange).doFinally(signal -> {
+            try {
+                auditClient.submit(buildEvent(exchange, start));
+            } catch (RuntimeException error) {
+                log.debug("网关审计采集异常（已忽略）：{}", error.toString());
+            }
+        });
+    }
+
+    private AuditEvent buildEvent(ServerWebExchange exchange, long start) {
+        ServerHttpRequest request = exchange.getRequest();
+        AuditEvent event = new AuditEvent();
+        event.setService("yunanexus-gateway");
+        event.setModule(GATEWAY_MODULE);
+        event.setAction(GATEWAY_ACTION);
+        event.setMethod(request.getMethod().name());
+        event.setUri(truncate(request.getPath().value(), 512));
+        event.setTraceId(request.getHeaders().getFirst(TRACE_HEADER));
+        event.setUserId(parseUserId(request.getHeaders().getFirst(USER_ID_HEADER)));
+        event.setUsername(request.getHeaders().getFirst(USERNAME_HEADER));
+        event.setIp(resolveIp(request));
+        event.setUserAgent(truncate(request.getHeaders().getFirst("User-Agent"), 512));
+        event.setDurationMs(System.currentTimeMillis() - start);
+        event.setCreateTime(System.currentTimeMillis());
+        Integer status = exchange.getResponse().getStatusCode() == null
+                ? null : exchange.getResponse().getStatusCode().value();
+        if (status != null) {
+            event.setStatus(status < 400 ? 1 : 0);
+            if (status >= 400) {
+                event.setErrorMsg("HTTP " + status);
+            }
+        }
+        return event;
+    }
+
+    private Long parseUserId(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(raw.trim());
+        } catch (NumberFormatException error) {
+            return 0L;
+        }
+    }
+
+    private String resolveIp(ServerHttpRequest request) {
+        List<String> forwarded = request.getHeaders().get("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isEmpty()) {
+            String value = forwarded.get(0);
+            int comma = value.indexOf(',');
+            return truncate(comma > 0 ? value.substring(0, comma).trim() : value.trim(), 64);
+        }
+        if (request.getRemoteAddress() == null) {
+            return null;
+        }
+        return truncate(request.getRemoteAddress().getAddress().getHostAddress(), 64);
+    }
+
+    private String truncate(String value, int max) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() > max ? value.substring(0, max) : value;
+    }
+
+    @Override
+    public int getOrder() {
+        // 尽量靠后：确保 JwtAuthFilter 已注入 X-User-Id，采集到的才是"谁"
+        return Ordered.LOWEST_PRECEDENCE - 100;
+    }
+}

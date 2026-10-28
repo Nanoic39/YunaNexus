@@ -34,6 +34,12 @@
             <artifactId>common-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 审计采集（网关兜底，方案 A）：客户端不依赖 Servlet，可安全用于 WebFlux -->
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>common-audit</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- JWT 验签（RS256，kid 选公钥，ADR-015/027） -->
         <dependency>

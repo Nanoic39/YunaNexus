@@ -17,6 +17,7 @@
         <module>common-core</module>
         <module>common-web</module>
         <module>common-data-scope</module>
+        <module>common-audit</module>
     </modules>
 
     <dependencyManagement>
@@ -24,6 +25,11 @@
             <dependency>
                 <groupId>cc.nanoic.yunanexus</groupId>
                 <artifactId>common-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cc.nanoic.yunanexus</groupId>
+                <artifactId>common-audit</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

@@ -130,6 +130,9 @@ public class AuditServiceImpl implements AuditService {
         ReentrantLock lock = chainLocks[Math.floorMod(shardIndex, CHAIN_LOCK_STRIPES)];
         lock.lock();
         try {
+            if (mergeGatewayRecord(entity, shardIndex)) {
+                return;
+            }
             // 先取链头再算摘要：两步必须与插入同处一个临界区，否则并发写会分叉
             String head = auditLogMapper.selectHeadHash(shardIndex);
             String prevHash = (head == null || head.isEmpty()) ? AuditChainHasher.GENESIS : head;
@@ -142,6 +145,29 @@ public class AuditServiceImpl implements AuditService {
             lock.unlock();
             ShardContextHolder.clear();
         }
+    }
+
+    /**
+     * 网关兜底记录与业务语义记录的合并（方案 A+B 的 C 语义）。
+     *
+     * <p>同一 traceId 下只保留一条：业务记录带真实模块/动作，价值更高；
+     * 网关记录只证明"这个请求发生过"，在有业务记录时是冗余的。
+     *
+     * @param entity     待写入记录
+     * @param shardIndex 逻辑分片
+     * @return true 表示该事件无需写入
+     */
+    private boolean mergeGatewayRecord(AuditLog entity, int shardIndex) {
+        String traceId = entity.getTraceId();
+        if (traceId == null || traceId.isBlank()) {
+            return false;
+        }
+        boolean gatewayRecord = "gateway".equalsIgnoreCase(entity.getModule());
+        if (gatewayRecord) {
+            return auditLogMapper.countSemanticByTraceId(shardIndex, traceId) > 0;
+        }
+        auditLogMapper.deleteGatewayByTraceId(shardIndex, traceId);
+        return false;
     }
 
     @Override

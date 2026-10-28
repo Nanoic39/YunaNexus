@@ -39,6 +39,12 @@
             <artifactId>common-web</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>common-audit</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
 
         <!-- RocketMQ 原生客户端（事件投递 analytics-event topic，见 analytics.md §6.1） -->
         <dependency>

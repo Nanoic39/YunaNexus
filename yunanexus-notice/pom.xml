@@ -48,6 +48,12 @@
             <artifactId>common-web</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>common-audit</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
 
         <!-- 服务间调用：meta 取号（OpenFeign + 负载均衡，ADR-005 / ADR-011） -->
         <dependency>

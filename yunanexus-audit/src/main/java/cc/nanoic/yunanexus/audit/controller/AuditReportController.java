@@ -29,6 +29,25 @@ public class AuditReportController {
     /**
      * 上报一条审计日志（异步落库）。
      */
+    /**
+     * 批量上报（采集客户端按批发送，降低请求数）。
+     *
+     * @param requests 事件列表
+     * @return 成功接收的条数
+     */
+    @PostMapping("/report/batch")
+    public Result<Integer> reportBatch(@RequestBody java.util.List<AuditReportRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return Result.success(0);
+        }
+        int accepted = 0;
+        for (AuditReportRequest request : requests) {
+            auditService.report(request);
+            accepted++;
+        }
+        return Result.success(accepted);
+    }
+
     @PostMapping("/report")
     public Result<Void> report(@Valid @RequestBody AuditReportRequest request) {
         auditService.report(request);

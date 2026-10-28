@@ -42,6 +42,12 @@
             <artifactId>common-web</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>cc.nanoic.yunanexus</groupId>
+            <artifactId>common-audit</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
 
         <!-- 可观测性：Actuator + Prometheus 指标（号段剩余/领取/冲突/降级） -->
         <dependency>
