@@ -3,21 +3,22 @@ package cc.nanoic.yunanexus.file.service;
 import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
 import cc.nanoic.yunanexus.common.web.exception.BizException;
 import cc.nanoic.yunanexus.file.config.FileProperties;
+import cc.nanoic.yunanexus.file.mapper.UploadRateMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-
 /**
- * 上传限流（A4）。<p>
+ * 上传限流（A4）。
  *
- * 用固定窗口计数而不是引入 Redis/Sentinel：限流对象是"单实例的上传入口"，
- * 本地计数足够且没有网络开销；将来多实例部署时把计数换成 Redis INCR 即可，
- * 接口不变。
+ * <p><b>为什么用数据库而不是内存计数</b>：内存计数在多实例部署时每个实例各算一份，
+ * 实际每秒上限会随实例数线性放大——限流形同虚设。改为库内共享计数后，
+ * 无论几个实例，全局限额一致。
  *
- * <p>两个维度同时限：<b>按用户</b>防止单人刷爆，<b>按 IP</b>防止换账号绕过。
- * 只限上传类接口——下载与删除不应被限，否则用户连清理都做不了。
+ * <p><b>为什么不用 Redis</b>：file 服务当前没有 Redis 依赖，为限流引入连接池与
+ * 一整套运维面不划算；MySQL 的原子 UPSERT 足以承担"每分钟每用户几十次"的量级。
+ *
+ * <p>两个维度同时限：按用户防单人刷爆，按 IP 防换账号绕过。
+ * 只作用于上传类接口——下载与删除不限，否则用户连清理都做不了。
  *
  * @author yunanexus
  */
@@ -29,12 +30,11 @@ public class UploadRateLimiter {
     private static final long WINDOW_MILLIS = 60_000L;
 
     private final FileProperties properties;
+    private final UploadRateMapper rateMapper;
 
-    /** key → 当前窗口计数 */
-    private final ConcurrentHashMap<String, Counter> counters = new ConcurrentHashMap<>();
-
-    public UploadRateLimiter(FileProperties properties) {
+    public UploadRateLimiter(FileProperties properties, UploadRateMapper rateMapper) {
         this.properties = properties;
+        this.rateMapper = rateMapper;
     }
 
     /**
@@ -49,41 +49,27 @@ public class UploadRateLimiter {
         if (!limit.isEnabled()) {
             return;
         }
-        tick("u:" + userId, limit.getPerUserPerMinute());
+        long windowStart = (System.currentTimeMillis() / WINDOW_MILLIS) * WINDOW_MILLIS;
+        tick("u:" + userId, windowStart, limit.getPerUserPerMinute());
         if (ip != null && !ip.isBlank()) {
-            tick("ip:" + ip, limit.getPerIpPerMinute());
+            tick("ip:" + ip, windowStart, limit.getPerIpPerMinute());
+        }
+        // 清理两分钟前的窗口（低频、均摊），避免表无界增长
+        if (System.nanoTime() % 100 == 0) {
+            rateMapper.purgeBefore(windowStart - 2 * WINDOW_MILLIS);
         }
     }
 
-    private void tick(String key, int maxPerMinute) {
+    private void tick(String key, long windowStart, int maxPerMinute) {
         if (maxPerMinute <= 0) {
             return;
         }
-        long now = System.currentTimeMillis();
-        Counter counter = counters.compute(key, (k, current) -> {
-            if (current == null || now - current.windowStart >= WINDOW_MILLIS) {
-                return new Counter(now);
-            }
-            return current;
-        });
-        int used = counter.count.incrementAndGet();
+        rateMapper.increment(key, windowStart);
+        Integer hits = rateMapper.selectHits(key, windowStart);
+        int used = hits == null ? 1 : hits;
         if (used > maxPerMinute) {
             throw new BizException(ErrorCode.FILE_UPLOAD_RATE_LIMITED,
                     "上传过于频繁：" + used + " 次/分钟，上限 " + maxPerMinute + " 次/分钟");
-        }
-        // 顺手清理过期窗口，避免 map 无界增长（低频、均摊）
-        if (counters.size() > 10_000) {
-            counters.entrySet().removeIf(entry -> now - entry.getValue().windowStart >= WINDOW_MILLIS);
-        }
-    }
-
-    /** 单 key 的固定窗口计数 */
-    private static final class Counter {
-        private final long windowStart;
-        private final AtomicInteger count = new AtomicInteger();
-
-        private Counter(long windowStart) {
-            this.windowStart = windowStart;
         }
     }
 }

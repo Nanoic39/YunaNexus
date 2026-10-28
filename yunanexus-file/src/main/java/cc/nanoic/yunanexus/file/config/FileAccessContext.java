@@ -24,6 +24,9 @@ public final class FileAccessContext {
     /** 网关注入的客户端标识请求头 */
     public static final String CLIENT_HEADER = "X-Client-Code";
 
+    /** 网关注入的角色列表（逗号分隔） */
+    public static final String ROLES_HEADER = "X-User-Roles";
+
     private FileAccessContext() {
     }
 
@@ -47,6 +50,31 @@ public final class FileAccessContext {
      */
     public static boolean isOfficial() {
         return currentAppId() == null;
+    }
+
+    /**
+     * 取当前用户角色列表（网关按权限字段注入）。
+     *
+     * @return 角色代码列表；无法判定时返回空列表
+     */
+    public static java.util.List<String> currentRoles() {
+        ServletRequestAttributes attrs =
+                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attrs == null) {
+            return java.util.List.of();
+        }
+        String raw = attrs.getRequest().getHeader(ROLES_HEADER);
+        if (raw == null || raw.isBlank()) {
+            return java.util.List.of();
+        }
+        java.util.List<String> roles = new java.util.ArrayList<>();
+        for (String part : raw.split(",")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                roles.add(trimmed);
+            }
+        }
+        return roles;
     }
 
     private static String currentHeader() {

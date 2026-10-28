@@ -39,6 +39,17 @@ public class FileProperties {
 
     private Thumbnail thumbnail = new Thumbnail();
 
+    /** 角色配额规则（按权限字段下发） */
+    @Data
+    public static class RoleLimit {
+        /** 角色代码，如 ROLE_VIP */
+        private String role;
+        /** 该角色的容量上限（0 表示不覆盖） */
+        private long limitBytes;
+        /** 该角色的文件数上限（0 表示不覆盖） */
+        private long limitFiles;
+    }
+
     /** 版本保留策略 */
     @Data
     public static class Version {
@@ -55,6 +66,8 @@ public class FileProperties {
         private int defaultSize = 256;
         /** 允许的最大边长，防超大请求打爆 CPU/内存 */
         private int maxSize = 1024;
+        /** ffmpeg 可执行文件路径（视频抽帧用；未安装则视频缩略图不可用） */
+        private String ffmpegPath = "ffmpeg";
     }
 
     /** 回收站 */
@@ -107,6 +120,8 @@ public class FileProperties {
         private long defaultLimitFiles = 50L;
         /** 是否启用对账（关闭则配额纯靠增减维护，不推荐） */
         private boolean reconcileEnabled = true;
+        /** 角色配额规则：多角色取最高 */
+        private RoleLimit[] roleLimits = new RoleLimit[0];
     }
 
     /** 分片参数 */

@@ -47,8 +47,9 @@ public class FileQuotaService {
      */
     public void ensure(long userId, long incomingSize) {
         FileQuota quota = load(userId);
-        long limitBytes = resolve(quota.getLimitBytes(), properties.getQuota().getDefaultLimitBytes());
-        long limitFiles = resolve(quota.getLimitFiles(), properties.getQuota().getDefaultLimitFiles());
+        // 优先级：用户行显式覆盖 > 角色配额（取角色中最高者）> 全局默认
+        long limitBytes = resolve(quota.getLimitBytes(), resolveRoleLimit(userId, true));
+        long limitFiles = resolve(quota.getLimitFiles(), resolveRoleLimit(userId, false));
         if (quota.getUsedBytes() + incomingSize > limitBytes) {
             throw new BizException(ErrorCode.FILE_QUOTA_EXCEEDED,
                     "容量不足：已用 " + human(quota.getUsedBytes()) + "，本次需要 " + human(incomingSize)
@@ -144,6 +145,41 @@ public class FileQuotaService {
         } finally {
             ShardContextHolder.clear();
         }
+    }
+
+    /**
+     * 按角色解析配额上限。
+     *
+     * <p>角色来自网关注入的 {@code X-User-Roles}（权限字段）。用户可能有多个角色，
+     * 取其中**最高**的配额——按"最小权限"给配额会让多角色用户反而受限，不符合直觉。
+     *
+     * @param userId 用户 ID
+     * @param bytes  true 取容量上限，false 取文件数上限
+     * @return 解析到的上限；无角色配额配置时返回全局默认
+     */
+    private long resolveRoleLimit(long userId, boolean bytes) {
+        long fallback = bytes
+                ? properties.getQuota().getDefaultLimitBytes()
+                : properties.getQuota().getDefaultLimitFiles();
+        FileProperties.RoleLimit[] table = properties.getQuota().getRoleLimits();
+        if (table == null || table.length == 0) {
+            return fallback;
+        }
+        java.util.List<String> roles = cc.nanoic.yunanexus.file.config.FileAccessContext.currentRoles();
+        if (roles.isEmpty()) {
+            return fallback;
+        }
+        long best = 0L;
+        for (FileProperties.RoleLimit rule : table) {
+            if (rule.getRole() == null || !roles.contains(rule.getRole())) {
+                continue;
+            }
+            long candidate = bytes ? rule.getLimitBytes() : rule.getLimitFiles();
+            if (candidate > 0) {
+                best = Math.max(best, candidate);
+            }
+        }
+        return best > 0 ? best : fallback;
     }
 
     /** 0 表示"未单独设置"，回落到全局默认 */

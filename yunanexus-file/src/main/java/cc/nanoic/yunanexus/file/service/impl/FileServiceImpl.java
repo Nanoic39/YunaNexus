@@ -445,6 +445,13 @@ public class FileServiceImpl implements FileService {
         }
     }
 
+    /** 缩略图缓存路径：与原文件同级目录下的 .thumb 目录，文件名含尺寸，避免不同尺寸互相覆盖 */
+    private java.nio.file.Path thumbnailCacheFile(FileMeta meta, int edge) {
+        String baseDir = properties.getStorage().getBaseDir();
+        return java.nio.file.Path.of(baseDir, ".thumb",
+                meta.getFileId() + "_" + edge + ".jpg");
+    }
+
     @Override
     @ShardRoute
     public byte[] thumbnail(long fileId, long userId, int size) {
@@ -453,10 +460,34 @@ public class FileServiceImpl implements FileService {
             throw new BizException(ErrorCode.BAD_REQUEST, "缩略图未启用");
         }
         String contentType = meta.getContentType() == null ? "" : meta.getContentType();
-        if (!contentType.startsWith("image/")) {
-            throw new BizException(ErrorCode.BAD_REQUEST, "仅图片支持缩略图");
+        boolean image = contentType.startsWith("image/");
+        boolean video = contentType.startsWith("video/");
+        if (!image && !video) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "仅图片与视频支持缩略图");
+        }
+        int edgeLimit = Math.min(Math.max(32, size), properties.getThumbnail().getMaxSize());
+        java.nio.file.Path cachedVideo = thumbnailCacheFile(meta, edgeLimit);
+        if (!image) {
+            // 视频：需要 ffmpeg 抽帧；未安装时明确报错而不是返回空白图
+            if (java.nio.file.Files.isReadable(cachedVideo)) {
+                try {
+                    return java.nio.file.Files.readAllBytes(cachedVideo);
+                } catch (java.io.IOException ignored) {
+                    // 继续尝试重新生成
+                }
+            }
+            return extractVideoFrame(meta, edgeLimit, cachedVideo);
         }
         int edge = Math.min(Math.max(32, size), properties.getThumbnail().getMaxSize());
+        // 命中缓存直接返回：缩放是 CPU 密集型，热门图片不能反复重算
+        java.nio.file.Path cached = thumbnailCacheFile(meta, edge);
+        if (java.nio.file.Files.isReadable(cached)) {
+            try {
+                return java.nio.file.Files.readAllBytes(cached);
+            } catch (java.io.IOException ignored) {
+                // 缓存损坏则回退到重新生成
+            }
+        }
         try (java.io.InputStream in = fileStorage.open(meta.getStoragePath())) {
             java.awt.image.BufferedImage source = javax.imageio.ImageIO.read(in);
             if (source == null) {
@@ -479,9 +510,72 @@ public class FileServiceImpl implements FileService {
             }
             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
             javax.imageio.ImageIO.write(scaled, "jpg", out);
-            return out.toByteArray();
+            byte[] bytes = out.toByteArray();
+            writeThumbnailCache(cached, bytes);
+            return bytes;
         } catch (java.io.IOException error) {
             throw new BizException(ErrorCode.FILE_UPLOAD_FAILED, "缩略图生成失败: " + error.getMessage());
+        }
+    }
+
+    /** 写缓存，失败不影响返回 */
+    private void writeThumbnailCache(java.nio.file.Path target, byte[] bytes) {
+        try {
+            java.nio.file.Files.createDirectories(target.getParent());
+            java.nio.file.Files.write(target, bytes);
+        } catch (java.io.IOException error) {
+            log.debug("缩略图缓存写入失败 {}", error.getMessage());
+        }
+    }
+
+    /**
+     * 抽视频首帧（依赖 ffmpeg）。
+     *
+     * <p>没有 ffmpeg 时明确报错，而不是返回空白图——静默返回占位图会让前端以为
+     * 视频就是这样，问题永远不会被发现。安装路径可配 {@code thumbnail.ffmpeg-path}。
+     */
+    private byte[] extractVideoFrame(FileMeta meta, int edge, java.nio.file.Path cached) {
+        String ffmpeg = properties.getThumbnail().getFfmpegPath();
+        if (ffmpeg == null || ffmpeg.isBlank() || !java.nio.file.Files.isExecutable(
+                java.nio.file.Path.of(ffmpeg))) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "服务端未安装 ffmpeg，暂不支持视频缩略图");
+        }
+        java.nio.file.Path source = java.nio.file.Path.of(properties.getStorage().getBaseDir(),
+                meta.getStoragePath());
+        if (!java.nio.file.Files.isReadable(source)) {
+            throw new BizException(ErrorCode.FILE_NOT_FOUND, "视频源文件不可读");
+        }
+        java.nio.file.Path tmp;
+        try {
+            tmp = java.nio.file.Files.createTempFile("thumb-", ".jpg");
+        } catch (java.io.IOException error) {
+            throw new BizException(ErrorCode.FILE_UPLOAD_FAILED, "创建临时文件失败");
+        }
+        try {
+            Process process = new ProcessBuilder(ffmpeg, "-y", "-ss", "0", "-i", source.toString(),
+                    "-frames:v", "1", "-vf", "scale=" + edge + ":-1", tmp.toString())
+                    .redirectErrorStream(true).start();
+            if (!process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new BizException(ErrorCode.FILE_UPLOAD_FAILED, "视频抽帧超时");
+            }
+            if (process.exitValue() != 0 || !java.nio.file.Files.isReadable(tmp)) {
+                throw new BizException(ErrorCode.FILE_UPLOAD_FAILED, "视频抽帧失败");
+            }
+            byte[] bytes = java.nio.file.Files.readAllBytes(tmp);
+            writeThumbnailCache(cached, bytes);
+            return bytes;
+        } catch (java.io.IOException error) {
+            throw new BizException(ErrorCode.FILE_UPLOAD_FAILED, "视频抽帧失败: " + error.getMessage());
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new BizException(ErrorCode.FILE_UPLOAD_FAILED, "视频抽帧被中断");
+        } finally {
+            try {
+                java.nio.file.Files.deleteIfExists(tmp);
+            } catch (java.io.IOException ignored) {
+                // 临时文件清理失败不影响主流程
+            }
         }
     }
 
