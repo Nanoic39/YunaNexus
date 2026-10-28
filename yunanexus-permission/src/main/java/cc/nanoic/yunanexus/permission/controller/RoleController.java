@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.permission.controller;
 
+import cc.nanoic.yunanexus.common.audit.annotation.AuditAction;
 import cc.nanoic.yunanexus.common.core.model.Result;
 import cc.nanoic.yunanexus.permission.domain.RoleSaveRequest;
 import cc.nanoic.yunanexus.permission.entity.PermRole;
@@ -53,12 +54,14 @@ public class RoleController {
         return Result.success(roleService.create(request));
     }
 
+    @AuditAction(module = "permission", action = "UPDATE_ROLE", risk = "CRITICAL")
     @PostMapping("/{id}")
     public Result<PermRole> update(
             @PathVariable("id") long id, @Valid @RequestBody RoleSaveRequest request) {
         return Result.success(roleService.update(id, request));
     }
 
+    @AuditAction(module = "permission", action = "DELETE_ROLE", risk = "CRITICAL")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable("id") long id) {
         roleService.delete(id);

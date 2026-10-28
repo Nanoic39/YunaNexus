@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.user.controller;
 
+import cc.nanoic.yunanexus.common.audit.annotation.AuditAction;
 import cc.nanoic.yunanexus.common.core.model.Result;
 import cc.nanoic.yunanexus.user.domain.CreateUserProfileRequest;
 import cc.nanoic.yunanexus.user.domain.UpdateUserProfileRequest;
@@ -34,6 +35,7 @@ public class InternalUserController {
     @Resource
     private UserBadgeService userBadgeService;
 
+    @AuditAction(module = "user", action = "CREATE_USER", risk = "HIGH")
     @PostMapping("/create")
     public Result<Integer> create(@Valid @RequestBody CreateUserProfileRequest request) {
         return Result.success(userProfileService.createUserProfile(request.getUserId(), request));
@@ -44,6 +46,7 @@ public class InternalUserController {
         return Result.success(userProfileService.getByUserId(userId));
     }
 
+    @AuditAction(module = "user", action = "UPDATE_USER", risk = "HIGH")
     @PostMapping("/update")
     public Result<Void> update(@Valid @RequestBody UpdateUserProfileRequest request) {
         userProfileService.updateProfile(request.getUserId(), request);

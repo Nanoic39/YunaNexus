@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.permission.controller;
 
+import cc.nanoic.yunanexus.common.audit.annotation.AuditAction;
 import cc.nanoic.yunanexus.common.core.model.Result;
 import cc.nanoic.yunanexus.permission.domain.DeptIdsRequest;
 import cc.nanoic.yunanexus.permission.domain.MenuIdsRequest;
@@ -39,6 +40,7 @@ public class BindingController {
         return Result.success(bindingService.listRoleIdsByUserId(userId));
     }
 
+    @AuditAction(module = "permission", action = "ASSIGN_ROLE", risk = "CRITICAL")
     @PostMapping("/users/{userId}/roles")
     public Result<Void> setUserRoles(@PathVariable("userId") long userId,
                                      @Valid @RequestBody RoleIdsRequest request) {
@@ -51,6 +53,7 @@ public class BindingController {
         return Result.success(bindingService.listPermissionIdsByRoleId(roleId));
     }
 
+    @AuditAction(module = "permission", action = "ASSIGN_PERMISSION", risk = "CRITICAL")
     @PostMapping("/roles/{roleId}/permissions")
     public Result<Void> setRolePermissions(@PathVariable("roleId") long roleId,
                                            @Valid @RequestBody PermissionIdsRequest request) {
@@ -63,6 +66,7 @@ public class BindingController {
         return Result.success(bindingService.getUserDeptId(userId));
     }
 
+    @AuditAction(module = "permission", action = "ASSIGN_DEPT", risk = "HIGH")
     @PostMapping("/users/{userId}/dept")
     public Result<Void> setUserDept(@PathVariable("userId") long userId,
                                     @Valid @RequestBody UserDeptRequest request) {
@@ -93,6 +97,7 @@ public class BindingController {
         return Result.success(bindingService.listMenuIdsByRoleId(roleId));
     }
 
+    @AuditAction(module = "permission", action = "ASSIGN_ROLE_MENU", risk = "CRITICAL")
     @PostMapping("/roles/{roleId}/menus")
     public Result<Void> setRoleMenus(@PathVariable("roleId") long roleId,
                                      @Valid @RequestBody MenuIdsRequest request) {

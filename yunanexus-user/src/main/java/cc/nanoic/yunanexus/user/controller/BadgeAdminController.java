@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.user.controller;
 
+import cc.nanoic.yunanexus.common.audit.annotation.AuditAction;
 import cc.nanoic.yunanexus.common.core.model.Result;
 import cc.nanoic.yunanexus.user.service.BadgeCatalogService;
 
@@ -39,6 +40,7 @@ public class BadgeAdminController {
 
     public record Grant(List<Long> userIds) {}
 
+    @AuditAction(module = "user", action = "GRANT_BADGE", risk = "HIGH")
     @PostMapping("/{id}/grant")
     public Result<?> grant(@PathVariable("id") long id, @RequestBody Grant b) {
         badges.grant(id, b.userIds());

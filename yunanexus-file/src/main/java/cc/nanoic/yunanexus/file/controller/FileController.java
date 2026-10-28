@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.file.controller;
 
+import cc.nanoic.yunanexus.common.audit.annotation.AuditAction;
 import cc.nanoic.yunanexus.common.core.model.PageResult;
 import cc.nanoic.yunanexus.common.core.model.Result;
 import cc.nanoic.yunanexus.common.web.constant.ErrorCode;
@@ -63,6 +64,7 @@ public class FileController {
      * @param publicAccess 是否同时发布为可匿名访问的公开文件
      * @return 文件元数据（含全局文件 ID）
      */
+    @AuditAction(module = "file", action = "UPLOAD", risk = "HIGH")
     @PostMapping("/upload")
     public Result<FileView> upload(@RequestParam("file") MultipartFile file,
                                    @RequestParam(value = "publicAccess", defaultValue = "false") boolean publicAccess,
@@ -173,6 +175,7 @@ public class FileController {
     /**
      * 删除文件（逻辑删除元数据 + 引用计数归零后物理删除内容）。
      */
+    @AuditAction(module = "file", action = "DELETE", risk = "HIGH")
     @PostMapping("/delete/{fileId}")
     public Result<Void> delete(@PathVariable("fileId") long fileId,
                                @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
