@@ -79,6 +79,9 @@ public interface FileService {
      */
     void abortChunkUpload(String uploadId);
 
+    /** 回写恶意文件扫描结果（A5） */
+    void reportScanResult(long fileId, String status);
+
     /**
      * 清理过期的分片上传会话（临时分片 + 会话元数据），由定时任务周期调用。
      *

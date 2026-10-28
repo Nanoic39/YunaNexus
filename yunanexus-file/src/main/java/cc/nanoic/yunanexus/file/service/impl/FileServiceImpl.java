@@ -323,6 +323,40 @@ public class FileServiceImpl implements FileService {
         }
     }
 
+    /**
+     * 回写扫描结果（A5）。
+     *
+     * @param fileId 文件 ID
+     * @param status clean / infected
+     */
+    @Override
+    public void reportScanResult(long fileId, String status) {
+        if (!"clean".equals(status) && !"infected".equals(status)) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "非法扫描状态: " + status);
+        }
+        int shardIndex = shardRouter.route(fileId);
+        ShardContextHolder.set(shardIndex);
+        try {
+            FileMeta meta = fileMetaMapper.selectByFileId(fileId);
+            if (meta == null) {
+                throw new BizException(ErrorCode.FILE_NOT_FOUND);
+            }
+            meta.setScanStatus(status);
+            if ("infected".equals(status)) {
+                // 检出即隔离：逻辑删除并释放配额，避免恶意文件继续被下载
+                meta.setStatus(FileMeta.STATUS_DELETED);
+                Long owner = meta.getCreateBy();
+                if (owner != null) {
+                    quotaService.removeUsage(owner, meta.getSize() == null ? 0L : meta.getSize());
+                }
+            }
+            fileMetaMapper.updateById(meta);
+            log.warn("扫描结果回写 fileId={} status={}", fileId, status);
+        } finally {
+            ShardContextHolder.clear();
+        }
+    }
+
     @Override
     public void abortChunkUpload(String uploadId) {
         loadSession(uploadId);
@@ -531,6 +565,9 @@ public class FileServiceImpl implements FileService {
     private FileMeta buildMeta(long fileId, int shardIndex, String fileName, String ext, String contentType,
                                long size, String storagePath, String sha256, long userId, Long deptId) {
         FileMeta meta = new FileMeta();
+        // A5：新上传一律先标 pending。扫描服务不可用时也保持 pending（fail-open 但可追溯），
+        // 恢复后由补扫任务回写 clean/infected。
+        meta.setScanStatus("pending");
         meta.setFileId(fileId);
         meta.setShardIndex(shardIndex);
         meta.setFileName(fileName);

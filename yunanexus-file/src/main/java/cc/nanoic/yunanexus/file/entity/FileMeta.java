@@ -68,5 +68,8 @@ public class FileMeta {
 
     private LocalDateTime createTime;
 
+    /** 扫描状态：pending 待扫 / clean 通过 / infected 检出 */
+    private String scanStatus;
+
     private LocalDateTime updateTime;
 }

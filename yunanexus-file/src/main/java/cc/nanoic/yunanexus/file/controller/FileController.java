@@ -242,6 +242,19 @@ public class FileController {
         }
     }
 
+    /**
+     * 扫描服务回写结果（内部接口）：clean 标记通过，infected 直接隔离。
+     *
+     * @param fileId 文件 ID
+     * @param status clean / infected
+     */
+    @PostMapping("/internal/scan-result")
+    public Result<Void> reportScanResult(@RequestParam("fileId") long fileId,
+                                         @RequestParam("status") String status) {
+        fileService.reportScanResult(fileId, status);
+        return Result.success();
+    }
+
     /** 取客户端 IP：优先代理头，取第一个非空段 */
     private String clientIp() {
         org.springframework.web.context.request.ServletRequestAttributes attrs =
