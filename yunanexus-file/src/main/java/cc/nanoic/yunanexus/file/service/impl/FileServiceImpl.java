@@ -192,6 +192,10 @@ public class FileServiceImpl implements FileService {
                 }
             }));
         }
+        // 多应用隔离：在汇总后就地过滤，再计算 total。
+        // 该接口本来就是"逐库全量读 + 内存分页"，因此过滤发生在分页之前，
+        // 不会出现总数与页内容不一致的问题（这与在 SQL 侧分页的接口不同）。
+        views = scopeForApp(views);
         long total = views.size();
         if (total == 0) {
             return PageResult.empty(p, s);
@@ -200,6 +204,32 @@ public class FileServiceImpl implements FileService {
         int from = Math.min((p - 1) * s, views.size());
         int to = Math.min(from + s, views.size());
         return PageResult.of(new ArrayList<>(views.subList(from, to)), total, p, s);
+    }
+
+    /**
+     * 按调用方应用过滤列表结果。
+     *
+     * <p>官方前端（appId 为空）返回全部；三方应用只保留"本应用下的文件"与
+     * "系统内公开文件（头像等，只读可见）"。
+     *
+     * @param views 原始列表
+     * @return 过滤后的列表
+     */
+    private List<FileView> scopeForApp(List<FileView> views) {
+        String appId = cc.nanoic.yunanexus.file.config.FileAccessContext.currentAppId();
+        if (appId == null) {
+            return views;
+        }
+        List<FileView> scoped = new ArrayList<>(views.size());
+        for (FileView view : views) {
+            boolean sameApp = appId.equals(view.getAppId());
+            boolean internal = cc.nanoic.yunanexus.file.service.FileAccessService.VISIBILITY_INTERNAL
+                    .equals(view.getVisibility());
+            if (sameApp || internal) {
+                scoped.add(view);
+            }
+        }
+        return scoped;
     }
 
     // ---------- 分片上传 ----------
