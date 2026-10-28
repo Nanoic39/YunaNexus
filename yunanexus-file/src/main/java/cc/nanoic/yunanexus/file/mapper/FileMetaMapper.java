@@ -58,6 +58,15 @@ public interface FileMetaMapper extends BaseMapper<FileMeta> {
     int decrementRefCount(@Param("fileId") long fileId);
 
     /**
+     * 引用计数加一（秒传复用、回收站恢复时调用）。
+     *
+     * @param fileId 文件 ID
+     * @return 影响行数
+     */
+    @Update("UPDATE file_meta SET ref_count = ref_count + 1 WHERE file_id = #{fileId}")
+    int incrementRefCount(@Param("fileId") long fileId);
+
+    /**
      * 读取剩余引用数。
      *
      * @param fileId 文件 ID

@@ -289,6 +289,16 @@ public class FileController {
         return Result.success(fileService.uploadSystemAsset(file, owner));
     }
 
+    /**
+     * 从回收站恢复文件。
+     */
+    @PostMapping("/restore/{fileId}")
+    public Result<cc.nanoic.yunanexus.file.domain.FileView> restore(
+            @PathVariable("fileId") long fileId,
+            @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        return Result.success(fileService.restoreTrashed(fileId, requireUserId(userId)));
+    }
+
     /** 取客户端 IP：优先代理头，取第一个非空段 */
     private String clientIp() {
         org.springframework.web.context.request.ServletRequestAttributes attrs =

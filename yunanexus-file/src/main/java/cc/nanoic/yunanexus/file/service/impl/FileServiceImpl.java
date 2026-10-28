@@ -253,10 +253,20 @@ public class FileServiceImpl implements FileService {
         // 秒传：客户端提供内容指纹且命中已有文件时，直接复用存储、落一条新元数据
         if (request.getSha256() != null && !request.getSha256().isBlank() && request.getTotalSize() > 0) {
             FileMeta existing = findBySha256AcrossShards(request.getSha256(), request.getTotalSize());
+            // 只在本人文件间复用：若允许按 sha256 命中他人内容，等于给了一个
+            // "知道指纹就能取到别人文件"的旁路（内容预言机），这是安全属性不是性能优化
             if (existing != null && Long.valueOf(userId).equals(existing.getCreateBy())) {
                 FileMeta meta = buildMeta(fileId, shardIndex, fileName, ext, request.getContentType(),
                         existing.getSize(), existing.getStoragePath(), existing.getSha256(), userId, deptId);
                 FileMeta persisted = persistMeta(meta);
+                Integer reuseShard = existing.getShardIndex() != null
+                        ? existing.getShardIndex() : shardIndex;
+                ShardContextHolder.set(reuseShard);
+                try {
+                    fileMetaMapper.incrementRefCount(existing.getFileId());
+                } finally {
+                    ShardContextHolder.clear();
+                }
                 log.info("秒传命中 fileId={} sha256={} user={}", fileId, request.getSha256(), userId);
                 return new ChunkInitResult(null, true, List.of(), FileView.from(persisted));
             }
@@ -367,6 +377,26 @@ public class FileServiceImpl implements FileService {
      * @param fileId 文件 ID
      * @param status clean / infected
      */
+    @Override
+    @ShardRoute
+    public FileView restoreTrashed(long fileId, long userId) {
+        FileMeta meta = fileMetaMapper.selectByFileId(fileId);
+        if (meta == null) {
+            throw new BizException(ErrorCode.FILE_NOT_FOUND);
+        }
+        if (!Integer.valueOf(FileMeta.STATUS_TRASHED).equals(meta.getStatus())) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "文件不在回收站中");
+        }
+        accessService.checkWrite(meta, userId);
+        meta.setStatus(FileMeta.STATUS_NORMAL);
+        meta.setDeletedAt(null);
+        fileMetaMapper.updateById(meta);
+        // 恢复不改变配额：回收站期间本就没释放过，这里只需把引用计数补回来
+        fileMetaMapper.incrementRefCount(fileId);
+        log.info("文件从回收站恢复 fileId={} user={}", fileId, userId);
+        return FileView.from(meta);
+    }
+
     @Override
     public FileView uploadSystemAsset(MultipartFile file, long userId) {
         validate(file);

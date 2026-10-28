@@ -101,6 +101,15 @@ public interface FileService {
     cc.nanoic.yunanexus.file.domain.FileView uploadSystemAsset(
             org.springframework.web.multipart.MultipartFile file, long userId);
 
+    /**
+     * 从回收站恢复文件。
+     *
+     * @param fileId 文件 ID
+     * @param userId 当前用户
+     * @return 文件视图
+     */
+    cc.nanoic.yunanexus.file.domain.FileView restoreTrashed(long fileId, long userId);
+
     /** 回写恶意文件扫描结果（A5） */
     void reportScanResult(long fileId, String status);
 
