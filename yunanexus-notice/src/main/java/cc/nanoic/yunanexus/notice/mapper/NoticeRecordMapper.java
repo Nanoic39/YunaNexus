@@ -18,6 +18,19 @@ import java.util.List;
 public interface NoticeRecordMapper extends BaseMapper<NoticeRecord> {
 
     /**
+     * 取到期待重试的记录。
+     *
+     * @param now   当前时间
+     * @param limit 最多取多少条
+     * @return 待重试记录
+     */
+    @Select("SELECT * FROM notice_record WHERE status = 0 AND dead_letter = 0 "
+            + "AND next_retry_time IS NOT NULL AND next_retry_time <= #{now} "
+            + "ORDER BY next_retry_time ASC LIMIT #{limit}")
+    java.util.List<NoticeRecord> selectRetryCandidates(@Param("now") java.time.LocalDateTime now,
+                                                       @Param("limit") int limit);
+
+    /**
      * 按全局通知 ID 查询记录。
      *
      * @param noticeId 全局通知 ID

@@ -58,6 +58,15 @@ public class NoticeRecord {
     /** 重试次数 */
     private Integer retryCount;
 
+    /** 最近一次失败原因 */
+    private String failReason;
+
+    /** 下次重试时间（指数退避） */
+    private LocalDateTime nextRetryTime;
+
+    /** 是否已进入死信，不再重试 */
+    private Boolean deadLetter;
+
     /** 发送成功时间 */
     private LocalDateTime sendTime;
 

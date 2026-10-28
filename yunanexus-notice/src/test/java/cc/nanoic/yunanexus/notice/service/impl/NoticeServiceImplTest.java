@@ -246,8 +246,12 @@ class NoticeServiceImplTest {
 
         service.dispatch(5L);
 
-        assertEquals(NoticeRecord.STATUS_FAILED, record.getStatus());
+        // 状态机：首次失败不直接判死，而是安排退避重试（maxAttempts 默认 5）
+        assertEquals(NoticeRecord.STATUS_PENDING, record.getStatus());
         assertEquals(1, record.getRetryCount());
+        org.junit.jupiter.api.Assertions.assertNotNull(record.getNextRetryTime(), "应安排下次重试时间");
+        org.junit.jupiter.api.Assertions.assertFalse(Boolean.TRUE.equals(record.getDeadLetter()),
+                "首次失败不应进入死信");
         assertEquals(500, record.getErrorMsg().length(), "失败原因应截断至列宽上限");
         verify(recordMapper).updateById(record);
     }

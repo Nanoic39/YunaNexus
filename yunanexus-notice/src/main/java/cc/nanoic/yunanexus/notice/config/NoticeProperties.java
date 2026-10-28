@@ -26,6 +26,23 @@ public class NoticeProperties {
     /** 邮件配置 */
     private Mail mail = new Mail();
 
+    private Retry retry = new Retry();
+
+    /**
+     * 投递重试策略。
+     */
+    @Data
+    public static class Retry {
+        /** 最大尝试次数（含首次） */
+        private int maxAttempts = 5;
+        /** 退避基数（秒） */
+        private int baseBackoffSeconds = 60;
+        /** 退避上限（秒） */
+        private int backoffCapSeconds = 3600;
+        /** 每轮最多处理条数 */
+        private int batchSize = 50;
+    }
+
     @Data
     public static class Rocketmq {
 

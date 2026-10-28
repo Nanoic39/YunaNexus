@@ -181,30 +181,64 @@ public class NoticeServiceImpl implements NoticeService {
             log.warn("通知记录不存在，忽略投递 recordId={}", recordId);
             return;
         }
+        if (Boolean.TRUE.equals(record.getDeadLetter())) {
+            log.info("通知已进入死信，跳过投递 recordId={}", recordId);
+            return;
+        }
         try {
             NoticeSender sender = senderRegistry.get(NoticeChannel.of(record.getChannel()));
             sender.send(record);
             record.setStatus(NoticeRecord.STATUS_SENT);
             record.setSendTime(LocalDateTime.now(java.time.ZoneOffset.UTC));
             record.setErrorMsg(null);
+            record.setFailReason(null);
+            record.setNextRetryTime(null);
             recordMapper.updateById(record);
-            log.info(
-                    "通知投递成功 noticeId={} channel={} receiver={}",
-                    record.getNoticeId(),
-                    record.getChannel(),
-                    record.getReceiver());
+            log.info("通知投递成功 noticeId={} channel={} receiver={}", record.getNoticeId(),
+                    record.getChannel(), record.getReceiver());
         } catch (RuntimeException e) {
-            record.setStatus(NoticeRecord.STATUS_FAILED);
+            int attempts = record.getRetryCount() == null ? 1 : record.getRetryCount() + 1;
+            record.setRetryCount(attempts);
             record.setErrorMsg(truncate(e.getMessage()));
-            record.setRetryCount(record.getRetryCount() == null ? 1 : record.getRetryCount() + 1);
+            record.setFailReason(truncate(e.getMessage()));
+            int maxAttempts = properties.getRetry().getMaxAttempts();
+            if (attempts >= maxAttempts) {
+                // 重试耗尽 → 死信：保留痕迹、不再重试，由死信汇总告警兜底
+                record.setStatus(NoticeRecord.STATUS_FAILED);
+                record.setDeadLetter(true);
+                record.setNextRetryTime(null);
+                recordMapper.updateById(record);
+                log.error("通知进入死信 noticeId={} channel={} receiver={} attempts={} reason={}",
+                        record.getNoticeId(), record.getChannel(), record.getReceiver(), attempts,
+                        e.getMessage());
+                return;
+            }
+            // 指数退避：1min、2min、4min……上限 backoffCapSeconds
+            long delaySeconds = Math.min(
+                    properties.getRetry().getBackoffCapSeconds(),
+                    (long) properties.getRetry().getBaseBackoffSeconds() * (1L << (attempts - 1)));
+            record.setStatus(NoticeRecord.STATUS_PENDING);
+            record.setNextRetryTime(LocalDateTime.now(java.time.ZoneOffset.UTC).plusSeconds(delaySeconds));
             recordMapper.updateById(record);
-            log.error(
-                    "通知投递失败 noticeId={} channel={} receiver={}: {}",
-                    record.getNoticeId(),
-                    record.getChannel(),
-                    record.getReceiver(),
-                    e.getMessage());
+            log.warn("通知投递失败，{} 秒后重试 noticeId={} attempt={} reason={}",
+                    delaySeconds, record.getNoticeId(), attempts, e.getMessage());
         }
+    }
+
+    @Override
+    public int retryDue() {
+        List<NoticeRecord> candidates = recordMapper.selectRetryCandidates(
+                LocalDateTime.now(java.time.ZoneOffset.UTC), properties.getRetry().getBatchSize());
+        int handled = 0;
+        for (NoticeRecord record : candidates) {
+            try {
+                dispatch(record.getId());
+                handled++;
+            } catch (RuntimeException error) {
+                log.warn("重试调度异常 recordId={}: {}", record.getId(), error.toString());
+            }
+        }
+        return handled;
     }
 
     @Override

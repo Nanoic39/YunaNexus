@@ -32,6 +32,13 @@ public interface NoticeService {
     void dispatch(long recordId);
 
     /**
+     * 扫描到期重试的通知并重新投递（由调度任务触发）。
+     *
+     * @return 处理条数
+     */
+    int retryDue();
+
+    /**
      * 分页查询站内信收件箱（已发送 / 已读）。
      *
      * @param receiver 接收方（用户 ID 字符串）
