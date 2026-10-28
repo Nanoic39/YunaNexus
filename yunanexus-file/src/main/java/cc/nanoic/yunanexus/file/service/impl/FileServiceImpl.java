@@ -17,6 +17,7 @@ import cc.nanoic.yunanexus.file.domain.FileRange;
 import cc.nanoic.yunanexus.file.domain.FileView;
 import cc.nanoic.yunanexus.file.domain.UploadSession;
 import cc.nanoic.yunanexus.file.entity.FileMeta;
+import cc.nanoic.yunanexus.file.service.FileQuotaService;
 import cc.nanoic.yunanexus.file.mapper.FileMetaMapper;
 import cc.nanoic.yunanexus.file.service.FileService;
 import cc.nanoic.yunanexus.file.shard.ShardRoute;
@@ -70,6 +71,7 @@ public class FileServiceImpl implements FileService {
     private final MetaIdClient metaIdClient;
     private final PermissionClient permissionClient;
     private final ObjectMapper objectMapper;
+    private final FileQuotaService quotaService;
 
     public FileServiceImpl(FileMetaMapper fileMetaMapper,
                            FileStorage fileStorage,
@@ -77,7 +79,8 @@ public class FileServiceImpl implements FileService {
                            ShardRouter shardRouter,
                            MetaIdClient metaIdClient,
                            PermissionClient permissionClient,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper,
+                           FileQuotaService quotaService) {
         this.fileMetaMapper = fileMetaMapper;
         this.fileStorage = fileStorage;
         this.properties = properties;
@@ -85,11 +88,14 @@ public class FileServiceImpl implements FileService {
         this.metaIdClient = metaIdClient;
         this.permissionClient = permissionClient;
         this.objectMapper = objectMapper;
+        this.quotaService = quotaService;
     }
 
     @Override
     public FileView upload(MultipartFile file, long userId) {
         validate(file);
+        // 配额在进入存储前校验：宁可让用户在上传前被拒，也不要白传几 G 再失败
+        quotaService.ensure(userId, file.getSize());
         String originalName = normalize(file.getOriginalFilename());
         if (originalName.isEmpty()) {
             originalName = "unnamed";
@@ -105,6 +111,7 @@ public class FileServiceImpl implements FileService {
         } catch (IOException e) {
             throw new BizException(ErrorCode.FILE_UPLOAD_FAILED, "读取上传流失败: " + e.getMessage());
         }
+        quotaService.addUsage(userId, stored.size());
 
         FileMeta meta = buildMeta(fileId, shardIndex, originalName, ext, file.getContentType(),
                 stored.size(), stored.path(), stored.sha256(), userId, deptId);
@@ -189,6 +196,8 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public ChunkInitResult initChunkUpload(ChunkInitRequest request, long userId) {
+        // 分片初始化阶段就校验配额：这是用户决定"要不要传"的最后时机
+        quotaService.ensure(userId, request.getTotalSize());
         String fileName = normalize(request.getFileName());
         String ext = extractExt(fileName);
         validateChunkInit(request, fileName, ext);

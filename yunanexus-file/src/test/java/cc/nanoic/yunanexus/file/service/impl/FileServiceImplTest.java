@@ -18,6 +18,7 @@ import cc.nanoic.yunanexus.file.domain.FileView;
 import cc.nanoic.yunanexus.file.domain.UploadSession;
 import cc.nanoic.yunanexus.file.entity.FileMeta;
 import cc.nanoic.yunanexus.file.mapper.FileMetaMapper;
+import cc.nanoic.yunanexus.file.service.FileQuotaService;
 import cc.nanoic.yunanexus.file.shard.ShardRouter;
 import cc.nanoic.yunanexus.file.storage.FileStorage;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +68,8 @@ class FileServiceImplTest {
     private PermissionClient permissionClient;
     private FileServiceImpl service;
 
+    private FileQuotaService quotaService;
+
     @BeforeEach
     void setUp() {
         fileMetaMapper = mock(FileMetaMapper.class);
@@ -75,8 +78,9 @@ class FileServiceImplTest {
         shardRouter = mock(ShardRouter.class);
         metaIdClient = mock(MetaIdClient.class);
         permissionClient = mock(PermissionClient.class);
+        quotaService = mock(FileQuotaService.class);
         service = new FileServiceImpl(fileMetaMapper, fileStorage, properties,
-                shardRouter, metaIdClient, permissionClient, new ObjectMapper());
+                shardRouter, metaIdClient, permissionClient, new ObjectMapper(), quotaService);
     }
 
     private MockMultipartFile txtFile(String content) {

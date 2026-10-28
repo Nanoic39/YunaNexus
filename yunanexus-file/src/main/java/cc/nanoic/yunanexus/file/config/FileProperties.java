@@ -27,6 +27,17 @@ public class FileProperties {
 
     private Chunk chunk = new Chunk();
 
+    private Quota quota = new Quota();
+
+    /** 存储配额（单用户默认值；file_quota 表可按用户覆盖） */
+    @Data
+    public static class Quota {
+        /** 默认容量上限（20 GiB） */
+        private long defaultLimitBytes = 20L * 1024 * 1024 * 1024;
+        /** 默认文件数上限 */
+        private long defaultLimitFiles = 50_000L;
+    }
+
     /** 分片参数 */
     @Data
     public static class Shard {

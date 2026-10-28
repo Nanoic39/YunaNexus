@@ -99,6 +99,7 @@ public enum ErrorCode {
     // 50005~50099 分片上传
     FILE_CHUNK_UPLOAD_FAILED(50005, "分片上传失败"),
     FILE_CHUNK_MISSING(50006, "分片缺失，无法合并"),
+    FILE_QUOTA_EXCEEDED(50009, "存储配额不足"),
     FILE_UPLOAD_SESSION_NOT_FOUND(50007, "上传会话不存在或已过期"),
     FILE_CHUNK_INDEX_INVALID(50008, "分片下标非法"),
     // 50100~50199 下载/删除
