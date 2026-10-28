@@ -58,15 +58,6 @@ public interface AuditLogMapper extends BaseMapper<AuditLog> {
      * @param endTime   操作时间上界（含），null 表示不限
      * @return 记录数
      */
-    @Select("<script>"
-            + "SELECT COUNT(*) FROM audit_log"
-            + "<where>"
-            + "<if test='userId != null'> AND user_id = #{userId}</if>"
-            + "<if test='service != null and service != \"\"'> AND service = #{service}</if>"
-            + "<if test='startTime != null'> AND create_time &gt;= #{startTime}</if>"
-            + "<if test='endTime != null'> AND create_time &lt;= #{endTime}</if>"
-            + "</where>"
-            + "</script>")
     /**
      * 取该分片当前的链头摘要（最后一条记录的 record_hash）。
      *
@@ -141,6 +132,15 @@ public interface AuditLogMapper extends BaseMapper<AuditLog> {
                                   @Param("limit") int limit,
                                   @Param("offset") int offset);
 
+    @Select("<script>"
+            + "SELECT COUNT(*) FROM audit_log"
+            + "<where>"
+            + "<if test='userId != null'> AND user_id = #{userId}</if>"
+            + "<if test='service != null and service != \"\"'> AND service = #{service}</if>"
+            + "<if test='startTime != null'> AND create_time &gt;= #{startTime}</if>"
+            + "<if test='endTime != null'> AND create_time &lt;= #{endTime}</if>"
+            + "</where>"
+            + "</script>")
     long countByCondition(@Param("userId") Long userId,
                           @Param("service") String service,
                           @Param("startTime") LocalDateTime startTime,
