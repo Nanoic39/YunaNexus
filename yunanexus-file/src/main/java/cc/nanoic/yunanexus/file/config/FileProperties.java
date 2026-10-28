@@ -42,6 +42,14 @@ public class FileProperties {
         private long pendingTimeoutMinutes = 1440;
         /** 每轮最多取多少条 */
         private int batchSize = 200;
+        /** 扫描引擎：clamav / none */
+        private String engine = "clamav";
+        /** clamd 主机（同 compose 网络内为服务名） */
+        private String clamdHost = "clamav";
+        /** clamd 端口 */
+        private int clamdPort = 3310;
+        /** 单次扫描超时（毫秒） */
+        private int timeoutMillis = 10_000;
     }
 
     /** 上传限流（A4）：用户与 IP 双维度，固定 1 分钟窗口 */
