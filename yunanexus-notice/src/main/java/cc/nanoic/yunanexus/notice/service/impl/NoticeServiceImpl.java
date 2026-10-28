@@ -65,6 +65,7 @@ public class NoticeServiceImpl implements NoticeService {
     private final NoticeProperties properties;
     private final ObjectMapper objectMapper;
     private final cc.nanoic.yunanexus.notice.service.NoticePreferenceService preferenceService;
+    private final cc.nanoic.yunanexus.notice.service.NoticeDedupService dedupService;
 
     public NoticeServiceImpl(
             NoticeTemplateMapper templateMapper,
@@ -75,7 +76,8 @@ public class NoticeServiceImpl implements NoticeService {
             NoticeSenderRegistry senderRegistry,
             NoticeProperties properties,
             ObjectMapper objectMapper,
-            cc.nanoic.yunanexus.notice.service.NoticePreferenceService preferenceService) {
+            cc.nanoic.yunanexus.notice.service.NoticePreferenceService preferenceService,
+            cc.nanoic.yunanexus.notice.service.NoticeDedupService dedupService) {
         this.templateMapper = templateMapper;
         this.recordMapper = recordMapper;
         this.metaIdClient = metaIdClient;
@@ -85,6 +87,7 @@ public class NoticeServiceImpl implements NoticeService {
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.preferenceService = preferenceService;
+        this.dedupService = dedupService;
     }
 
     @Override
@@ -119,6 +122,11 @@ public class NoticeServiceImpl implements NoticeService {
                     receiverId <= 0 ? cc.nanoic.yunanexus.notice.service.NoticePreferenceService.Decision.ALLOW
                             : preferenceService.decide(receiverId, channelCode, template.getTemplateCode(),
                                     java.time.LocalTime.now());
+            if (!dedupService.shouldDeliver(receiverId, template.getTemplateCode(),
+                    properties.getRocketmq().getDedupWindowSeconds())) {
+                log.info("通知在去重窗口内已发送，跳过 receiver={} template={}", receiver, template.getTemplateCode());
+                continue;
+            }
             if (decision == cc.nanoic.yunanexus.notice.service.NoticePreferenceService.Decision.BLOCKED) {
                 log.info("通知被用户偏好关闭 receiver={} template={}", receiver, template.getTemplateCode());
                 continue;

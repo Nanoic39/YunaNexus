@@ -60,6 +60,7 @@ class NoticeServiceImplTest {
     private NoticeProducer noticeProducer;
     private NoticeSenderRegistry senderRegistry;
     private cc.nanoic.yunanexus.notice.service.NoticePreferenceService preferenceService;
+    private cc.nanoic.yunanexus.notice.service.NoticeDedupService dedupService;
     private NoticeServiceImpl service;
 
     @BeforeEach
@@ -71,6 +72,10 @@ class NoticeServiceImplTest {
         senderRegistry = mock(NoticeSenderRegistry.class);
         NoticeProperties properties = new NoticeProperties();
         preferenceService = mock(cc.nanoic.yunanexus.notice.service.NoticePreferenceService.class);
+        dedupService = mock(cc.nanoic.yunanexus.notice.service.NoticeDedupService.class);
+        when(dedupService.shouldDeliver(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(true);
         service =
                 new NoticeServiceImpl(
                         templateMapper,
@@ -80,7 +85,7 @@ class NoticeServiceImplTest {
                         noticeProducer,
                         senderRegistry,
                         properties,
-                        new ObjectMapper(), preferenceService);
+                        new ObjectMapper(), preferenceService, dedupService);
     }
 
     private NoticeTemplate template(int channel, int status) {

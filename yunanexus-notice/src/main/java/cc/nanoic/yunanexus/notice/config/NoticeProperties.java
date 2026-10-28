@@ -32,6 +32,9 @@ public class NoticeProperties {
         /** 免打扰时使用的最小延迟级别（越大越晚；RocketMQ 默认 1~18） */
         private int quietDelayLevel = 10;
 
+        /** 去重窗口（秒）；同一用户同一模板在窗口内只发一次，<=0 关闭 */
+        private int dedupWindowSeconds = 60;
+
         /** 是否启用 RocketMQ（关闭时通知仅落库待发送） */
         private boolean enabled = true;
 
