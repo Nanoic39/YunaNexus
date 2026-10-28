@@ -29,6 +29,9 @@ public class NoticeProperties {
     @Data
     public static class Rocketmq {
 
+        /** 免打扰时使用的最小延迟级别（越大越晚；RocketMQ 默认 1~18） */
+        private int quietDelayLevel = 10;
+
         /** 是否启用 RocketMQ（关闭时通知仅落库待发送） */
         private boolean enabled = true;
 

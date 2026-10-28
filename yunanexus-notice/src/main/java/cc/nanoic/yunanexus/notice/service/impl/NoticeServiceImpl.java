@@ -64,6 +64,7 @@ public class NoticeServiceImpl implements NoticeService {
     private final NoticeSenderRegistry senderRegistry;
     private final NoticeProperties properties;
     private final ObjectMapper objectMapper;
+    private final cc.nanoic.yunanexus.notice.service.NoticePreferenceService preferenceService;
 
     public NoticeServiceImpl(
             NoticeTemplateMapper templateMapper,
@@ -73,7 +74,8 @@ public class NoticeServiceImpl implements NoticeService {
             NoticeProducer noticeProducer,
             NoticeSenderRegistry senderRegistry,
             NoticeProperties properties,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            cc.nanoic.yunanexus.notice.service.NoticePreferenceService preferenceService) {
         this.templateMapper = templateMapper;
         this.recordMapper = recordMapper;
         this.metaIdClient = metaIdClient;
@@ -82,6 +84,7 @@ public class NoticeServiceImpl implements NoticeService {
         this.senderRegistry = senderRegistry;
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.preferenceService = preferenceService;
     }
 
     @Override
@@ -110,6 +113,21 @@ public class NoticeServiceImpl implements NoticeService {
 
         List<NoticeRecordView> views = new ArrayList<>();
         for (String receiver : request.getReceivers()) {
+            // 方案 B：按用户偏好与免打扰时段判定；免打扰只顺延不丢弃
+            long receiverId = parseReceiverId(receiver);
+            cc.nanoic.yunanexus.notice.service.NoticePreferenceService.Decision decision =
+                    receiverId <= 0 ? cc.nanoic.yunanexus.notice.service.NoticePreferenceService.Decision.ALLOW
+                            : preferenceService.decide(receiverId, channelCode, template.getTemplateCode(),
+                                    java.time.LocalTime.now());
+            if (decision == cc.nanoic.yunanexus.notice.service.NoticePreferenceService.Decision.BLOCKED) {
+                log.info("通知被用户偏好关闭 receiver={} template={}", receiver, template.getTemplateCode());
+                continue;
+            }
+            // 免打扰：把延迟级别上调，交给 MQ 顺延投递，而不是丢弃
+            int effectiveDelay = decision
+                    == cc.nanoic.yunanexus.notice.service.NoticePreferenceService.Decision.DEFERRED
+                            ? Math.max(delayLevel, properties.getRocketmq().getQuietDelayLevel())
+                            : delayLevel;
             long noticeId = nextNoticeId();
             NoticeRecord record = new NoticeRecord();
             record.setNoticeId(noticeId);
@@ -123,7 +141,7 @@ public class NoticeServiceImpl implements NoticeService {
             record.setRetryCount(0);
             recordMapper.insert(record);
 
-            noticeProducer.send(new NoticeMessage(record.getId(), noticeId), delayLevel);
+            noticeProducer.send(new NoticeMessage(record.getId(), noticeId), effectiveDelay);
             views.add(NoticeRecordView.from(recordMapper.selectByNoticeId(noticeId)));
             log.info(
                     "通知已入队 noticeId={} channel={} receiver={} delayLevel={}",
@@ -134,6 +152,19 @@ public class NoticeServiceImpl implements NoticeService {
         }
         return views;
     }
+
+    /** 接收人若是用户 ID 数字串则用于偏好判定，否则视为普通地址 */
+    private long parseReceiverId(String receiver) {
+        if (receiver == null) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(receiver.trim());
+        } catch (NumberFormatException error) {
+            return 0L;
+        }
+    }
+
 
     @Override
     public void dispatch(long recordId) {

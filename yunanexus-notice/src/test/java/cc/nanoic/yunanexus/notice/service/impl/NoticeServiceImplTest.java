@@ -59,6 +59,7 @@ class NoticeServiceImplTest {
     private MetaIdClient metaIdClient;
     private NoticeProducer noticeProducer;
     private NoticeSenderRegistry senderRegistry;
+    private cc.nanoic.yunanexus.notice.service.NoticePreferenceService preferenceService;
     private NoticeServiceImpl service;
 
     @BeforeEach
@@ -69,6 +70,7 @@ class NoticeServiceImplTest {
         noticeProducer = mock(NoticeProducer.class);
         senderRegistry = mock(NoticeSenderRegistry.class);
         NoticeProperties properties = new NoticeProperties();
+        preferenceService = mock(cc.nanoic.yunanexus.notice.service.NoticePreferenceService.class);
         service =
                 new NoticeServiceImpl(
                         templateMapper,
@@ -78,7 +80,7 @@ class NoticeServiceImplTest {
                         noticeProducer,
                         senderRegistry,
                         properties,
-                        new ObjectMapper());
+                        new ObjectMapper(), preferenceService);
     }
 
     private NoticeTemplate template(int channel, int status) {
