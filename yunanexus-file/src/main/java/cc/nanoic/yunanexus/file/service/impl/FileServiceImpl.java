@@ -580,6 +580,10 @@ public class FileServiceImpl implements FileService {
         meta.setStatus(FileMeta.STATUS_NORMAL);
         meta.setCreateBy(userId);
         meta.setDeptId(deptId);
+        // 记录文件归属的应用：官方前端上传 app_id 为空，三方应用上传带上自身 ID
+        meta.setOwnerType("user");
+        meta.setAppId(cc.nanoic.yunanexus.file.config.FileAccessContext.currentAppId());
+        meta.setVisibility("private");
         return meta;
     }
 

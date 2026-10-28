@@ -71,5 +71,14 @@ public class FileMeta {
     /** 扫描状态：pending 待扫 / clean 通过 / infected 检出 */
     private String scanStatus;
 
+    /** 归属类型：user 用户 / system 系统（如头像）/ app 应用 */
+    private String ownerType;
+
+    /** 所属应用 ID；空表示官方前端上传 */
+    private String appId;
+
+    /** 可见性：private 私有 / internal 系统内公开（所有登录用户可见） */
+    private String visibility;
+
     private LocalDateTime updateTime;
 }
