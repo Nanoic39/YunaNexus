@@ -40,8 +40,12 @@ public class AuditClientAutoConfiguration {
     /** 上报客户端：所有 Web 应用（含网关）共用 */
     @Bean(destroyMethod = "close")
     @ConditionalOnMissingBean(AuditClient.class)
-    public AuditClient auditClient(AuditClientProperties properties, ObjectMapper objectMapper) {
+    public AuditClient auditClient(AuditClientProperties properties,
+                                   org.springframework.beans.factory.ObjectProvider<ObjectMapper> objectMapperProvider) {
         log.info("审计采集已启用，上报端点 {}", properties.getEndpoint());
+        // 有些服务（如 meta）没有引入 starter-json，拿不到 ObjectMapper bean；
+        // 事件字段只有字符串与数字，自建一个即可，不强制所有服务都具备 Jackson 装配。
+        ObjectMapper objectMapper = objectMapperProvider.getIfAvailable(ObjectMapper::new);
         return new AsyncHttpAuditClient(properties, objectMapper);
     }
 
