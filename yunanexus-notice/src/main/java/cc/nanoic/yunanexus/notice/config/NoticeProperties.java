@@ -28,6 +28,22 @@ public class NoticeProperties {
 
     private Retry retry = new Retry();
 
+    private DeadLetter deadLetter = new DeadLetter();
+
+    /**
+     * 死信告警（邮件）。
+     */
+    @Data
+    public static class DeadLetter {
+        private boolean enabled = true;
+        /** 告警收件人 */
+        private String alertTo = "";
+        /** 时间窗口（分钟） */
+        private int windowMinutes = 60;
+        /** 单封邮件最多列出条数 */
+        private int batchSize = 50;
+    }
+
     /**
      * 投递重试策略。
      */

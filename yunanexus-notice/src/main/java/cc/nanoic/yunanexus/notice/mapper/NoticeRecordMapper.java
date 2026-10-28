@@ -18,6 +18,18 @@ import java.util.List;
 public interface NoticeRecordMapper extends BaseMapper<NoticeRecord> {
 
     /**
+     * 取窗口内新增的死信记录。
+     *
+     * @param since 起始时间
+     * @param limit 最多条数
+     * @return 死信列表
+     */
+    @Select("SELECT * FROM notice_record WHERE dead_letter = 1 AND update_time >= #{since} "
+            + "ORDER BY update_time DESC LIMIT #{limit}")
+    java.util.List<NoticeRecord> selectRecentDeadLetters(@Param("since") java.time.LocalDateTime since,
+                                                        @Param("limit") int limit);
+
+    /**
      * 取到期待重试的记录。
      *
      * @param now   当前时间
