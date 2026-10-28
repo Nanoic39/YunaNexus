@@ -3,12 +3,12 @@ package cc.nanoic.yunanexus.gateway.filter;
 import cc.nanoic.yunanexus.common.audit.client.AuditClient;
 import cc.nanoic.yunanexus.common.audit.event.AuditEvent;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -23,13 +23,18 @@ import java.util.List;
  * 业务记录带真实模块与动作；审计服务按 traceId 合并，业务记录优先、网关记录让位，
  * 因此不会出现"一个请求两条审计"。
  *
- * <p>放在响应提交后采集，且只用内存事件（不读 body），对网关吞吐影响可忽略。
+ * <p><b>为什么用 WebFilter 而不是 GlobalFilter</b>：GlobalFilter 只在命中路由后才进入
+ * 过滤器链，未匹配任何路由的请求（404）由 RoutePredicateHandlerMapping 直接返回，
+ * 整条链根本不会构建——攻击者扫描不存在的路径将完全不留痕。WebFilter 在 WebFlux
+ * 层面拦截所有 exchange，与路由匹配无关，因此能覆盖 404 探测流量。
+ *
+ * <p>放在响应完成后采集，且只用内存事件（不读、不包装 body），对网关吞吐影响可忽略。
  *
  * @author yunanexus
  */
 @Slf4j
 @Component
-public class AuditGatewayFilter implements GlobalFilter, Ordered {
+public class AuditGatewayFilter implements WebFilter, Ordered {
 
     /** 网关兜底记录的模块标识，审计服务据此识别"可被业务记录替换"的行 */
     public static final String GATEWAY_MODULE = "gateway";
@@ -47,7 +52,12 @@ public class AuditGatewayFilter implements GlobalFilter, Ordered {
     }
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        // 监控端点不进审计：健康检查频率高且无业务含义，写进去只会淹没真正的信号
+        String path = exchange.getRequest().getPath().value();
+        if (path.startsWith("/actuator")) {
+            return chain.filter(exchange);
+        }
         long start = System.currentTimeMillis();
         return chain.filter(exchange).doFinally(signal -> {
             try {
@@ -123,6 +133,7 @@ public class AuditGatewayFilter implements GlobalFilter, Ordered {
     public int getOrder() {
         // 必须最先执行：鉴权/限流过滤器会短路整条链，排在后面就采集不到被拒绝的请求——
         // 而"谁被拒绝、被拒了多少次"恰恰是审计最该看见的部分。
+        // WebFilter 与 GlobalFilter 的序在同一有序链上生效，故此处仍取极小值。
         return Ordered.HIGHEST_PRECEDENCE + 5;
     }
 }
