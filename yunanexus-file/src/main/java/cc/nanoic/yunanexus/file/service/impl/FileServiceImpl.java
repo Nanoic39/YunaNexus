@@ -379,6 +379,60 @@ public class FileServiceImpl implements FileService {
      */
     @Override
     @ShardRoute
+    public FileView uploadNewVersion(long rootId, MultipartFile file, long userId) {
+        validate(file);
+        FileMeta root = fileMetaMapper.selectByFileId(rootId);
+        if (root == null) {
+            throw new BizException(ErrorCode.FILE_NOT_FOUND);
+        }
+        accessService.checkWrite(root, userId);
+        long size = file.getSize();
+        // 新版本占用配额：旧版本不会自动释放，故按增量校验
+        quotaService.ensure(userId, size);
+        Integer maxVersion = fileMetaMapper.selectMaxVersion(rootId);
+        int nextVersion = (maxVersion == null ? 1 : maxVersion) + 1;
+        String originalName = normalize(file.getOriginalFilename());
+        if (originalName.isEmpty()) {
+            originalName = root.getFileName();
+        }
+        String ext = extractExt(originalName);
+        rejectDangerous(ext);
+        long fileId = nextFileId();
+        int shardIndex = shardRouter.route(fileId);
+        FileStorage.StoredObject stored;
+        try (java.io.InputStream in = file.getInputStream()) {
+            stored = fileStorage.store(in, ext);
+        } catch (java.io.IOException error) {
+            throw new BizException(ErrorCode.FILE_UPLOAD_FAILED, "读取上传流失败: " + error.getMessage());
+        }
+        FileMeta meta = buildMeta(fileId, shardIndex, originalName, ext, file.getContentType(),
+                stored.size(), stored.path(), stored.sha256(), userId, root.getDeptId());
+        // 归属跟随根文件：应用、可见性、系统物料属性不因新版本改变
+        meta.setAppId(root.getAppId());
+        meta.setVisibility(root.getVisibility());
+        meta.setOwnerType(root.getOwnerType());
+        meta.setRootId(rootId);
+        meta.setVersion(nextVersion);
+        FileMeta persisted = persistMeta(meta);
+        quotaService.addUsage(userId, stored.size());
+        log.info("新版本落库 rootId={} version={} fileId={} user={}", rootId, nextVersion, fileId, userId);
+        return FileView.from(persisted);
+    }
+
+    @Override
+    @ShardRoute
+    public java.util.List<FileView> listVersions(long rootId, long userId) {
+        FileMeta root = fileMetaMapper.selectByFileId(rootId);
+        if (root == null) {
+            throw new BizException(ErrorCode.FILE_NOT_FOUND);
+        }
+        accessService.checkRead(root, userId);
+        return fileMetaMapper.selectVersions(rootId).stream().map(FileView::from).toList();
+    }
+
+
+    @Override
+    @ShardRoute
     public FileView restoreTrashed(long fileId, long userId) {
         FileMeta meta = fileMetaMapper.selectByFileId(fileId);
         if (meta == null) {
@@ -710,6 +764,8 @@ public class FileServiceImpl implements FileService {
         meta.setOwnerType("user");
         meta.setAppId(cc.nanoic.yunanexus.file.config.FileAccessContext.currentAppId());
         meta.setVisibility("private");
+        meta.setRootId(fileId);
+        meta.setVersion(1);
         return meta;
     }
 

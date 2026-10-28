@@ -299,6 +299,29 @@ public class FileController {
         return Result.success(fileService.restoreTrashed(fileId, requireUserId(userId)));
     }
 
+    /**
+     * 上传新版本（同一逻辑文件的多版本）。
+     */
+    @PostMapping("/{rootId}/versions")
+    public Result<cc.nanoic.yunanexus.file.domain.FileView> uploadVersion(
+            @PathVariable("rootId") long rootId,
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        long owner = requireUserId(userId);
+        rateLimiter.acquire(owner, clientIp());
+        return Result.success(fileService.uploadNewVersion(rootId, file, owner));
+    }
+
+    /**
+     * 列出某文件的全部版本。
+     */
+    @GetMapping("/{rootId}/versions")
+    public Result<java.util.List<cc.nanoic.yunanexus.file.domain.FileView>> listVersions(
+            @PathVariable("rootId") long rootId,
+            @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        return Result.success(fileService.listVersions(rootId, requireUserId(userId)));
+    }
+
     /** 取客户端 IP：优先代理头，取第一个非空段 */
     private String clientIp() {
         org.springframework.web.context.request.ServletRequestAttributes attrs =

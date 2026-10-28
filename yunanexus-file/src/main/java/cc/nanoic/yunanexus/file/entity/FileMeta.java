@@ -88,5 +88,11 @@ public class FileMeta {
     /** 进入回收站时间（30 天后物理清理） */
     private LocalDateTime deletedAt;
 
+    /** 逻辑文件根 ID；首版等于自身 file_id */
+    private Long rootId;
+
+    /** 版本号，从 1 递增 */
+    private Integer version;
+
     private LocalDateTime updateTime;
 }

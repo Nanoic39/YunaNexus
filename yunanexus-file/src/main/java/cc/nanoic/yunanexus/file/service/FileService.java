@@ -110,6 +110,26 @@ public interface FileService {
      */
     cc.nanoic.yunanexus.file.domain.FileView restoreTrashed(long fileId, long userId);
 
+    /**
+     * 上传新版本：元数据新增一行，版本号 +1，归属沿用根文件。
+     *
+     * @param rootId 逻辑文件根 ID
+     * @param file   新版本内容
+     * @param userId 当前用户
+     * @return 新版本视图
+     */
+    cc.nanoic.yunanexus.file.domain.FileView uploadNewVersion(long rootId,
+            org.springframework.web.multipart.MultipartFile file, long userId);
+
+    /**
+     * 列出一个逻辑文件的全部版本（新到旧）。
+     *
+     * @param rootId 根 ID
+     * @param userId 当前用户
+     * @return 版本列表
+     */
+    java.util.List<cc.nanoic.yunanexus.file.domain.FileView> listVersions(long rootId, long userId);
+
     /** 回写恶意文件扫描结果（A5） */
     void reportScanResult(long fileId, String status);
 

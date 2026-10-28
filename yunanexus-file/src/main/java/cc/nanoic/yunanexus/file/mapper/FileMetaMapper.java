@@ -87,6 +87,24 @@ public interface FileMetaMapper extends BaseMapper<FileMeta> {
     java.util.List<FileMeta> selectTrashExpired(@Param("before") java.time.LocalDateTime before,
                                                 @Param("limit") int limit);
 
+    /**
+     * 取某逻辑文件当前最大版本号。
+     *
+     * @param rootId 根 ID
+     * @return 最大版本；无版本时返回 null
+     */
+    @Select("SELECT MAX(version) FROM file_meta WHERE root_id = #{rootId}")
+    Integer selectMaxVersion(@Param("rootId") long rootId);
+
+    /**
+     * 列出某逻辑文件的全部版本（新到旧）。
+     *
+     * @param rootId 根 ID
+     * @return 版本列表
+     */
+    @Select("SELECT * FROM file_meta WHERE root_id = #{rootId} AND status IN (1,2) ORDER BY version DESC")
+    java.util.List<FileMeta> selectVersions(@Param("rootId") long rootId);
+
     @Select("SELECT * FROM file_meta WHERE file_id = #{fileId}")
     FileMeta selectByFileId(@Param("fileId") long fileId);
 
