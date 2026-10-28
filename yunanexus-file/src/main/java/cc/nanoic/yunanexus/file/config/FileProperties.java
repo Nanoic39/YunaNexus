@@ -32,10 +32,10 @@ public class FileProperties {
     /** 存储配额（单用户默认值；file_quota 表可按用户覆盖） */
     @Data
     public static class Quota {
-        /** 默认容量上限（20 GiB） */
-        private long defaultLimitBytes = 20L * 1024 * 1024 * 1024;
-        /** 默认文件数上限 */
-        private long defaultLimitFiles = 50_000L;
+        /** 默认容量上限（5 GiB）；超出只拒绝新上传，不删已有文件 */
+        private long defaultLimitBytes = 5L * 1024 * 1024 * 1024;
+        /** 默认文件数上限（50 个）；后续可按角色/权限动态放宽 */
+        private long defaultLimitFiles = 50L;
     }
 
     /** 分片参数 */
@@ -87,6 +87,9 @@ public class FileProperties {
     public static class Chunk {
         /** 单个分片最大字节数（服务端校验，防单请求过大；默认 20MB） */
         private long maxChunkSize = 20L * 1024 * 1024;
+        /** 分片总数上限（默认 10000，约等于 200GB/20MB 分片；防稀疏下标 DoS） */
+        private int maxChunks = 10_000;
+
         /** 分片文件总大小上限（默认 5GB） */
         private long maxSize = 5L * 1024 * 1024 * 1024;
         /** 上传会话过期时间（秒），超时后临时分片被清理任务回收（默认 24h） */

@@ -160,6 +160,11 @@ public class FileServiceImpl implements FileService {
         } else {
             log.info("存储内容仍被其他文件引用，保留物理内容 fileId={} path={}", fileId, meta.getStoragePath());
         }
+        // 释放配额：只在逻辑删除时扣一次（重复删除会被上面的状态校验挡掉）
+        Long owner = meta.getCreateBy();
+        if (owner != null) {
+            quotaService.removeUsage(owner, meta.getSize() == null ? 0L : meta.getSize());
+        }
         log.info("文件删除成功 fileId={} user={}", fileId, userId);
     }
 
@@ -296,6 +301,7 @@ public class FileServiceImpl implements FileService {
                 session.getUserId(), session.getDeptId());
         try {
             FileMeta persisted = persistMeta(meta);
+            quotaService.addUsage(session.getUserId(), merged.size());
             log.info("分片上传完成 fileId={} chunks={} size={} user={}",
                     session.getFileId(), session.getTotalChunks(), merged.size(), userId);
             return FileView.from(persisted);
@@ -375,6 +381,18 @@ public class FileServiceImpl implements FileService {
         }
         if (request.getTotalChunks() <= 0) {
             throw new BizException(ErrorCode.FILE_CHUNK_INDEX_INVALID, "分片总数必须大于 0");
+        }
+        // 分片总数必须有上界：客户端可伪造超大 totalChunks，配合稀疏下标把会话/元数据撑爆
+        int maxChunks = properties.getChunk().getMaxChunks();
+        if (maxChunks > 0 && request.getTotalChunks() > maxChunks) {
+            throw new BizException(ErrorCode.FILE_CHUNK_INDEX_INVALID,
+                    "分片总数 " + request.getTotalChunks() + " 超过上限 " + maxChunks);
+        }
+        // 分片数 × 单分片上限 必须能覆盖声明总大小，避免"1 个分片声称 5GB"这类畸形请求
+        long singleMax = properties.getChunk().getMaxChunkSize();
+        if (singleMax > 0 && request.getTotalSize() > (long) request.getTotalChunks() * singleMax) {
+            throw new BizException(ErrorCode.FILE_SIZE_EXCEED,
+                    "声明大小 " + request.getTotalSize() + " 与分片数 " + request.getTotalChunks() + " 不匹配");
         }
         long maxSize = properties.getChunk().getMaxSize();
         if (maxSize > 0 && request.getTotalSize() > maxSize) {
