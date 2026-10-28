@@ -46,6 +46,9 @@ import java.nio.charset.StandardCharsets;
 @RequestMapping("/api/v1/file")
 public class FileController {
 
+    @jakarta.annotation.Resource
+    private cc.nanoic.yunanexus.file.service.UploadRateLimiter rateLimiter;
+
     /** 网关下发的用户 ID 请求头（与 GatewayProperties.userIdHeader 一致） */
     private static final String USER_ID_HEADER = "X-User-Id";
 
@@ -70,6 +73,7 @@ public class FileController {
                                    @RequestParam(value = "publicAccess", defaultValue = "false") boolean publicAccess,
                                    @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
         long owner = requireUserId(userId);
+        rateLimiter.acquire(owner, clientIp());
         FileView view = fileService.upload(file, owner);
         if (publicAccess) {
             var visibility = publicFileService.set(view.getFileId(), owner, true);
@@ -118,7 +122,9 @@ public class FileController {
     @PostMapping("/chunk/init")
     public Result<ChunkInitResult> chunkInit(@Valid @RequestBody ChunkInitRequest request,
                                              @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
-        return Result.success(fileService.initChunkUpload(request, requireUserId(userId)));
+        long owner = requireUserId(userId);
+        rateLimiter.acquire(owner, clientIp());
+        return Result.success(fileService.initChunkUpload(request, owner));
     }
 
     /**
@@ -129,7 +135,9 @@ public class FileController {
                                     @RequestParam("index") int index,
                                     @RequestParam("chunk") MultipartFile chunk,
                                     @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
-        fileService.requireChunkOwner(uploadId, requireUserId(userId));
+        long owner = requireUserId(userId);
+        rateLimiter.acquire(owner, clientIp());
+        fileService.requireChunkOwner(uploadId, owner);
         fileService.uploadChunk(uploadId, index, chunk);
         return Result.success();
     }
@@ -232,6 +240,23 @@ public class FileController {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    /** 取客户端 IP：优先代理头，取第一个非空段 */
+    private String clientIp() {
+        org.springframework.web.context.request.ServletRequestAttributes attrs =
+                (org.springframework.web.context.request.ServletRequestAttributes)
+                        org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        if (attrs == null) {
+            return null;
+        }
+        jakarta.servlet.http.HttpServletRequest request = attrs.getRequest();
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            int comma = forwarded.indexOf(',');
+            return (comma > 0 ? forwarded.substring(0, comma) : forwarded).trim();
+        }
+        return request.getRemoteAddr();
     }
 
     private long requireUserId(Long userId) {

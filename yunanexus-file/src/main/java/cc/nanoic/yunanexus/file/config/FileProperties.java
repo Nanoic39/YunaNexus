@@ -29,6 +29,19 @@ public class FileProperties {
 
     private Quota quota = new Quota();
 
+    private RateLimit rateLimit = new RateLimit();
+
+    /** 上传限流（A4）：用户与 IP 双维度，固定 1 分钟窗口 */
+    @Data
+    public static class RateLimit {
+        /** 是否启用 */
+        private boolean enabled = true;
+        /** 单用户每分钟上传次数上限 */
+        private int perUserPerMinute = 60;
+        /** 单 IP 每分钟上传次数上限 */
+        private int perIpPerMinute = 120;
+    }
+
     /** 存储配额（单用户默认值；file_quota 表可按用户覆盖） */
     @Data
     public static class Quota {
