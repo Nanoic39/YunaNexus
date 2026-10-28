@@ -415,8 +415,74 @@ public class FileServiceImpl implements FileService {
         meta.setVersion(nextVersion);
         FileMeta persisted = persistMeta(meta);
         quotaService.addUsage(userId, stored.size());
+        pruneOldVersions(rootId);
         log.info("新版本落库 rootId={} version={} fileId={} user={}", rootId, nextVersion, fileId, userId);
         return FileView.from(persisted);
+    }
+
+    /**
+     * 版本裁剪：只保留最近 N 个版本，更旧的递减引用计数、归零删存储、释放配额。
+     *
+     * <p>没有它版本管理会退化成"只增不减"，用户额度被历史版本吃光。
+     *
+     * @param rootId 根 ID
+     */
+    private void pruneOldVersions(long rootId) {
+        int keep = Math.max(1, properties.getVersion().getKeep());
+        for (FileMeta old : fileMetaMapper.selectVersionsBeyond(rootId, keep)) {
+            fileMetaMapper.decrementRefCount(old.getFileId());
+            Integer remaining = fileMetaMapper.selectRefCount(old.getFileId());
+            if (remaining != null && remaining <= 0) {
+                fileStorage.delete(old.getStoragePath());
+            }
+            old.setStatus(FileMeta.STATUS_DELETED);
+            fileMetaMapper.updateById(old);
+            Long owner = old.getCreateBy();
+            if (owner != null) {
+                quotaService.removeUsage(owner, old.getSize() == null ? 0L : old.getSize());
+            }
+            log.info("版本裁剪 rootId={} fileId={} version={}", rootId, old.getFileId(), old.getVersion());
+        }
+    }
+
+    @Override
+    @ShardRoute
+    public byte[] thumbnail(long fileId, long userId, int size) {
+        FileMeta meta = requireVisible(fileId, userId);
+        if (!properties.getThumbnail().isEnabled()) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "缩略图未启用");
+        }
+        String contentType = meta.getContentType() == null ? "" : meta.getContentType();
+        if (!contentType.startsWith("image/")) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "仅图片支持缩略图");
+        }
+        int edge = Math.min(Math.max(32, size), properties.getThumbnail().getMaxSize());
+        try (java.io.InputStream in = fileStorage.open(meta.getStoragePath())) {
+            java.awt.image.BufferedImage source = javax.imageio.ImageIO.read(in);
+            if (source == null) {
+                throw new BizException(ErrorCode.BAD_REQUEST, "图片无法解析");
+            }
+            int width = source.getWidth();
+            int height = source.getHeight();
+            double scale = Math.min(1.0, (double) edge / Math.max(width, height));
+            int targetW = Math.max(1, (int) Math.round(width * scale));
+            int targetH = Math.max(1, (int) Math.round(height * scale));
+            java.awt.image.BufferedImage scaled = new java.awt.image.BufferedImage(
+                    targetW, targetH, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            java.awt.Graphics2D g = scaled.createGraphics();
+            try {
+                g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                        java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g.drawImage(source, 0, 0, targetW, targetH, null);
+            } finally {
+                g.dispose();
+            }
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(scaled, "jpg", out);
+            return out.toByteArray();
+        } catch (java.io.IOException error) {
+            throw new BizException(ErrorCode.FILE_UPLOAD_FAILED, "缩略图生成失败: " + error.getMessage());
+        }
     }
 
     @Override

@@ -130,6 +130,16 @@ public interface FileService {
      */
     java.util.List<cc.nanoic.yunanexus.file.domain.FileView> listVersions(long rootId, long userId);
 
+    /**
+     * 按需生成缩略图（仅图片）。
+     *
+     * @param fileId 文件 ID
+     * @param userId 当前用户
+     * @param size   目标边长
+     * @return JPEG 字节
+     */
+    byte[] thumbnail(long fileId, long userId, int size);
+
     /** 回写恶意文件扫描结果（A5） */
     void reportScanResult(long fileId, String status);
 

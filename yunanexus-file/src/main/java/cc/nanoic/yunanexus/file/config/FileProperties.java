@@ -35,6 +35,28 @@ public class FileProperties {
 
     private Trash trash = new Trash();
 
+    private Version version = new Version();
+
+    private Thumbnail thumbnail = new Thumbnail();
+
+    /** 版本保留策略 */
+    @Data
+    public static class Version {
+        /** 每个逻辑文件保留的版本数（含最新版） */
+        private int keep = 5;
+    }
+
+    /** 缩略图 */
+    @Data
+    public static class Thumbnail {
+        /** 是否启用按需生成 */
+        private boolean enabled = true;
+        /** 默认边长（像素） */
+        private int defaultSize = 256;
+        /** 允许的最大边长，防超大请求打爆 CPU/内存 */
+        private int maxSize = 1024;
+    }
+
     /** 回收站 */
     @Data
     public static class Trash {

@@ -322,6 +322,21 @@ public class FileController {
         return Result.success(fileService.listVersions(rootId, requireUserId(userId)));
     }
 
+    /**
+     * 缩略图（仅图片，按需生成）。
+     */
+    @GetMapping("/{fileId}/thumbnail")
+    public org.springframework.http.ResponseEntity<byte[]> thumbnail(
+            @PathVariable("fileId") long fileId,
+            @RequestParam(value = "size", defaultValue = "256") int size,
+            @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        byte[] body = fileService.thumbnail(fileId, requireUserId(userId), size);
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "private, max-age=3600")
+                .contentType(org.springframework.http.MediaType.IMAGE_JPEG)
+                .body(body);
+    }
+
     /** 取客户端 IP：优先代理头，取第一个非空段 */
     private String clientIp() {
         org.springframework.web.context.request.ServletRequestAttributes attrs =

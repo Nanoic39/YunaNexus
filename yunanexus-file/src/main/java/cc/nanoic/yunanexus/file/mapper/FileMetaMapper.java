@@ -105,6 +105,17 @@ public interface FileMetaMapper extends BaseMapper<FileMeta> {
     @Select("SELECT * FROM file_meta WHERE root_id = #{rootId} AND status IN (1,2) ORDER BY version DESC")
     java.util.List<FileMeta> selectVersions(@Param("rootId") long rootId);
 
+    /**
+     * 取超出保留数的旧版本（按版本号升序，最旧在前）。
+     *
+     * @param rootId 根 ID
+     * @param keep   保留的版本数
+     * @return 需要清理的版本
+     */
+    @Select("SELECT * FROM file_meta WHERE root_id = #{rootId} AND status IN (1,2) "
+            + "ORDER BY version DESC LIMIT 18446744073709551615 OFFSET #{keep}")
+    java.util.List<FileMeta> selectVersionsBeyond(@Param("rootId") long rootId, @Param("keep") int keep);
+
     @Select("SELECT * FROM file_meta WHERE file_id = #{fileId}")
     FileMeta selectByFileId(@Param("fileId") long fileId);
 
