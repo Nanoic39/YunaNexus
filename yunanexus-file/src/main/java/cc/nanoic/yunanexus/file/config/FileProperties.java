@@ -31,6 +31,19 @@ public class FileProperties {
 
     private RateLimit rateLimit = new RateLimit();
 
+    private Scan scan = new Scan();
+
+    /** 恶意文件扫描（A5） */
+    @Data
+    public static class Scan {
+        /** 是否启用补扫调度 */
+        private boolean enabled = true;
+        /** 视为"超期未扫描"的分钟数 */
+        private long pendingTimeoutMinutes = 1440;
+        /** 每轮最多取多少条 */
+        private int batchSize = 200;
+    }
+
     /** 上传限流（A4）：用户与 IP 双维度，固定 1 分钟窗口 */
     @Data
     public static class RateLimit {
@@ -49,6 +62,8 @@ public class FileProperties {
         private long defaultLimitBytes = 5L * 1024 * 1024 * 1024;
         /** 默认文件数上限（50 个）；后续可按角色/权限动态放宽 */
         private long defaultLimitFiles = 50L;
+        /** 是否启用对账（关闭则配额纯靠增减维护，不推荐） */
+        private boolean reconcileEnabled = true;
     }
 
     /** 分片参数 */

@@ -21,6 +21,27 @@ import java.util.List;
 public interface FileMetaMapper extends BaseMapper<FileMeta> {
 
     /**
+     * 按用户聚合真实用量（配额对账用）。
+     *
+     * @return 每行 [createBy, count, sumSize]
+     */
+    @Select("SELECT create_by AS userId, COUNT(*) AS fileCount, COALESCE(SUM(size),0) AS usedBytes "
+            + "FROM file_meta WHERE status = 1 AND create_by IS NOT NULL GROUP BY create_by")
+    java.util.List<java.util.Map<String, Object>> aggregateUsage();
+
+    /**
+     * 取超期未扫描的文件 ID（补扫调度用）。
+     *
+     * @param before 早于该时间创建
+     * @param limit  最多取多少条
+     * @return 文件 ID 列表
+     */
+    @Select("SELECT file_id FROM file_meta WHERE status = 1 AND scan_status = 'pending' "
+            + "AND create_time < #{before} ORDER BY create_time ASC LIMIT #{limit}")
+    java.util.List<Long> selectPendingScan(@Param("before") java.time.LocalDateTime before,
+                                          @Param("limit") int limit);
+
+    /**
      * 按全局文件 ID 查询元数据（含已删除，由调用方判定状态）。
      *
      * @param fileId 全局文件 ID
