@@ -17,6 +17,7 @@ import cc.nanoic.yunanexus.file.domain.FileRange;
 import cc.nanoic.yunanexus.file.domain.FileView;
 import cc.nanoic.yunanexus.file.domain.UploadSession;
 import cc.nanoic.yunanexus.file.entity.FileMeta;
+import cc.nanoic.yunanexus.file.service.FileAccessService;
 import cc.nanoic.yunanexus.file.service.FileQuotaService;
 import cc.nanoic.yunanexus.file.mapper.FileMetaMapper;
 import cc.nanoic.yunanexus.file.service.FileService;
@@ -72,6 +73,7 @@ public class FileServiceImpl implements FileService {
     private final PermissionClient permissionClient;
     private final ObjectMapper objectMapper;
     private final FileQuotaService quotaService;
+    private final FileAccessService accessService;
 
     public FileServiceImpl(FileMetaMapper fileMetaMapper,
                            FileStorage fileStorage,
@@ -80,7 +82,8 @@ public class FileServiceImpl implements FileService {
                            MetaIdClient metaIdClient,
                            PermissionClient permissionClient,
                            ObjectMapper objectMapper,
-                           FileQuotaService quotaService) {
+                           FileQuotaService quotaService,
+                           FileAccessService accessService) {
         this.fileMetaMapper = fileMetaMapper;
         this.fileStorage = fileStorage;
         this.properties = properties;
@@ -89,6 +92,7 @@ public class FileServiceImpl implements FileService {
         this.permissionClient = permissionClient;
         this.objectMapper = objectMapper;
         this.quotaService = quotaService;
+        this.accessService = accessService;
     }
 
     @Override
@@ -678,6 +682,8 @@ public class FileServiceImpl implements FileService {
         if (!isVisible(resolveScope(userId), meta)) {
             throw new BizException(ErrorCode.FILE_ACCESS_DENIED);
         }
+        // 多应用隔离：官方前端可访问全部；三方应用只能访问本应用下的文件
+        accessService.checkRead(meta, userId);
         return meta;
     }
 

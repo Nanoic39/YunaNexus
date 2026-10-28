@@ -18,6 +18,7 @@ import cc.nanoic.yunanexus.file.domain.FileView;
 import cc.nanoic.yunanexus.file.domain.UploadSession;
 import cc.nanoic.yunanexus.file.entity.FileMeta;
 import cc.nanoic.yunanexus.file.mapper.FileMetaMapper;
+import cc.nanoic.yunanexus.file.service.FileAccessService;
 import cc.nanoic.yunanexus.file.service.FileQuotaService;
 import cc.nanoic.yunanexus.file.shard.ShardRouter;
 import cc.nanoic.yunanexus.file.storage.FileStorage;
@@ -69,6 +70,7 @@ class FileServiceImplTest {
     private FileServiceImpl service;
 
     private FileQuotaService quotaService;
+    private FileAccessService accessService;
 
     @BeforeEach
     void setUp() {
@@ -79,8 +81,9 @@ class FileServiceImplTest {
         metaIdClient = mock(MetaIdClient.class);
         permissionClient = mock(PermissionClient.class);
         quotaService = mock(FileQuotaService.class);
+        accessService = mock(FileAccessService.class);
         service = new FileServiceImpl(fileMetaMapper, fileStorage, properties,
-                shardRouter, metaIdClient, permissionClient, new ObjectMapper(), quotaService);
+                shardRouter, metaIdClient, permissionClient, new ObjectMapper(), quotaService, accessService);
     }
 
     private MockMultipartFile txtFile(String content) {
