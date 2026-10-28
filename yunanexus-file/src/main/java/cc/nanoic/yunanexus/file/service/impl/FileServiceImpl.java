@@ -101,6 +101,7 @@ public class FileServiceImpl implements FileService {
             originalName = "unnamed";
         }
         String ext = extractExt(originalName);
+        rejectDangerous(ext);
         long fileId = nextFileId();
         int shardIndex = shardRouter.route(fileId);
         Long deptId = resolveDeptId(userId);
@@ -279,6 +280,15 @@ public class FileServiceImpl implements FileService {
         FileStorage.StoredObject merged =
                 fileStorage.mergeChunks(uploadId, session.getTotalChunks(), session.getExt());
 
+        // A3：合并后的真实大小必须与声明一致。声明值参与了配额与上限判断，
+        // 不一致意味着要么客户端撒谎，要么分片缺失/被截断，两种都不能入库。
+        long declaredSize = session.getTotalSize();
+        if (declaredSize > 0 && merged.size() != declaredSize) {
+            fileStorage.delete(merged.path());
+            throw new BizException(ErrorCode.FILE_SIZE_EXCEED,
+                    "合并后大小 " + merged.size() + " 与声明 " + declaredSize + " 不一致");
+        }
+
         // 合并后再查重：并发上传的相同内容可复用已有存储，丢弃本次合并副本
         String storagePath = merged.path();
         boolean reused = false;
@@ -353,6 +363,24 @@ public class FileServiceImpl implements FileService {
     // ---------- 校验与工具 ----------
 
     /** 校验单次上传参数（空文件 / 大小上限 / 扩展名白名单）。 */
+    /**
+     * 高危扩展名一律拒绝（A5 的前置硬规则）。
+     *
+     * <p>扫描服务不可用时采用 fail-open（放行 + 标记待扫），但"已知可执行/脚本类"
+     * 不属于"无法判定"，因此这条规则不随扫描可用性变化。
+     *
+     * @param ext 小写扩展名
+     */
+    private void rejectDangerous(String ext) {
+        if (ext == null || ext.isEmpty()) {
+            return;
+        }
+        List<String> dangerous = properties.getUpload().getDangerousExtensions();
+        if (dangerous != null && dangerous.contains(ext)) {
+            throw new BizException(ErrorCode.FILE_TYPE_NOT_ALLOWED, "高危文件类型: " + ext);
+        }
+    }
+
     private void validate(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BizException(ErrorCode.FILE_EMPTY);
@@ -403,6 +431,7 @@ public class FileServiceImpl implements FileService {
         if (allowed != null && !allowed.isEmpty() && (ext == null || !allowed.contains(ext))) {
             throw new BizException(ErrorCode.FILE_TYPE_NOT_ALLOWED, "扩展名: " + ext);
         }
+        rejectDangerous(ext);
     }
 
     /** 解析下载区间并打开对应内容流（{@code start} 为空表示整文件）。 */

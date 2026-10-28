@@ -78,6 +78,16 @@ public class FileProperties {
     public static class Upload {
         /** 单文件最大字节数（默认 20MB） */
         private long maxSize = 20L * 1024 * 1024;
+        /**
+         * 高危扩展名：无论扫描是否可用都拒绝。
+         *
+         * <p>扫描服务不可用时的 fail-open 策略只适用于"无法判定"的普通文件；
+         * 可执行/脚本类属于"已知高风险"，不能因为扫描没开就放行。
+         */
+        private List<String> dangerousExtensions = List.of(
+                "exe", "dll", "so", "bat", "cmd", "com", "scr", "msi", "vbs", "ps1",
+                "sh", "bash", "php", "jsp", "asp", "aspx", "cgi", "jar", "war", "class");
+
         /** 允许的扩展名（小写、不含点）；为空表示不限制 */
         private List<String> allowedExtensions = List.of();
     }
