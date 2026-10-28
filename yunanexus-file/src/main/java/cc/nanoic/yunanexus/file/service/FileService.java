@@ -79,6 +79,18 @@ public interface FileService {
      */
     void abortChunkUpload(String uploadId);
 
+    /**
+     * 跨应用转移文件（仅官方前端可调用）。
+     *
+     * @param fileId      文件 ID
+     * @param userId      发起人
+     * @param targetAppId 目标应用；空表示转回官方前端
+     * @param copy        true 复制（占用配额），false 移动（不复制存储）
+     * @return 结果文件元数据
+     */
+    cc.nanoic.yunanexus.file.domain.FileView transferApp(long fileId, long userId,
+                                                          String targetAppId, boolean copy);
+
     /** 回写恶意文件扫描结果（A5） */
     void reportScanResult(long fileId, String status);
 

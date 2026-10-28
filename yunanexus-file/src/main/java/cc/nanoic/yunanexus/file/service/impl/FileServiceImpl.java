@@ -334,6 +334,35 @@ public class FileServiceImpl implements FileService {
      * @param status clean / infected
      */
     @Override
+    @ShardRoute
+    public FileView transferApp(long fileId, long userId, String targetAppId, boolean copy) {
+        if (!cc.nanoic.yunanexus.file.config.FileAccessContext.isOfficial()) {
+            throw new BizException(ErrorCode.FILE_ACCESS_DENIED, "仅官方前端可转移文件");
+        }
+        FileMeta source = requireVisible(fileId, userId);
+        String target = (targetAppId == null || targetAppId.isBlank()) ? null : targetAppId.trim();
+        if (copy) {
+            // 复制：共享同一份存储内容，但元数据独立，且必须占用配额
+            quotaService.ensure(userId, source.getSize() == null ? 0L : source.getSize());
+            long newId = nextFileId();
+            FileMeta clone = buildMeta(newId, shardRouter.route(newId), source.getFileName(), source.getExt(),
+                    source.getContentType(), source.getSize() == null ? 0L : source.getSize(),
+                    source.getStoragePath(), source.getSha256(), userId, source.getDeptId());
+            clone.setAppId(target);
+            clone.setScanStatus(source.getScanStatus() == null ? "pending" : source.getScanStatus());
+            FileMeta persisted = persistMeta(clone);
+            quotaService.addUsage(userId, clone.getSize());
+            log.info("文件复制 fileId={} -> {} targetApp={} user={}", fileId, newId, target, userId);
+            return FileView.from(persisted);
+        }
+        // 移动：只改归属，不动存储、不动用量
+        source.setAppId(target);
+        fileMetaMapper.updateById(source);
+        log.info("文件转移 fileId={} targetApp={} user={}", fileId, target, userId);
+        return FileView.from(source);
+    }
+
+    @Override
     public void reportScanResult(long fileId, String status) {
         if (!"clean".equals(status) && !"infected".equals(status)) {
             throw new BizException(ErrorCode.BAD_REQUEST, "非法扫描状态: " + status);

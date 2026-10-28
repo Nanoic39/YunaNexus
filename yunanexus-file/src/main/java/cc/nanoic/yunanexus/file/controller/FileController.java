@@ -255,6 +255,24 @@ public class FileController {
         return Result.success();
     }
 
+    /**
+     * 跨应用转移文件（仅官方前端）。move 改归属不占配额，copy 复制并占用配额。
+     *
+     * @param fileId      文件 ID
+     * @param targetAppId 目标应用；空表示转回官方前端
+     * @param copy        是否复制
+     * @param userId      当前用户
+     * @return 结果文件
+     */
+    @PostMapping("/transfer/{fileId}")
+    public Result<cc.nanoic.yunanexus.file.domain.FileView> transfer(
+            @PathVariable("fileId") long fileId,
+            @RequestParam(value = "targetAppId", required = false) String targetAppId,
+            @RequestParam(value = "copy", defaultValue = "false") boolean copy,
+            @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        return Result.success(fileService.transferApp(fileId, requireUserId(userId), targetAppId, copy));
+    }
+
     /** 取客户端 IP：优先代理头，取第一个非空段 */
     private String clientIp() {
         org.springframework.web.context.request.ServletRequestAttributes attrs =
