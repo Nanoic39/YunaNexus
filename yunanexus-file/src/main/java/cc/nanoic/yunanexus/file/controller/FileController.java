@@ -273,6 +273,22 @@ public class FileController {
         return Result.success(fileService.transferApp(fileId, requireUserId(userId), targetAppId, copy));
     }
 
+    /**
+     * 上传系统物料（头像等）：系统内公开、不计个人配额，仅官方前端可调。
+     */
+    @PostMapping("/system-asset")
+    public Result<cc.nanoic.yunanexus.file.domain.FileView> uploadSystemAsset(
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader(value = USER_ID_HEADER, required = false) Long userId) {
+        long owner = requireUserId(userId);
+        if (!cc.nanoic.yunanexus.file.config.FileAccessContext.isOfficial()) {
+            throw new cc.nanoic.yunanexus.common.web.exception.BizException(
+                    cc.nanoic.yunanexus.common.web.constant.ErrorCode.FILE_ACCESS_DENIED, "仅官方前端可上传系统物料");
+        }
+        rateLimiter.acquire(owner, clientIp());
+        return Result.success(fileService.uploadSystemAsset(file, owner));
+    }
+
     /** 取客户端 IP：优先代理头，取第一个非空段 */
     private String clientIp() {
         org.springframework.web.context.request.ServletRequestAttributes attrs =

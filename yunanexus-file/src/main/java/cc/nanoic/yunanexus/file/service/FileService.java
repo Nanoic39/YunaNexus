@@ -91,6 +91,16 @@ public interface FileService {
     cc.nanoic.yunanexus.file.domain.FileView transferApp(long fileId, long userId,
                                                           String targetAppId, boolean copy);
 
+    /**
+     * 上传系统物料（头像等）：归平台所有、系统内公开、不计个人配额。
+     *
+     * @param file   文件
+     * @param userId 上传人（仅作操作留痕，不作为归属）
+     * @return 文件视图
+     */
+    cc.nanoic.yunanexus.file.domain.FileView uploadSystemAsset(
+            org.springframework.web.multipart.MultipartFile file, long userId);
+
     /** 回写恶意文件扫描结果（A5） */
     void reportScanResult(long fileId, String status);
 

@@ -45,6 +45,15 @@ public class FileView {
     @cc.nanoic.yunanexus.common.web.time.UtcDateTime
     private LocalDateTime createTime;
 
+    /** 所属应用；空表示官方前端 */
+    private String appId;
+
+    /** 归属类型：user/system/app */
+    private String ownerType;
+
+    /** 可见性：private/internal */
+    private String visibility;
+
     public static FileView from(FileMeta meta) {
         FileView view = new FileView();
         view.setFileId(meta.getFileId());
@@ -56,6 +65,9 @@ public class FileView {
         view.setCreateBy(meta.getCreateBy());
         view.setDeptId(meta.getDeptId());
         view.setCreateTime(meta.getCreateTime());
+        view.setAppId(meta.getAppId());
+        view.setOwnerType(meta.getOwnerType());
+        view.setVisibility(meta.getVisibility());
         return view;
     }
 }

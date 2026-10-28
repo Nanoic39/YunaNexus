@@ -334,6 +334,35 @@ public class FileServiceImpl implements FileService {
      * @param status clean / infected
      */
     @Override
+    public FileView uploadSystemAsset(MultipartFile file, long userId) {
+        validate(file);
+        String originalName = normalize(file.getOriginalFilename());
+        if (originalName.isEmpty()) {
+            originalName = "asset";
+        }
+        String ext = extractExt(originalName);
+        rejectDangerous(ext);
+        // 系统物料不校验个人配额：头像这类东西不该占用用户的 5 GiB
+        long fileId = nextFileId();
+        int shardIndex = shardRouter.route(fileId);
+        FileStorage.StoredObject stored;
+        try (java.io.InputStream in = file.getInputStream()) {
+            stored = fileStorage.store(in, ext);
+        } catch (java.io.IOException error) {
+            throw new BizException(ErrorCode.FILE_UPLOAD_FAILED, "读取上传流失败: " + error.getMessage());
+        }
+        FileMeta meta = buildMeta(fileId, shardIndex, originalName, ext, file.getContentType(),
+                stored.size(), stored.path(), stored.sha256(), userId, null);
+        // 系统归属 + 系统内公开：所有登录用户可读，仅官方前端可维护
+        meta.setOwnerType(cc.nanoic.yunanexus.file.service.FileAccessService.OWNER_SYSTEM);
+        meta.setVisibility(cc.nanoic.yunanexus.file.service.FileAccessService.VISIBILITY_INTERNAL);
+        meta.setAppId(null);
+        log.info("系统物料上传 fileId={} size={} by={}", fileId, stored.size(), userId);
+        return FileView.from(persistMeta(meta));
+    }
+
+
+    @Override
     @ShardRoute
     public FileView transferApp(long fileId, long userId, String targetAppId, boolean copy) {
         if (!cc.nanoic.yunanexus.file.config.FileAccessContext.isOfficial()) {
