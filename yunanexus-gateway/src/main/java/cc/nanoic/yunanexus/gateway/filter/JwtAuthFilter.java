@@ -31,6 +31,9 @@ import reactor.core.publisher.Mono;
  */
 @Component
 public class JwtAuthFilter implements GlobalFilter, Ordered {
+
+    /** 审计用：把解析出的内部用户 ID 放进 exchange 属性，供审计过滤器在请求结束后读取 */
+    public static final String AUDIT_USER_ATTR = "yunanexus.audit.userId";
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private cc.nanoic.yunanexus.gateway.security.OAuthClientChecker oauthClients;
 
@@ -74,6 +77,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             return personalApiKeyChecker.verify(incoming.substring(7),sanitized.getMethod().name(),sanitized.getPath().value())
                 .onErrorResume(e->errorWriter.write(exchange,401,GatewayErrorCodes.UNAUTHORIZED,"密钥无效、已失效或无此接口权限").then(Mono.empty()))
                 .flatMap(identity->{
+                    exchange.getAttributes().put(AUDIT_USER_ATTR, identity.userId());
                     ServerHttpRequest request=sanitized.mutate()
                         .header(properties.getUserIdHeader(),Long.toString(identity.userId()))
                         .header(properties.getShardHeader(),Integer.toString(identity.shardIndex())).build();
@@ -113,6 +117,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
                     } catch (RuntimeException e) {
                         return errorWriter.write(exchange, 401, GatewayErrorCodes.TOKEN_INVALID, "令牌无效");
                     }
+                    exchange.getAttributes().put(AUDIT_USER_ATTR, decoded.internalId());
                     ServerHttpRequest request = sanitizedExchange.getRequest().mutate()
                             .header(properties.getUserIdHeader(), Long.toString(decoded.internalId()))
                             .header(properties.getShardHeader(), Integer.toString(decoded.shardIndex()))

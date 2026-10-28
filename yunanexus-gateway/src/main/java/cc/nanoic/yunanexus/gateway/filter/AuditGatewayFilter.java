@@ -67,7 +67,11 @@ public class AuditGatewayFilter implements GlobalFilter, Ordered {
         event.setMethod(request.getMethod().name());
         event.setUri(truncate(request.getPath().value(), 512));
         event.setTraceId(request.getHeaders().getFirst(TRACE_HEADER));
-        event.setUserId(parseUserId(request.getHeaders().getFirst(USER_ID_HEADER)));
+        // 用户身份由 JwtAuthFilter 解析后写入 exchange 属性：
+        // 审计过滤器必须排在鉴权之前（否则鉴权短路会让"被拒绝的请求"完全不留痕），
+        // 而那时请求头里还没有 X-User-Id，所以只能事后从属性里取。
+        Object resolvedUserId = exchange.getAttributes().get(JwtAuthFilter.AUDIT_USER_ATTR);
+        event.setUserId(resolvedUserId instanceof Long id ? id : 0L);
         event.setUsername(request.getHeaders().getFirst(USERNAME_HEADER));
         event.setIp(resolveIp(request));
         event.setUserAgent(truncate(request.getHeaders().getFirst("User-Agent"), 512));
@@ -117,7 +121,8 @@ public class AuditGatewayFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        // 尽量靠后：确保 JwtAuthFilter 已注入 X-User-Id，采集到的才是"谁"
-        return Ordered.LOWEST_PRECEDENCE - 100;
+        // 必须最先执行：鉴权/限流过滤器会短路整条链，排在后面就采集不到被拒绝的请求——
+        // 而"谁被拒绝、被拒了多少次"恰恰是审计最该看见的部分。
+        return Ordered.HIGHEST_PRECEDENCE + 5;
     }
 }
