@@ -68,6 +68,10 @@ public class AuditGatewayFilter implements WebFilter, Ordered {
                 request.getHeaders().getFirst(USERNAME_HEADER),
                 resolveIp(request),
                 truncate(request.getHeaders().getFirst("User-Agent"), 512));
+        // 临时诊断：确认 XFF 是否到达、remoteAddress 是否可解析
+        log.info("审计 IP 诊断: xff={} remote={} addr={}", request.getHeaders().get("X-Forwarded-For"),
+                request.getRemoteAddress(),
+                request.getRemoteAddress() == null ? null : request.getRemoteAddress().getAddress());
         long start = System.currentTimeMillis();
         return chain.filter(exchange).doFinally(signal -> {
             try {
