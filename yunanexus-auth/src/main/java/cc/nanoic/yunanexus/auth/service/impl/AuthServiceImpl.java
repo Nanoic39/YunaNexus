@@ -64,6 +64,7 @@ public class AuthServiceImpl implements AuthService {
     private final AuthLoginAttemptMapper loginAttemptMapper;
     private final PasswordEncoder passwordEncoder;
     private final LoginAttemptService loginAttemptService;
+    private final cc.nanoic.yunanexus.auth.service.impl.LoginGuardService loginGuardService;
     private final CaptchaService captchaService;
     private final TokenService tokenService;
     private final TokenBlacklistService blacklistService;
@@ -80,6 +81,7 @@ public class AuthServiceImpl implements AuthService {
                            AuthLoginAttemptMapper loginAttemptMapper,
                            PasswordEncoder passwordEncoder,
                            LoginAttemptService loginAttemptService,
+                           cc.nanoic.yunanexus.auth.service.impl.LoginGuardService loginGuardService,
                            CaptchaService captchaService,
                            TokenService tokenService,
                            TokenBlacklistService blacklistService,
@@ -97,6 +99,7 @@ public class AuthServiceImpl implements AuthService {
         this.loginAttemptMapper = loginAttemptMapper;
         this.passwordEncoder = passwordEncoder;
         this.loginAttemptService = loginAttemptService;
+        this.loginGuardService = loginGuardService;
         this.captchaService = captchaService;
         this.tokenService = tokenService;
         this.blacklistService = blacklistService;
@@ -143,6 +146,24 @@ public class AuthServiceImpl implements AuthService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             int failCount = loginAttemptService.recordFailure(user.getUsername());
             authUserMapper.incrementFailCount(user.getUsername(), now());
+            // 分级处置：3 次出验证码 / 5 次冻结并通知 / 10 次冻结并告警管理员
+            var decision = loginGuardService.onFailure(user.getUsername(), ip);
+            if (decision.tier() == cc.nanoic.yunanexus.auth.service.impl.LoginGuardService.Tier.LOCK_ALERT_ADMIN) {
+                log.warn("LOGIN_ALERT_ADMIN username={} ip={} failures={}", user.getUsername(), ip,
+                        decision.userFailures());
+                recordAttempt(user.getUsername(), user.getUserId(), request.getClientCode(),
+                        false, "LOGIN_ALERT_ADMIN", ip);
+                lockAccount(user, decision.userFailures());
+                throw new BizException(ErrorCode.USER_LOCKED);
+            }
+            if (decision.tier() == cc.nanoic.yunanexus.auth.service.impl.LoginGuardService.Tier.LOCK_NOTIFY) {
+                log.warn("LOGIN_LOCK_NOTIFY username={} ip={} failures={} lock={}s", user.getUsername(), ip,
+                        decision.userFailures(), decision.lockSeconds());
+                recordAttempt(user.getUsername(), user.getUserId(), request.getClientCode(),
+                        false, "LOGIN_LOCK_NOTIFY", ip);
+                lockAccount(user, decision.userFailures());
+                throw new BizException(ErrorCode.USER_LOCKED);
+            }
             if (failCount >= properties.getLockThreshold()) {
                 lockAccount(user, failCount);
                 recordAttempt(user.getUsername(), user.getUserId(), request.getClientCode(),

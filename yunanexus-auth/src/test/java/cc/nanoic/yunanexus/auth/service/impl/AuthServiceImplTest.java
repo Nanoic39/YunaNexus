@@ -66,6 +66,7 @@ class AuthServiceImplTest {
     private AuthLoginAttemptMapper loginAttemptMapper;
     private PasswordEncoder passwordEncoder;
     private LoginAttemptService loginAttemptService;
+    private cc.nanoic.yunanexus.auth.service.impl.LoginGuardService loginGuardService;
     private CaptchaService captchaService;
     private TokenService tokenService;
     private TokenBlacklistService blacklistService;
@@ -90,6 +91,11 @@ class AuthServiceImplTest {
         loginAttemptMapper = mock(AuthLoginAttemptMapper.class);
         passwordEncoder = new BCryptPasswordEncoder();
         loginAttemptService = mock(LoginAttemptService.class);
+        loginGuardService = mock(cc.nanoic.yunanexus.auth.service.impl.LoginGuardService.class);
+        when(loginGuardService.onFailure(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(
+                new cc.nanoic.yunanexus.auth.service.impl.LoginGuardService.Decision(
+                        cc.nanoic.yunanexus.auth.service.impl.LoginGuardService.Tier.NONE, 1, false, 0));
         captchaService = mock(CaptchaService.class);
         tokenService = mock(TokenService.class);
         blacklistService = mock(TokenBlacklistService.class);
@@ -112,7 +118,7 @@ class AuthServiceImplTest {
                 authUserMapper, authClientMapper, authPlatformMapper, clock);
 
         service = new AuthServiceImpl(authUserMapper, authClientMapper, authPlatformMapper,
-                loginAttemptMapper, passwordEncoder, loginAttemptService, captchaService,
+                loginAttemptMapper, passwordEncoder, loginAttemptService, loginGuardService, captchaService,
                 tokenService, blacklistService, sessionService, properties, clock,
                 accountEpochService, authenticationService, userProfileSyncClient, mock(cc.nanoic.yunanexus.auth.service.OAuthApplicationService.class));
 

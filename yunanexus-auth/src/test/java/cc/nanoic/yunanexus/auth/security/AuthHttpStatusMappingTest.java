@@ -468,7 +468,14 @@ class AuthHttpStatusMappingTest {
         @Bean
         public AuthService authService() {
             return new AuthServiceImpl(authUserMapper(), authClientMapper(), authPlatformMapper(),
-                    authLoginAttemptMapper(), passwordEncoder(), loginAttemptService(), captchaService(),
+                    authLoginAttemptMapper(), passwordEncoder(), loginAttemptService(),
+                    Mockito.mock(cc.nanoic.yunanexus.auth.service.impl.LoginGuardService.class, invocation -> {
+                        if ("onFailure".equals(invocation.getMethod().getName())) {
+                            return new cc.nanoic.yunanexus.auth.service.impl.LoginGuardService.Decision(
+                                    cc.nanoic.yunanexus.auth.service.impl.LoginGuardService.Tier.NONE, 1, false, 0);
+                        }
+                        return Mockito.RETURNS_DEFAULTS.answer(invocation);
+                    }), captchaService(),
                     tokenService(), tokenBlacklistService(), sessionService(), authProperties(), clock(),
                     accountEpochService(), authenticationService(), Mockito.mock(cc.nanoic.yunanexus.auth.client.UserProfileSyncClient.class), Mockito.mock(cc.nanoic.yunanexus.auth.service.OAuthApplicationService.class));
         }
