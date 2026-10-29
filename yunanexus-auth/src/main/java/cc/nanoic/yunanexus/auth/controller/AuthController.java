@@ -46,6 +46,7 @@ public class AuthController {
     @Resource private CaptchaService captchaService;
 
     @Resource private SsoService ssoService;
+    @Resource private cc.nanoic.yunanexus.auth.service.impl.EmailCodeService emailCodeService;
 
     /**
      * 登录（含分级处置）。
@@ -63,6 +64,17 @@ public class AuthController {
         LoginResult result = authService.login(request, clientIp(httpRequest));
         ssoService.establish(result, httpRequest, httpResponse);
         return Result.success(result);
+    }
+
+    /**
+     * 发送邮箱验证码（注册校验 / 找回密码共用）。
+     *
+     * @param body 请求体，含 email
+     * @return 是否已发送
+     */
+    @PostMapping("/email-code")
+    public Result<Boolean> sendEmailCode(@RequestBody java.util.Map<String, String> body) {
+        return Result.success(emailCodeService.send(body.get("email")));
     }
 
     @PostMapping("/refresh")

@@ -1296,6 +1296,18 @@ public class SecurityRedisMvcIntegrationTest {
     static class TestConfig {
 
         @Bean
+
+
+        public cc.nanoic.yunanexus.auth.service.impl.EmailCodeService emailCodeService() {
+
+
+            return Mockito.mock(cc.nanoic.yunanexus.auth.service.impl.EmailCodeService.class);
+
+
+        }
+
+
+        @Bean
         public Clock clock() {
             return Clock.systemUTC();
         }
