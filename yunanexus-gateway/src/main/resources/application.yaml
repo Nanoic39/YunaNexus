@@ -79,7 +79,7 @@ spring:
               uri: lb://yunanexus-analytics
               predicates:
                 - Path=/api/v1/analytics/**
-            # 埋点上报：SDK 匿名上报，需要放行；此前只有注释没有路由，端点实际不可达
+            # 注：埋点上报由 SDK 匿名调用，permit-paths 里同步放行；此前只有注释没有路由，端点实际不可达
             - id: yunanexus-analytics-track
               uri: lb://yunanexus-analytics
               predicates:
