@@ -30,7 +30,7 @@ public class MysqlEventStore implements EventStore {
     }
 
     @Override
-    public void append(TrackEvent event, String ip) {
+    public boolean append(TrackEvent event, String ip) {
         try {
             jdbcTemplate.update(INSERT_SQL,
                     truncate(event.getEventId(), 64),
@@ -45,9 +45,12 @@ public class MysqlEventStore implements EventStore {
                     truncate(ip, 64),
                     truncate(event.getUserAgent(), 512),
                     event.getProps() == null ? null : String.valueOf(event.getProps()));
+            // INSERT IGNORE 命中重复时为 0 行：事件已存在，视为成功
+            return true;
         } catch (RuntimeException error) {
-            // 单条失败不能中断整批
+            // 单条失败不能中断整批，但必须让调用方知道没存进去
             log.warn("埋点写入失败 eventId={}: {}", event.getEventId(), error.toString());
+            return false;
         }
     }
 

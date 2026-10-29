@@ -66,17 +66,56 @@ public class TrackServiceImpl implements TrackService {
                 rejected++;
                 continue;
             }
-            normalize(event, clientIp, now);
-            // 先落库再投递：库是分析的唯一事实来源，MQ 只做下游异步通道
-            eventStore.append(event, clientIp);
-            if (producer.send(event)) {
-                accepted++;
-            } else {
+            if (!valid(event)) {
                 rejected++;
+                continue;
             }
+            normalize(event, clientIp, now);
+            // 落库成功才算接入成功：库是分析的唯一事实来源，MQ 失败只影响下游实时消费
+            boolean stored = eventStore.append(event, clientIp);
+            if (!stored) {
+                rejected++;
+                continue;
+            }
+            if (!producer.send(event)) {
+                log.debug("埋点已落库但投递 MQ 失败（不影响分析数据）eventId={}", event.getEventId());
+            }
+            accepted++;
         }
         log.debug("埋点批次接入完成 size={} accepted={} rejected={}", events.size(), accepted, rejected);
         return TrackAccepted.of(accepted, rejected);
+    }
+
+    /**
+     * 入库前的必要条件校验。
+     *
+     * <p>eventType 是必填且要写进 VARCHAR(64)：超长会让整条 insert 失败，
+     * 事件在"看起来成功"的情况下被丢弃——这是最坏的一种数据丢失。
+     * eventTime 允许 30 天回溯以容忍客户端补传，但拒绝明显穿越的时间戳。
+     *
+     * @param event 事件
+     * @return 通过返回 true
+     */
+    private boolean valid(TrackEvent event) {
+        String type = event.getEventType();
+        if (type == null || type.isBlank()) {
+            return false;
+        }
+        if (type.length() > 64) {
+            log.debug("eventType 超长已拒绝: length={}", type.length());
+            return false;
+        }
+        Long eventTime = event.getEventTime();
+        if (eventTime != null && eventTime > 0) {
+            long now = System.currentTimeMillis();
+            long minAllowed = now - 30L * 24 * 3600 * 1000;
+            long maxAllowed = now + 5L * 60 * 1000;
+            if (eventTime < minAllowed || eventTime > maxAllowed) {
+                log.debug("eventTime 超出允许区间已拒绝 eventType={} eventTime={}", type, eventTime);
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

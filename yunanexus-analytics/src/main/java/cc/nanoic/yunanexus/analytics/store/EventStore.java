@@ -19,8 +19,9 @@ public interface EventStore {
      *
      * @param event 事件
      * @param ip    客户端 IP
+     * @return true 表示已落库（重复上报视为已存在，同样返回 true）
      */
-    void append(TrackEvent event, String ip);
+    boolean append(TrackEvent event, String ip);
 
     /**
      * 删除早于指定时间的事件（保留策略）。
