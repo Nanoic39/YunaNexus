@@ -63,7 +63,8 @@ public class AuditGatewayFilter implements WebFilter, Ordered {
             try {
                 auditClient.submit(buildEvent(exchange, start));
             } catch (RuntimeException error) {
-                log.debug("网关审计采集异常（已忽略）：{}", error.toString());
+                // 用 WARN 而不是 DEBUG：采集失败若只记 DEBUG，线上等于静默丢审计
+                log.warn("网关审计采集异常（已忽略）：{}", error.toString(), error);
             }
         });
     }
