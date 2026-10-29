@@ -20,7 +20,16 @@ public class AuthProperties {
     private int captchaThreshold = 3;
 
     /** 登录失败锁定阈值（≥ 此值后锁定账号） */
-    private int lockThreshold = 7;
+    private int lockThreshold = 5;
+
+    /** 冻结账户并通知管理员的阈值（次） */
+    private int alertThreshold = 10;
+
+    /** 冻结时长与 IP 封禁时长（秒） */
+    private long lockDurationSeconds = 600;
+
+    /** 失败计数窗口（秒） */
+    private long failWindowSeconds = 1800;
 
     /** 锁定时长（分钟） */
     private int lockMinutes = 30;
