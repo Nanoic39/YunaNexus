@@ -53,39 +53,53 @@ public class AuditGatewayFilter implements WebFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        // 监控端点不进审计：健康检查频率高且无业务含义，写进去只会淹没真正的信号
+        // 监控端点不进审计：健康检查频率高且无业务含义
         String path = exchange.getRequest().getPath().value();
         if (path.startsWith("/actuator")) {
             return chain.filter(exchange);
         }
+        // 入口即采集：请求完成后连接已释放，getRemoteAddress 与入站头都不可靠，
+        // 必须在链路开始前把需要的字段抓成快照（此前这里取到的是 null，导致 IP 恒为空）
+        ServerHttpRequest request = exchange.getRequest();
+        Snapshot snapshot = new Snapshot(
+                path,
+                request.getMethod().name(),
+                request.getHeaders().getFirst(TRACE_HEADER),
+                request.getHeaders().getFirst(USERNAME_HEADER),
+                resolveIp(request),
+                truncate(request.getHeaders().getFirst("User-Agent"), 512));
         long start = System.currentTimeMillis();
         return chain.filter(exchange).doFinally(signal -> {
             try {
-                auditClient.submit(buildEvent(exchange, start));
+                auditClient.submit(buildEvent(exchange, snapshot, start));
             } catch (RuntimeException error) {
-                // 用 WARN 而不是 DEBUG：采集失败若只记 DEBUG，线上等于静默丢审计
                 log.warn("网关审计采集异常（已忽略）：{}", error.toString(), error);
             }
         });
     }
 
-    private AuditEvent buildEvent(ServerWebExchange exchange, long start) {
+    /** 请求入口处的字段快照：只在连接存活时可安全读取 */
+    private record Snapshot(String uri, String method, String traceId, String username,
+                            String ip, String userAgent) {
+    }
+
+    private AuditEvent buildEvent(ServerWebExchange exchange, Snapshot snapshot, long start) {
         ServerHttpRequest request = exchange.getRequest();
         AuditEvent event = new AuditEvent();
         event.setService("yunanexus-gateway");
         event.setModule(GATEWAY_MODULE);
         event.setAction(GATEWAY_ACTION);
-        event.setMethod(request.getMethod().name());
-        event.setUri(truncate(request.getPath().value(), 512));
-        event.setTraceId(request.getHeaders().getFirst(TRACE_HEADER));
+        event.setMethod(snapshot.method());
+        event.setUri(snapshot.uri());
+        event.setTraceId(snapshot.traceId());
         // 用户身份由 JwtAuthFilter 解析后写入 exchange 属性：
         // 审计过滤器必须排在鉴权之前（否则鉴权短路会让"被拒绝的请求"完全不留痕），
         // 而那时请求头里还没有 X-User-Id，所以只能事后从属性里取。
         Object resolvedUserId = exchange.getAttributes().get(JwtAuthFilter.AUDIT_USER_ATTR);
         event.setUserId(resolvedUserId instanceof Long id ? id : 0L);
-        event.setUsername(request.getHeaders().getFirst(USERNAME_HEADER));
-        event.setIp(resolveIp(request));
-        event.setUserAgent(truncate(request.getHeaders().getFirst("User-Agent"), 512));
+        event.setUsername(snapshot.username());
+        event.setIp(snapshot.ip());
+        event.setUserAgent(snapshot.userAgent());
         event.setDurationMs(System.currentTimeMillis() - start);
         event.setCreateTime(System.currentTimeMillis());
         Integer status = exchange.getResponse().getStatusCode() == null
