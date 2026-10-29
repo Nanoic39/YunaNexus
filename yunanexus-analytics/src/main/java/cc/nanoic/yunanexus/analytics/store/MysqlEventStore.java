@@ -24,9 +24,11 @@ public class MysqlEventStore implements EventStore {
             + "page_url, referrer, client_ip, user_agent, props) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
 
     private final JdbcTemplate jdbcTemplate;
+    private final tools.jackson.databind.ObjectMapper objectMapper;
 
-    public MysqlEventStore(JdbcTemplate jdbcTemplate) {
+    public MysqlEventStore(JdbcTemplate jdbcTemplate, tools.jackson.databind.ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -44,7 +46,7 @@ public class MysqlEventStore implements EventStore {
                     truncate(event.getReferrer(), 512),
                     truncate(ip, 64),
                     truncate(event.getUserAgent(), 512),
-                    event.getProps() == null ? null : String.valueOf(event.getProps()));
+                    toJson(event));
             // INSERT IGNORE 命中重复时为 0 行：事件已存在，视为成功
             return true;
         } catch (RuntimeException error) {
@@ -67,6 +69,19 @@ public class MysqlEventStore implements EventStore {
                 "SELECT COUNT(*) FROM track_event WHERE event_time >= ? AND event_time < ?",
                 Long.class, from, to);
         return count == null ? 0L : count;
+    }
+
+    /** props 必须序列化成 JSON：Map.toString 得到 {k=v}，后续无法做 JSON 路径查询 */
+    private String toJson(TrackEvent event) {
+        if (event.getProps() == null || event.getProps().isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(event.getProps());
+        } catch (Exception error) {
+            log.debug("props 序列化失败，按空处理 eventId={}: {}", event.getEventId(), error.toString());
+            return null;
+        }
     }
 
     private LocalDateTime toUtc(Long epochMillis) {

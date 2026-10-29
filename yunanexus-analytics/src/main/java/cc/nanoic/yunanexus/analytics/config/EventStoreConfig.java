@@ -41,7 +41,8 @@ public class EventStoreConfig {
     }
 
     @Bean
-    public EventStore eventStore(HikariDataSource eventStoreDataSource) {
-        return new MysqlEventStore(new JdbcTemplate(eventStoreDataSource));
+    public EventStore eventStore(HikariDataSource eventStoreDataSource,
+                                 tools.jackson.databind.ObjectMapper objectMapper) {
+        return new MysqlEventStore(new JdbcTemplate(eventStoreDataSource), objectMapper);
     }
 }
