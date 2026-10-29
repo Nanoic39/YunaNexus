@@ -64,6 +64,10 @@ public class AuthServiceImpl implements AuthService {
     private final AuthLoginAttemptMapper loginAttemptMapper;
     private final PasswordEncoder passwordEncoder;
     private final LoginAttemptService loginAttemptService;
+
+    /** 字段注入：避免改动构造签名牵连既有测试；测试环境为 null 时跳过通知 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private LoginLockNotifier loginLockNotifier;
     private final cc.nanoic.yunanexus.auth.service.impl.LoginGuardService loginGuardService;
     private final CaptchaService captchaService;
     private final TokenService tokenService;
@@ -435,6 +439,11 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private void lockAccount(AuthUser user, int failCount) {
+        if (loginLockNotifier != null) {
+            loginLockNotifier.notifyLocked(user.getUsername(), user.getEmail(), failCount,
+                    properties.getLockDurationSeconds());
+        }
+
         long lockedUntil = loginAttemptService.lock(user.getUsername());
         authUserMapper.updateStatusAndLock(user.getUserId(), 2,
                 LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(lockedUntil), clock.getZone()),
