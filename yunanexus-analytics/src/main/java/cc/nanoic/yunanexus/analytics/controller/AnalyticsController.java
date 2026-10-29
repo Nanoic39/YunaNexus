@@ -22,14 +22,41 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/analytics")
 public class AnalyticsController {
 
+    @jakarta.annotation.Resource
+    private cc.nanoic.yunanexus.analytics.service.AnalyticsQueryService queryService;
+
+    /** 默认查询窗口：最近 7 天 */
+    private java.time.LocalDateTime defaultFrom() {
+        return java.time.LocalDateTime.now().minusDays(7);
+    }
+
+    private java.time.LocalDateTime defaultTo() {
+        return java.time.LocalDateTime.now().plusDays(1);
+    }
+
     /**
      * 漏斗分析：按 {@code steps} 顺序统计各步骤到达用户数。
      *
      * @param steps 步骤事件类型，逗号分隔（如 {@code $view,$cart,$order}）
      */
     @GetMapping("/funnel")
-    public Result<FunnelResult> funnel(@RequestParam(value = "steps", required = false) String steps) {
-        return Result.success(FunnelResult.empty());
+    public Result<FunnelResult> funnel(@RequestParam(value = "steps", required = false) String steps,
+                                       @RequestParam(value = "from", required = false) String from,
+                                       @RequestParam(value = "to", required = false) String to) {
+        if (steps == null || steps.isBlank()) {
+            return Result.success(FunnelResult.empty());
+        }
+        return Result.success(queryService.funnel(
+                java.util.Arrays.stream(steps.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList(),
+                parseFrom(from), parseTo(to)));
+    }
+
+    private java.time.LocalDateTime parseFrom(String value) {
+        return value == null || value.isBlank() ? defaultFrom() : java.time.LocalDateTime.parse(value);
+    }
+
+    private java.time.LocalDateTime parseTo(String value) {
+        return value == null || value.isBlank() ? defaultTo() : java.time.LocalDateTime.parse(value);
     }
 
     /**
@@ -38,8 +65,14 @@ public class AnalyticsController {
      * @param cohort 留存批次维度（如注册日期）
      */
     @GetMapping("/retention")
-    public Result<RetentionResult> retention(@RequestParam(value = "cohort", required = false) String cohort) {
-        return Result.success(RetentionResult.empty());
+    public Result<RetentionResult> retention(@RequestParam(value = "cohort", required = false) String cohort,
+                                             @RequestParam(value = "days", defaultValue = "7") int days,
+                                             @RequestParam(value = "from", required = false) String from,
+                                             @RequestParam(value = "to", required = false) String to) {
+        if (cohort == null || cohort.isBlank()) {
+            return Result.success(RetentionResult.empty());
+        }
+        return Result.success(queryService.retention(cohort, days, parseFrom(from), parseTo(to)));
     }
 
     /**
@@ -48,8 +81,14 @@ public class AnalyticsController {
      * @param condition 分群条件表达式
      */
     @GetMapping("/segments")
-    public Result<SegmentResult> segments(@RequestParam(value = "condition", required = false) String condition) {
-        return Result.success(SegmentResult.empty());
+    public Result<SegmentResult> segments(@RequestParam(value = "condition", required = false) String condition,
+                                          @RequestParam(value = "minCount", defaultValue = "1") int minCount,
+                                          @RequestParam(value = "from", required = false) String from,
+                                          @RequestParam(value = "to", required = false) String to) {
+        if (condition == null || condition.isBlank()) {
+            return Result.success(SegmentResult.empty());
+        }
+        return Result.success(queryService.segments(condition, minCount, parseFrom(from), parseTo(to)));
     }
 
     /**
@@ -58,7 +97,9 @@ public class AnalyticsController {
      * @param userId 用户外部 ID
      */
     @GetMapping("/profile")
-    public Result<UserProfileResult> profile(@RequestParam(value = "userId", required = false) String userId) {
-        return Result.success(UserProfileResult.of(userId));
+    public Result<UserProfileResult> profile(@RequestParam(value = "userId", required = false) String userId,
+                                             @RequestParam(value = "from", required = false) String from,
+                                             @RequestParam(value = "to", required = false) String to) {
+        return Result.success(queryService.profile(userId, parseFrom(from), parseTo(to)));
     }
 }

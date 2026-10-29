@@ -40,6 +40,12 @@ public class EventStoreConfig {
         return dataSource;
     }
 
+    /** 查询专用 JdbcTemplate：与分析写入共用同一数据源，但语义上分离便于日后切 ClickHouse */
+    @Bean
+    public JdbcTemplate analyticsJdbcTemplate(HikariDataSource eventStoreDataSource) {
+        return new JdbcTemplate(eventStoreDataSource);
+    }
+
     @Bean
     public cc.nanoic.yunanexus.analytics.store.TrackRateLimiter trackRateLimiter(
             HikariDataSource eventStoreDataSource) {
