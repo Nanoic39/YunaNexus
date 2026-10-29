@@ -68,10 +68,6 @@ public class AuditGatewayFilter implements WebFilter, Ordered {
                 request.getHeaders().getFirst(USERNAME_HEADER),
                 resolveIp(request),
                 truncate(request.getHeaders().getFirst("User-Agent"), 512));
-        // 临时诊断：确认 XFF 是否到达、remoteAddress 是否可解析
-        log.info("审计 IP 诊断: xff={} remote={} addr={}", request.getHeaders().get("X-Forwarded-For"),
-                request.getRemoteAddress(),
-                request.getRemoteAddress() == null ? null : request.getRemoteAddress().getAddress());
         long start = System.currentTimeMillis();
         return chain.filter(exchange).doFinally(signal -> {
             try {
@@ -141,8 +137,10 @@ public class AuditGatewayFilter implements WebFilter, Ordered {
         if (remote == null) {
             return null;
         }
+        // 网关侧的 InetSocketAddress 常是"未解析"状态：getAddress() 为 null，
+        // 但 getHostString() 仍返回地址文本。用前者会让 IP 恒为空。
         java.net.InetAddress address = remote.getAddress();
-        return address == null ? null : truncate(address.getHostAddress(), 64);
+        return truncate(address != null ? address.getHostAddress() : remote.getHostString(), 64);
     }
 
     private String truncate(String value, int max) {
