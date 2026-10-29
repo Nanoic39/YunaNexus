@@ -15,6 +15,20 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "yunanexus.analytics")
 public class AnalyticsProperties {
 
+    /** 埋点保留策略 */
+    private Retention retention = new Retention();
+
+    /**
+     * 埋点保留策略。
+     */
+    @lombok.Data
+    public static class Retention {
+        /** 保留天数（<=0 表示不清理） */
+        private int days = 90;
+        /** 单批删除条数 */
+        private int batchSize = 5000;
+    }
+
     private Rocketmq rocketmq = new Rocketmq();
 
     private Ingest ingest = new Ingest();

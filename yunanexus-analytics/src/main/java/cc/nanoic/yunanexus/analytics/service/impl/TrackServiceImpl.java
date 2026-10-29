@@ -32,15 +32,18 @@ public class TrackServiceImpl implements TrackService {
     private final AnalyticsProducer producer;
     private final AnalyticsProperties properties;
     private final ObjectMapper objectMapper;
+    private final cc.nanoic.yunanexus.analytics.store.EventStore eventStore;
 
     /** 固定窗口限流用：当前窗口起始秒与窗口内累计事件数 */
     private final AtomicLong currentWindowSecond = new AtomicLong(-1);
     private final AtomicLong windowCount = new AtomicLong(0);
 
-    public TrackServiceImpl(AnalyticsProducer producer, AnalyticsProperties properties, ObjectMapper objectMapper) {
+    public TrackServiceImpl(AnalyticsProducer producer, AnalyticsProperties properties, ObjectMapper objectMapper,
+                            cc.nanoic.yunanexus.analytics.store.EventStore eventStore) {
         this.producer = producer;
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.eventStore = eventStore;
     }
 
     @Override
@@ -64,6 +67,8 @@ public class TrackServiceImpl implements TrackService {
                 continue;
             }
             normalize(event, clientIp, now);
+            // 先落库再投递：库是分析的唯一事实来源，MQ 只做下游异步通道
+            eventStore.append(event, clientIp);
             if (producer.send(event)) {
                 accepted++;
             } else {
