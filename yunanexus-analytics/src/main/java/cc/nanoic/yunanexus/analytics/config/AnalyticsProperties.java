@@ -51,6 +51,14 @@ public class AnalyticsProperties {
     /** 上报接入参数 */
     @Data
     public static class Ingest {
+
+        /**
+         * 事件类型白名单；为空表示不限制。
+         *
+         * <p>不限制时任何字符串都能入库，漏斗/留存依赖的事件名会因拼写漂移产生脏数据，
+         * 报表之间互相打架。生产环境建议显式配置。
+         */
+        private java.util.List<String> allowedEventTypes = new java.util.ArrayList<>();
         /** 单次上报最大事件数，超过返回 {@code 80001} */
         private int maxBatchSize = 200;
         /** 单事件 props 最大长度（字符），超过截断 */

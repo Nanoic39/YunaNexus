@@ -41,6 +41,13 @@ public class EventStoreConfig {
     }
 
     @Bean
+    public cc.nanoic.yunanexus.analytics.store.TrackRateLimiter trackRateLimiter(
+            HikariDataSource eventStoreDataSource) {
+        return new cc.nanoic.yunanexus.analytics.store.TrackRateLimiter(
+                new JdbcTemplate(eventStoreDataSource));
+    }
+
+    @Bean
     public EventStore eventStore(HikariDataSource eventStoreDataSource,
                                  tools.jackson.databind.ObjectMapper objectMapper) {
         return new MysqlEventStore(new JdbcTemplate(eventStoreDataSource), objectMapper);

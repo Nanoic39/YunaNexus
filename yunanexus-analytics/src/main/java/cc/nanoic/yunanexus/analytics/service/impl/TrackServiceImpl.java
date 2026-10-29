@@ -33,17 +33,20 @@ public class TrackServiceImpl implements TrackService {
     private final AnalyticsProperties properties;
     private final ObjectMapper objectMapper;
     private final cc.nanoic.yunanexus.analytics.store.EventStore eventStore;
+    private final cc.nanoic.yunanexus.analytics.store.TrackRateLimiter trackRateLimiter;
 
     /** 固定窗口限流用：当前窗口起始秒与窗口内累计事件数 */
     private final AtomicLong currentWindowSecond = new AtomicLong(-1);
     private final AtomicLong windowCount = new AtomicLong(0);
 
     public TrackServiceImpl(AnalyticsProducer producer, AnalyticsProperties properties, ObjectMapper objectMapper,
-                            cc.nanoic.yunanexus.analytics.store.EventStore eventStore) {
+                            cc.nanoic.yunanexus.analytics.store.EventStore eventStore,
+                            cc.nanoic.yunanexus.analytics.store.TrackRateLimiter trackRateLimiter) {
         this.producer = producer;
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.eventStore = eventStore;
+        this.trackRateLimiter = trackRateLimiter;
     }
 
     @Override
@@ -56,7 +59,14 @@ public class TrackServiceImpl implements TrackService {
             throw new BizException(ErrorCode.EVENT_INVALID,
                     "单次上报事件数超过上限 " + ingest.getMaxBatchSize());
         }
-        checkRateLimit(events.size(), ingest.getMaxQps());
+        if (ingest.getMaxQps() > 0) {
+            long second = System.currentTimeMillis() / 1000;
+            long hits = trackRateLimiter.accumulate(second, events.size());
+            if (hits > ingest.getMaxQps()) {
+                throw new BizException(ErrorCode.TRACK_RATE_LIMITED,
+                        "埋点上报超过限流阈值 " + ingest.getMaxQps() + "/s（当前窗口 " + hits + "）");
+            }
+        }
 
         long now = System.currentTimeMillis();
         int accepted = 0;
@@ -101,8 +111,18 @@ public class TrackServiceImpl implements TrackService {
         if (type == null || type.isBlank()) {
             return false;
         }
+        java.util.List<String> allowed = properties.getIngest().getAllowedEventTypes();
+        if (allowed != null && !allowed.isEmpty() && !allowed.contains(type)) {
+            log.debug("事件类型不在白名单已拒绝: {}", type);
+            return false;
+        }
         if (type.length() > 64) {
             log.debug("eventType 超长已拒绝: length={}", type.length());
+            return false;
+        }
+        java.util.List<String> allowed = properties.getIngest().getAllowedEventTypes();
+        if (allowed != null && !allowed.isEmpty() && !allowed.contains(type)) {
+            log.debug("事件类型不在白名单已拒绝: {}", type);
             return false;
         }
         Long eventTime = event.getEventTime();
