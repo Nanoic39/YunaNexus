@@ -15,6 +15,17 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "yunanexus.analytics")
 public class AnalyticsProperties {
 
+    /**
+     * 分级保留规则。
+     */
+    @lombok.Data
+    public static class RetentionRule {
+        /** 事件类型前缀匹配，如 $page 命中 $page_view；* 表示默认规则 */
+        private String eventTypePrefix;
+        /** 该类型保留天数 */
+        private int days;
+    }
+
     /** 埋点保留策略 */
     private Retention retention = new Retention();
 
@@ -27,6 +38,13 @@ public class AnalyticsProperties {
         private int days = 90;
         /** 单批删除条数 */
         private int batchSize = 5000;
+        /**
+         * 分级保留规则：命中更精确的事件类型可用更短或更长的保留期。
+         *
+         * <p>一刀切 90 天对交易类数据不够、对浏览类数据又太长——交易需要可追溯更久，
+         * 高频浏览事件占绝大多数且分析价值衰减快。
+         */
+        private java.util.List<RetentionRule> rules = new java.util.ArrayList<>();
     }
 
     private Rocketmq rocketmq = new Rocketmq();

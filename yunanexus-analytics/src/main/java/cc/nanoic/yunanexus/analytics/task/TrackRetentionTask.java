@@ -34,9 +34,24 @@ public class TrackRetentionTask {
         if (days <= 0) {
             return;
         }
-        LocalDateTime before = LocalDateTime.now().minusDays(days);
         int batch = Math.max(1, properties.getRetention().getBatchSize());
         long total = 0;
+        // 分级规则：更精确的类型优先匹配，未命中的走全局保留期
+        for (var rule : properties.getRetention().getRules()) {
+            if (rule.getEventTypePrefix() == null || rule.getDays() <= 0) {
+                continue;
+            }
+            LocalDateTime before = LocalDateTime.now().minusDays(rule.getDays());
+            while (true) {
+                int deleted = eventStore.purgeBeforeByTypePrefix(rule.getEventTypePrefix(), before, batch);
+                total += deleted;
+                if (deleted < batch) {
+                    break;
+                }
+            }
+            log.info("分级清理 {} 前缀：{} 天前数据", rule.getEventTypePrefix(), rule.getDays());
+        }
+        LocalDateTime before = LocalDateTime.now().minusDays(days);
         while (true) {
             int deleted = eventStore.purgeBefore(before, batch);
             total += deleted;
@@ -44,6 +59,6 @@ public class TrackRetentionTask {
                 break;
             }
         }
-        log.info("埋点保留清理完成：删除 {} 条（早于 {}）", total, before);
+        log.info("埋点保留清理完成：删除 {} 条（默认早于 {}）", total, before);
     }
 }

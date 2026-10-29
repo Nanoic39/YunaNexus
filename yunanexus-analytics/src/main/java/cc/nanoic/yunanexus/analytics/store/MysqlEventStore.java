@@ -44,8 +44,8 @@ public class MysqlEventStore implements EventStore {
                     truncate(event.getDeviceId(), 64),
                     truncate(event.getPageUrl(), 512),
                     truncate(event.getReferrer(), 512),
-                    truncate(ip, 64),
-                    truncate(event.getUserAgent(), 512),
+                    PiiMasker.maskIp(ip),
+                    PiiMasker.maskUserAgent(event.getUserAgent()),
                     toJson(event));
             // INSERT IGNORE 命中重复时为 0 行：事件已存在，视为成功
             return true;
@@ -60,6 +60,17 @@ public class MysqlEventStore implements EventStore {
     public int purgeBefore(LocalDateTime before, int limit) {
         Integer deleted = jdbcTemplate.update(
                 "DELETE FROM track_event WHERE event_time < ? LIMIT " + Math.max(1, limit), before);
+        return deleted == null ? 0 : deleted;
+    }
+
+    @Override
+    public int purgeBeforeByTypePrefix(String typePrefix, LocalDateTime before, int limit) {
+        if (typePrefix == null || typePrefix.isBlank()) {
+            return purgeBefore(before, limit);
+        }
+        Integer deleted = jdbcTemplate.update(
+                "DELETE FROM track_event WHERE event_time < ? AND event_type LIKE ? LIMIT "
+                        + Math.max(1, limit), before, typePrefix + "%");
         return deleted == null ? 0 : deleted;
     }
 

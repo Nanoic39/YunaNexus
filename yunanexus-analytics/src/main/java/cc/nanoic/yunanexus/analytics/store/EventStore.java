@@ -33,6 +33,16 @@ public interface EventStore {
     int purgeBefore(LocalDateTime before, int limit);
 
     /**
+     * 按事件类型前缀清理（分级保留）。
+     *
+     * @param typePrefix 事件类型前缀；{@code null} 表示不按类型过滤
+     * @param before     截止时间
+     * @param limit      单批上限
+     * @return 删除行数
+     */
+    int purgeBeforeByTypePrefix(String typePrefix, LocalDateTime before, int limit);
+
+    /**
      * 统计某时间范围内的事件数（用于健康检查与验证）。
      *
      * @param from 起始
