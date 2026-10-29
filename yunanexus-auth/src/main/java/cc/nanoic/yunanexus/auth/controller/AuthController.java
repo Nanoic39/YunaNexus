@@ -47,6 +47,14 @@ public class AuthController {
 
     @Resource private SsoService ssoService;
 
+    /**
+     * 登录（含分级处置）。
+     *
+     * <p>登录成功与失败都会进入审计链路：失败次数、冻结等细节由 auth 侧落表，
+     * 审计记录提供"谁在什么时候从哪个 IP 尝试登录"的独立凭据。
+     */
+    @cc.nanoic.yunanexus.common.audit.annotation.AuditAction(
+            module = "auth", action = "LOGIN", risk = "HIGH")
     @PostMapping("/login")
     public Result<LoginResult> login(
             @Valid @RequestBody LoginRequest request,
