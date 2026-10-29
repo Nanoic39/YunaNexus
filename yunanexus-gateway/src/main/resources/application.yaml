@@ -154,6 +154,9 @@ yunanexus:
     permission:
       # 仍要求 JWT；业务服务按网关注入的用户 ID 验证本人资源。
       permit-paths:
+        # 埋点上报为匿名 SDK 调用：权限校验层同样需要放行，否则仍会被判未认证
+        - /api/v1/track
+        - /api/v1/track/**
         - /api/v1/permission/me
         - /api/v1/auth/me
         - /api/v1/auth/logout
