@@ -120,11 +120,6 @@ public class TrackServiceImpl implements TrackService {
             log.debug("eventType 超长已拒绝: length={}", type.length());
             return false;
         }
-        java.util.List<String> allowed = properties.getIngest().getAllowedEventTypes();
-        if (allowed != null && !allowed.isEmpty() && !allowed.contains(type)) {
-            log.debug("事件类型不在白名单已拒绝: {}", type);
-            return false;
-        }
         Long eventTime = event.getEventTime();
         if (eventTime != null && eventTime > 0) {
             long now = System.currentTimeMillis();
