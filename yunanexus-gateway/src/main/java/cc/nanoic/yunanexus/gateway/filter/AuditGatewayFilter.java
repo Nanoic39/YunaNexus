@@ -117,10 +117,14 @@ public class AuditGatewayFilter implements WebFilter, Ordered {
             int comma = value.indexOf(',');
             return truncate(comma > 0 ? value.substring(0, comma).trim() : value.trim(), 64);
         }
-        if (request.getRemoteAddress() == null) {
+        // 请求完成后连接可能已关闭：InetSocketAddress.getAddress() 会返回 null，
+        // 直接解引用会让整条审计事件被丢弃（曾导致经 edge 的请求完全不落审计）。
+        java.net.InetSocketAddress remote = request.getRemoteAddress();
+        if (remote == null) {
             return null;
         }
-        return truncate(request.getRemoteAddress().getAddress().getHostAddress(), 64);
+        java.net.InetAddress address = remote.getAddress();
+        return address == null ? null : truncate(address.getHostAddress(), 64);
     }
 
     private String truncate(String value, int max) {
