@@ -79,6 +79,11 @@ spring:
               uri: lb://yunanexus-analytics
               predicates:
                 - Path=/api/v1/analytics/**
+            # 埋点上报：SDK 匿名上报，需要放行；此前只有注释没有路由，端点实际不可达
+            - id: yunanexus-analytics-track
+              uri: lb://yunanexus-analytics
+              predicates:
+                - Path=/api/v1/track/**
 
 management:
   endpoints:
@@ -120,6 +125,8 @@ yunanexus:
           hmac-key-base64: ${EXTERNAL_ID_HMAC_KEY_V1:}
     # 免 JWT 鉴权路径（认证中心自身负责这些端点的鉴权/CSRF）
     permit-paths:
+      - /api/v1/track
+      - /api/v1/track/**
       - /api/v1/status
       - /api/v1/status/**
       - /api/v1/file/public/assets/*
