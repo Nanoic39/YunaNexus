@@ -373,7 +373,8 @@ class AuthServiceImplTest {
         assertEquals("new-access-token", result.getAccessToken());
         assertEquals("ext-alice", result.getExternalId());
         verify(sessionService).rotate(eq(sid), eq(oldRefreshJti), any(SessionInfo.class));
-        verify(blacklistService, never()).revoke(anyString(), anyString(), any(Instant.class));
+        // 轮换后旧 access 必须被撤销：否则旧访问令牌在 TTL 内仍可用
+        verify(blacklistService).revoke(eq(sid), anyString(), any(Instant.class));
         verify(sessionService, never()).remove(anyString());
     }
 
@@ -554,6 +555,7 @@ class AuthServiceImplTest {
         BizException e = assertThrows(BizException.class, () -> service.refresh("refresh-token"));
         assertEquals(30104, e.getCode());
         verify(sessionService).rotate(eq(sid), eq(oldRefreshJti), any(SessionInfo.class));
+        // CAS 失败：不签发、不撤销
         verify(blacklistService, never()).revoke(anyString(), anyString(), any(Instant.class));
         verify(sessionService, never()).remove(anyString());
     }
@@ -694,7 +696,7 @@ class AuthServiceImplTest {
         BizException e = assertThrows(BizException.class, () -> service.refresh("refresh-token"));
         assertEquals(30104, e.getCode());
         verify(sessionService).rotate(eq(sid), eq(originalJti), any(SessionInfo.class));
-        verify(blacklistService, never()).revoke(anyString(), anyString(), any(Instant.class));
+        verify(blacklistService).revoke(eq(sid), anyString(), any(Instant.class));
         verify(sessionService, never()).remove(anyString());
     }
 

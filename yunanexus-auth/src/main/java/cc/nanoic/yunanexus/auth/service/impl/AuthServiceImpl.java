@@ -231,6 +231,11 @@ public class AuthServiceImpl implements AuthService {
             throw new BizException(ErrorCode.REFRESH_TOKEN_INVALID);
         }
 
+        // 轮换后撤销旧 access 令牌：刷新语义要求"旧的两个令牌同时失效"，
+        // 仅靠会话 CAS 只能让旧 refresh 失效，旧 access 仍可在 TTL 内继续使用。
+        blacklistService.revoke(session.getSid(), session.getAccessJti(),
+                java.time.Instant.ofEpochMilli(session.getAccessExpiresAtMillis()));
+
         // CAS 后检查 current，Redis 故障必须抛出（不吞）
         if (!accountEpochService.isCurrent(session.getUserId(), epoch)) {
             throw new BizException(ErrorCode.REFRESH_TOKEN_INVALID);
