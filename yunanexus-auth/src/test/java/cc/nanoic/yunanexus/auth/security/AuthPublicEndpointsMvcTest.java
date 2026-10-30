@@ -2,6 +2,8 @@ package cc.nanoic.yunanexus.auth.security;
 
 import cc.nanoic.yunanexus.auth.config.SecurityConfig;
 import cc.nanoic.yunanexus.auth.controller.AuthController;
+import cc.nanoic.yunanexus.auth.domain.EmailCodePurpose;
+import cc.nanoic.yunanexus.auth.domain.RegisterRequest;
 import cc.nanoic.yunanexus.auth.service.*;
 import cc.nanoic.yunanexus.auth.service.impl.EmailCodeService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,7 +38,7 @@ class AuthPublicEndpointsMvcTest {
             context.refresh();
             var mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
             var mail = context.getBean(EmailCodeService.class);
-            when(mail.send("test@example.com", "127.0.0.1")).thenReturn(true);
+            when(mail.send("test@example.com", EmailCodePurpose.REGISTER, "127.0.0.1")).thenReturn(true);
 
             mvc.perform(post("/api/v1/auth/email-code").contentType(MediaType.APPLICATION_JSON)
                     .content("{\"email\":\"test@example.com\"}"))
@@ -52,13 +54,47 @@ class AuthPublicEndpointsMvcTest {
                     .content("{\"email\":\"test@example.com\"}")
                     .cookie(cookie).header("X-XSRF-TOKEN", token))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(true));
-            verify(mail).send("test@example.com", "127.0.0.1");
+            verify(mail).send("test@example.com", EmailCodePurpose.REGISTER, "127.0.0.1");
 
             mvc.perform(post("/api/v1/auth/email-code").contentType(MediaType.APPLICATION_JSON)
                     .content("{\"email\":\"test@example.com\"}")
                     .cookie(cookie).header("X-XSRF-TOKEN", "wrong"))
                     .andExpect(status().isForbidden());
             verifyNoMoreInteractions(mail);
+
+            when(mail.send("test@example.com", EmailCodePurpose.LOGIN, "127.0.0.1")).thenReturn(true);
+            mvc.perform(post("/api/v1/auth/email-code").contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"email\":\"test@example.com\",\"purpose\":\"LOGIN\"}")
+                    .cookie(cookie).header("X-XSRF-TOKEN", token))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(true));
+            verify(mail).send("test@example.com", EmailCodePurpose.LOGIN, "127.0.0.1");
+            for (String purpose : new String[]{"null", "\"\"", "\"PASSWORD_RESET\"", "\"register\"", "0"}) {
+                mvc.perform(post("/api/v1/auth/email-code").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"test@example.com\",\"purpose\":" + purpose + "}")
+                        .cookie(cookie).header("X-XSRF-TOKEN", token))
+                        .andExpect(status().isBadRequest());
+            }
+            verifyNoMoreInteractions(mail);
+
+            var registration = context.getBean(RegisterService.class);
+            String registerBody = "{\"username\":\"owner\",\"password\":\"password123\",\"email\":\"test@example.com\"";
+            mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                    .content(registerBody + ",\"emailCode\":\"123456\"}"))
+                    .andExpect(status().isForbidden());
+            for (String suffix : new String[]{"}", ",\"emailCode\":\"abc\"}", ",\"emailCode\":null}"}) {
+                mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(registerBody + suffix).cookie(cookie).header("X-XSRF-TOKEN", token))
+                        .andExpect(status().isBadRequest());
+            }
+            verifyNoInteractions(registration);
+            when(registration.register(any(RegisterRequest.class))).thenReturn("registered-user");
+            mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                    .content(registerBody + ",\"emailCode\":\"123456\"}")
+                    .cookie(cookie).header("X-XSRF-TOKEN", token))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data").value("registered-user"));
+            verify(registration).register(argThat(r -> "test@example.com".equals(r.getEmail())
+                    && "123456".equals(r.getEmailCode())));
+
             for (String path : new String[]{"/api/v1/auth/email-code", "/api/v1/auth/me",
                     "/api/v1/auth/account/security", "/api/v1/auth/sso/unknown"}) {
                 mvc.perform(get(path)).andExpect(status().isUnauthorized());

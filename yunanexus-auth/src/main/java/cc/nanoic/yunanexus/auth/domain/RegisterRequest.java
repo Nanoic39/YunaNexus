@@ -8,7 +8,7 @@ import lombok.Data;
 /**
  * 注册请求。<p>
  *
- * 用户名、密码必填；邮箱、手机号可选但至少提供一种联系方式（供找回 / 申诉反馈）。
+ * 用户名、密码、邮箱及注册用途的邮箱验证码必填。手机号能力仍由独立开关控制。
  *
  * @author yunanexus
  */
@@ -26,8 +26,14 @@ public class RegisterRequest {
     @Size(min = 8, max = 64, message = "密码长度需在 8~64 之间")
     private String password;
 
-    /** 邮箱（可选） */
+    /** 邮箱（服务层与发码共用格式检查，落库前统一去空格、转小写） */
+    @NotBlank(message = "邮箱不能为空")
     private String email;
+
+    /** 注册用途的一次性邮箱验证码 */
+    @NotBlank(message = "邮箱验证码不能为空")
+    @Pattern(regexp = "^[0-9]{6}$", message = "邮箱验证码需为 6 位数字")
+    private String emailCode;
 
     /** 手机号国家号（手机号存在时默认 +86） */
     private String mobileCountry;

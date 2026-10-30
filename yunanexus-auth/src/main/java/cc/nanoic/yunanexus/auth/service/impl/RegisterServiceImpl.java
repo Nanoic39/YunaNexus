@@ -2,6 +2,8 @@ package cc.nanoic.yunanexus.auth.service.impl;
 
 import cc.nanoic.yunanexus.auth.client.MetaIdClient;
 import cc.nanoic.yunanexus.auth.config.AuthProperties;
+import cc.nanoic.yunanexus.auth.domain.EmailAddress;
+import cc.nanoic.yunanexus.auth.domain.EmailCodePurpose;
 import cc.nanoic.yunanexus.auth.domain.RegisterRequest;
 import cc.nanoic.yunanexus.auth.entity.AuthUser;
 import cc.nanoic.yunanexus.auth.mapper.AuthUserMapper;
@@ -17,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -62,6 +65,7 @@ public class RegisterServiceImpl implements RegisterService {
     private final ShardAllocator shardAllocator;
     private final RegisterPersistenceService registerPersistenceService;
     private final AuthProperties properties;
+    private final EmailCodeService emailCodeService;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private cc.nanoic.yunanexus.auth.task.RegisterOutboxCompensationTask registrationSync;
@@ -75,7 +79,8 @@ public class RegisterServiceImpl implements RegisterService {
             Clock clock,
             ShardAllocator shardAllocator,
             RegisterPersistenceService registerPersistenceService,
-            AuthProperties properties) {
+            AuthProperties properties,
+            EmailCodeService emailCodeService) {
         this.authUserMapper = authUserMapper;
         this.metaIdClient = metaIdClient;
         this.externalIdGenerator = externalIdGenerator;
@@ -85,10 +90,20 @@ public class RegisterServiceImpl implements RegisterService {
         this.shardAllocator = shardAllocator;
         this.registerPersistenceService = registerPersistenceService;
         this.properties = properties;
+        this.emailCodeService = emailCodeService;
     }
 
     @Override
     public String register(RegisterRequest request) {
+        // Do not rely on controller validation: internal callers must not bypass proof of ownership.
+        if (request == null || !hasText(request.getUsername())) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "账号不能为空");
+        }
+        String email = EmailAddress.normalize(request.getEmail());
+        if (email == null) throw new BizException(ErrorCode.BAD_REQUEST, "请提供有效邮箱");
+        if (request.getEmailCode() == null || !request.getEmailCode().matches("[0-9]{6}")) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "请提供 6 位邮箱验证码");
+        }
         String username = request.getUsername().trim();
         RLock lock = redissonClient.getLock(LOCK_KEY + username);
         boolean locked;
@@ -102,7 +117,7 @@ public class RegisterServiceImpl implements RegisterService {
             throw new BizException(ErrorCode.REGISTER_PROCESSING);
         }
         try {
-            return doRegister(request, username);
+            return doRegister(request, username, email);
         } finally {
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
@@ -111,7 +126,7 @@ public class RegisterServiceImpl implements RegisterService {
     }
 
     /** 实际注册逻辑（锁内执行）。 */
-    private String doRegister(RegisterRequest request, String username) {
+    private String doRegister(RegisterRequest request, String username, String email) {
         // 手机号功能默认关闭（无 SMS 能力无法校验归属）：注册不接受手机号 / 国家号
         if (!properties.isMobileEnabled()
                 && (hasText(request.getMobile()) || hasText(request.getMobileCountry()))) {
@@ -121,9 +136,7 @@ public class RegisterServiceImpl implements RegisterService {
         if (authUserMapper.selectByUsername(username) != null) {
             throw new BizException(ErrorCode.REGISTER_USER_ALREADY_EXISTS);
         }
-        if (request.getEmail() != null
-                && !request.getEmail().isBlank()
-                && authUserMapper.selectByEmail(request.getEmail().trim()) != null) {
+        if (authUserMapper.selectByEmail(email) != null) {
             throw new BizException(ErrorCode.REGISTER_USER_ALREADY_EXISTS);
         }
         String mobileCountry = resolveMobileCountry(request);
@@ -144,8 +157,17 @@ public class RegisterServiceImpl implements RegisterService {
         String externalId = externalIdGenerator.encode(userId, shardIndex);
 
         // 同一本地事务写入 auth_user + 注册 outbox
-        AuthUser user = buildUser(request, username, mobileCountry, userId, shardIndex, externalId);
-        registerPersistenceService.persistWithOutbox(user);
+        AuthUser user = buildUser(request, username, email, mobileCountry, userId, shardIndex, externalId);
+        // Preflight/ID/encoding failures preserve the code. Consume before any account is persisted,
+        // so concurrent usernames cannot reuse a single challenge. A DB failure requires a new code.
+        if (!emailCodeService.verify(email, EmailCodePurpose.REGISTER, request.getEmailCode())) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "邮箱验证码错误或已过期，请重新获取");
+        }
+        try {
+            registerPersistenceService.persistWithOutbox(user);
+        } catch (DuplicateKeyException error) {
+            throw new BizException(ErrorCode.REGISTER_USER_ALREADY_EXISTS);
+        }
         // The proxied persistence call has committed; the default role and profile are idempotent.
         if (registrationSync != null) registrationSync.synchronizeRegistered(user);
 
@@ -157,6 +179,7 @@ public class RegisterServiceImpl implements RegisterService {
     private AuthUser buildUser(
             RegisterRequest request,
             String username,
+            String email,
             String mobileCountry,
             long userId,
             int shardIndex,
@@ -166,7 +189,7 @@ public class RegisterServiceImpl implements RegisterService {
         user.setShardIndex(shardIndex);
         user.setExternalId(externalId);
         user.setUsername(username);
-        user.setEmail(blankToNull(request.getEmail()));
+        user.setEmail(email);
         user.setMobileCountry(mobileCountry);
         user.setMobile(blankToNull(request.getMobile()));
         user.setPassword(passwordEncoder.encode(request.getPassword()));

@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.auth.controller;
 
 import cc.nanoic.yunanexus.auth.domain.CaptchaResult;
+import cc.nanoic.yunanexus.auth.domain.EmailCodeRequest;
 import cc.nanoic.yunanexus.auth.domain.LoginRequest;
 import cc.nanoic.yunanexus.auth.domain.LoginResult;
 import cc.nanoic.yunanexus.auth.domain.MeResponse;
@@ -67,15 +68,15 @@ public class AuthController {
     }
 
     /**
-     * 发送邮箱验证码（注册校验 / 找回密码共用）。
+     * 发送按用途隔离的邮箱验证码；找回密码使用独立流程。
      *
-     * @param body 请求体，含 email
+     * @param body 请求体，含 email 和可选 purpose（默认 REGISTER）
      * @return 是否已发送
      */
     @PostMapping("/email-code")
     public Result<Boolean> sendEmailCode(
-            @RequestBody java.util.Map<String, String> body, HttpServletRequest request) {
-        return Result.success(emailCodeService.send(body.get("email"), clientIp(request)));
+            @Valid @RequestBody EmailCodeRequest body, HttpServletRequest request) {
+        return Result.success(emailCodeService.send(body.getEmail(), body.getPurpose(), clientIp(request)));
     }
 
     @PostMapping("/refresh")

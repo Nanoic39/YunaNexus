@@ -1,5 +1,7 @@
 package cc.nanoic.yunanexus.auth.service.impl;
 
+import cc.nanoic.yunanexus.auth.domain.EmailCodePurpose;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -100,7 +102,7 @@ class EmailCodeServiceRedisIntegrationTest {
         assertNotEquals(code(messages.getFirst()), stored.substring(stored.indexOf('|') + 1));
         assertTrue(redis.getExpire(key(email)) > 590);
         assertTrue(redis.getExpire(key(email)) <= 600);
-        assertTrue(redis.getExpire(key(email) + ":cooldown") > 50);
+        assertTrue(redis.getExpire(mailboxKey(email) + ":cooldown") > 50);
         assertTrue(keys.stream().noneMatch(k -> k.contains(email) || k.contains(ip)));
         assertTrue(service.verify(email.toUpperCase(Locale.ROOT), code(messages.getFirst())));
         assertFalse(service.verify(email, code(messages.getFirst())));
@@ -109,7 +111,7 @@ class EmailCodeServiceRedisIntegrationTest {
 
     @Test
     void invalidEmailAndMissingMailChannelNeverReserveOrSend() {
-        for (String invalid : new String[] {null, "", "bad", "a b@example.invalid", "a".repeat(255)})
+        for (String invalid : new String[] {null, "", "bad", "a b@example.invalid", "a..b@example.invalid", "a@-bad.example", "a\r\nBcc:b@example.invalid", "a".repeat(255)})
             assertFalse(service.send(invalid, ip));
         when(provider.getIfAvailable()).thenReturn(null);
         assertFalse(service.send(email, ip));
@@ -124,7 +126,7 @@ class EmailCodeServiceRedisIntegrationTest {
         assertEquals(1, result.stream().filter(Boolean::booleanValue).count());
         assertEquals(1, messages.size());
         assertFalse(service.send(email, "another-source"));
-        assertEquals("1", redis.opsForValue().get(key(email) + ":day"));
+        assertEquals("1", redis.opsForValue().get(mailboxKey(email) + ":day"));
     }
 
     @Test
@@ -170,7 +172,7 @@ class EmailCodeServiceRedisIntegrationTest {
         assertTrue(service.send(email, ip));
         assertFalse(service.verify(email, "bad"));
         String oldValue = redis.opsForValue().get(key(email));
-        redis.delete(key(email) + ":cooldown");
+        redis.delete(mailboxKey(email) + ":cooldown");
         assertTrue(service.send(email, ip));
         assertNotEquals(oldValue, redis.opsForValue().get(key(email)));
         assertFalse(redis.hasKey(key(email) + ":attempts"));
@@ -180,15 +182,15 @@ class EmailCodeServiceRedisIntegrationTest {
     @Test
     void dailyMailboxQuotaCannotBeBypassedByChangingIp() {
         for (int i = 0; i < 10; i++) {
-            redis.delete(key(email) + ":cooldown");
+            redis.delete(mailboxKey(email) + ":cooldown");
             String source = ip + "-" + i;
             remember(email, source);
             assertTrue(service.send(email, source));
         }
-        redis.delete(key(email) + ":cooldown");
+        redis.delete(mailboxKey(email) + ":cooldown");
         assertFalse(service.send(email, ip));
         assertEquals(10, messages.size());
-        assertTrue(redis.getExpire(key(email) + ":day") > 86300);
+        assertTrue(redis.getExpire(mailboxKey(email) + ":day") > 86300);
     }
 
     @Test
@@ -201,7 +203,7 @@ class EmailCodeServiceRedisIntegrationTest {
         assertFalse(service.send(email, ip));
         assertEquals(20, messages.size());
         assertTrue(redis.getExpire(ipKey(ip)) > 590);
-        assertFalse(redis.hasKey(key(email) + ":cooldown"));
+        assertFalse(redis.hasKey(mailboxKey(email) + ":cooldown"));
     }
 
     @Test
@@ -210,8 +212,8 @@ class EmailCodeServiceRedisIntegrationTest {
                 .when(sender).send(any(SimpleMailMessage.class));
         assertFalse(service.send(email, ip));
         assertFalse(redis.hasKey(key(email)));
-        assertFalse(redis.hasKey(key(email) + ":cooldown"));
-        assertEquals("1", redis.opsForValue().get(key(email) + ":day"));
+        assertFalse(redis.hasKey(mailboxKey(email) + ":cooldown"));
+        assertEquals("1", redis.opsForValue().get(mailboxKey(email) + ":day"));
         doNothing().when(sender).send(any(SimpleMailMessage.class));
         assertTrue(service.send(email, ip));
     }
@@ -234,14 +236,14 @@ class EmailCodeServiceRedisIntegrationTest {
             Future<Boolean> first = executor.submit(() -> service.send(email, ip));
             try {
                 assertTrue(entered.await(10, TimeUnit.SECONDS));
-                redis.delete(key(email) + ":cooldown"); // Simulate expiry while SMTP is blocked.
+                redis.delete(mailboxKey(email) + ":cooldown"); // Simulate expiry while SMTP is blocked.
                 assertTrue(service.send(email, ip));
             } finally {
                 release.countDown();
             }
             assertFalse(first.get(10, TimeUnit.SECONDS));
         }
-        assertTrue(redis.hasKey(key(email) + ":cooldown"));
+        assertTrue(redis.hasKey(mailboxKey(email) + ":cooldown"));
         assertTrue(service.verify(email, code(messages.getLast())));
     }
 
@@ -263,15 +265,57 @@ class EmailCodeServiceRedisIntegrationTest {
             Future<Boolean> first = executor.submit(() -> service.send(email, ip));
             try {
                 assertTrue(entered.await(10, TimeUnit.SECONDS));
-                redis.delete(key(email) + ":cooldown");
+                redis.delete(mailboxKey(email) + ":cooldown");
                 assertTrue(service.send(email, ip));
             } finally {
                 release.countDown();
             }
             assertFalse(first.get(10, TimeUnit.SECONDS));
         }
-        assertTrue(redis.hasKey(key(email) + ":cooldown"));
+        assertTrue(redis.hasKey(mailboxKey(email) + ":cooldown"));
         assertTrue(service.verify(email, code(messages.getLast())));
+    }
+
+    @Test
+    void purposesHaveIndependentChallengesAndFailureBudgetsWithSharedMailboxCooldown() {
+        assertTrue(service.send(email, EmailCodePurpose.LOGIN, ip));
+        String loginCode = code(messages.getFirst());
+        assertTrue(messages.getFirst().getSubject().contains("登录"));
+        assertFalse(service.send(email, EmailCodePurpose.REGISTER, ip));
+        assertFalse(service.verify(email, loginCode)); // The legacy method means REGISTER only.
+        assertFalse(redis.hasKey(key(email)));
+
+        redis.delete(mailboxKey(email) + ":cooldown");
+        assertTrue(service.send(email, ip));
+        String registerCode = code(messages.getLast());
+        assertTrue(messages.getLast().getSubject().contains("注册"));
+        for (int i = 0; i < 5; i++) assertFalse(service.verify(email, "wrong"));
+        assertFalse(service.verify(email, registerCode));
+        assertTrue(service.verify(email, EmailCodePurpose.LOGIN, loginCode));
+        assertFalse(service.verify(email, EmailCodePurpose.LOGIN, loginCode));
+        assertEquals("2", redis.opsForValue().get(mailboxKey(email) + ":day"));
+    }
+
+    @Test
+    void unknownPurposeAndUnscopedLegacyChallengesCannotBeUsed() {
+        assertFalse(service.send(email, null, ip));
+        assertFalse(service.verify(email, null, "123456"));
+        verifyNoInteractions(sender);
+        redis.opsForValue().set(mailboxKey(email), "legacy|" + hash("123456"), Duration.ofMinutes(10));
+        assertFalse(service.verify(email, "123456"));
+        assertFalse(service.verify(email, EmailCodePurpose.LOGIN, "123456"));
+    }
+
+    @Test
+    void dailyQuotaIsSharedAcrossPurposes() {
+        for (int i = 0; i < 10; i++) {
+            redis.delete(mailboxKey(email) + ":cooldown");
+            assertTrue(service.send(email, i % 2 == 0 ? EmailCodePurpose.REGISTER : EmailCodePurpose.LOGIN, ip));
+        }
+        redis.delete(mailboxKey(email) + ":cooldown");
+        assertFalse(service.send(email, EmailCodePurpose.LOGIN, ip));
+        assertFalse(service.send(email, EmailCodePurpose.REGISTER, ip));
+        assertEquals(10, messages.size());
     }
 
     private List<Boolean> concurrent(int count, BooleanSupplier action) throws Exception {
@@ -292,8 +336,9 @@ class EmailCodeServiceRedisIntegrationTest {
     }
 
     private void remember(String address, String source) {
-        keys.addAll(List.of(key(address), key(address) + ":cooldown", key(address) + ":attempts",
-                key(address) + ":day", ipKey(source)));
+        keys.addAll(List.of(key(address), key(address) + ":attempts",
+                key(address, EmailCodePurpose.LOGIN), key(address, EmailCodePurpose.LOGIN) + ":attempts",
+                mailboxKey(address) + ":cooldown", mailboxKey(address) + ":day", ipKey(source), mailboxKey(address)));
     }
 
     private static String code(SimpleMailMessage message) {
@@ -303,6 +348,14 @@ class EmailCodeServiceRedisIntegrationTest {
     }
 
     private static String key(String address) {
+        return key(address, EmailCodePurpose.REGISTER);
+    }
+
+    private static String key(String address, EmailCodePurpose purpose) {
+        return "auth:email-code:" + purpose.name() + ":" + hash(address.trim().toLowerCase(Locale.ROOT));
+    }
+
+    private static String mailboxKey(String address) {
         return "auth:email-code:" + hash(address.trim().toLowerCase(Locale.ROOT));
     }
 

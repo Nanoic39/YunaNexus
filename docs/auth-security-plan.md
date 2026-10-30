@@ -309,4 +309,8 @@ public record MeResponse(
 
 当前生产入口使用 Docker userland proxy，nginx 观察到的公网请求来源统一为 `172.29.10.1`，因此上述 IP 配额暂由公网用户共享。需要调整入口网络才能恢复真实来源；不能通过信任客户端传入的 XFF 绕过这一限制。入口必须覆盖转发头，避免框架将伪造地址解析为可信来源。
 
-本次仅打通发码与安全边界，`EmailCodeService` 尚未接入注册或邮箱验证码登录。接入这些消费方前需按用途隔离验证码。找回密码已有独立 `PasswordRecoveryService` 流程，不应误用通用发码接口替代。
+注册现已接入 `EmailCodeService`：`POST /api/v1/auth/email-code` 接收 `{email,purpose}`，用途仅接受 `REGISTER` 或 `LOGIN`，省略时默认 `REGISTER`，显式空值、未知值或其它类型返回 400。挑战与失败次数按用途隔离，邮箱/IP 的冷却和配额跨用途共享；升级前未分用途的旧挑战不再接受。
+
+`POST /api/v1/auth/register` 必须提供有效邮箱与六位 `emailCode`，只能消费 `REGISTER` 挑战。邮箱去首尾空格并转小写，长度上限与现有数据库列统一为 128。唯一性预检、取号及外部 ID 编码失败不消费码；验证码在落库前原子消费，跨 Redis/MySQL 无分布式事务，持久化失败后需等待冷却重新发码。并发重复由数据库唯一键兜底并映射为 409。
+
+`LOGIN` 挑战仅保留隔离空间，尚未接入邮箱验证码登录。找回密码已有独立 `PasswordRecoveryService` 流程，不应误用通用发码接口替代。前后端应配套发布，否则旧客户端注册请求缺少验证码会被拒绝。

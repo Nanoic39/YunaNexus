@@ -1,5 +1,7 @@
 package cc.nanoic.yunanexus.auth.service.impl;
 
+import cc.nanoic.yunanexus.auth.domain.EmailAddress;
+import cc.nanoic.yunanexus.auth.domain.EmailCodePurpose;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -85,20 +87,26 @@ public class EmailCodeService {
 
     /** 同邮箱每 60 秒一次、每日十次；同来源 IP 每十分钟二十次。 */
     public boolean send(String email, String ip) {
-        String normalized = normalizeEmail(email);
-        if (normalized == null) return false;
+        return send(email, EmailCodePurpose.REGISTER, ip);
+    }
+
+    /** 挑战与失败次数按用途隔离；所有用途共用邮箱/IP 配额，防止切换用途绕过限流。 */
+    public boolean send(String email, EmailCodePurpose purpose, String ip) {
+        String normalized = EmailAddress.normalize(email);
+        if (normalized == null || purpose == null) return false;
         JavaMailSender sender = mailSenderProvider.getIfAvailable();
         if (sender == null) {
             log.warn("邮件通道未配置，无法发送邮箱验证码");
             return false;
         }
 
-        String key = KEY_PREFIX + hash(normalized);
-        String cooldown = key + ":cooldown";
+        String mailboxKey = KEY_PREFIX + hash(normalized);
+        String key = challengeKey(normalized, purpose);
+        String cooldown = mailboxKey + ":cooldown";
         String nonce = UUID.randomUUID().toString();
         String source = ip == null || ip.isBlank() ? "unknown" : ip.trim();
         Long reserved = redisTemplate.execute(RESERVE,
-                List.of(cooldown, key + ":day", KEY_PREFIX + "ip:" + hash(source)), nonce);
+                List.of(cooldown, mailboxKey + ":day", KEY_PREFIX + "ip:" + hash(source)), nonce);
         if (!Long.valueOf(1).equals(reserved)) return false;
 
         String code = String.format(Locale.ROOT, "%06d", RANDOM.nextInt(1_000_000));
@@ -110,8 +118,8 @@ public class EmailCodeService {
             SimpleMailMessage message = new SimpleMailMessage();
             if (from != null && !from.isBlank()) message.setFrom(from);
             message.setTo(normalized);
-            message.setSubject("YunaNexus 邮箱验证码");
-            message.setText("您的验证码是 " + code + "，10 分钟内有效。\n\n"
+            message.setSubject("YunaNexus " + purpose.description() + "验证码");
+            message.setText("您正在" + purpose.description() + "，验证码是 " + code + "，10 分钟内有效。\n\n"
                     + "如果这不是您本人的操作，请忽略本邮件。\n\n"
                     + "本邮件由 YunaNexus 自动发送，请勿直接回复。");
             sender.send(message);
@@ -130,19 +138,22 @@ public class EmailCodeService {
 
     /** 校验和消费在同一 Redis 脚本内；错误输入也消耗一次尝试。 */
     public boolean verify(String email, String code) {
-        String normalized = normalizeEmail(email);
-        if (normalized == null) return false;
-        String key = KEY_PREFIX + hash(normalized);
+        return verify(email, EmailCodePurpose.REGISTER, code);
+    }
+
+    public boolean verify(String email, EmailCodePurpose purpose, String code) {
+        String normalized = EmailAddress.normalize(email);
+        if (normalized == null || purpose == null) return false;
+        String key = challengeKey(normalized, purpose);
         String candidate = code == null || !code.trim().matches("[0-9]{6}")
                 ? "invalid" : hash(code.trim());
         return Long.valueOf(1).equals(redisTemplate.execute(VERIFY,
                 List.of(key, key + ":attempts"), candidate));
     }
 
-    private static String normalizeEmail(String email) {
-        if (email == null || email.length() > 254) return null;
-        String normalized = email.trim().toLowerCase(Locale.ROOT);
-        return normalized.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$") ? normalized : null;
+    private static String challengeKey(String normalized, EmailCodePurpose purpose) {
+        // Legacy unscoped challenges are intentionally not accepted after the rollout.
+        return KEY_PREFIX + purpose.name() + ":" + hash(normalized);
     }
 
     private static String hash(String value) {

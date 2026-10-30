@@ -297,6 +297,8 @@ class AuthHttpStatusMappingTest {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("bobby");
         req.setPassword("password123");
+        req.setEmail("bobby@example.invalid");
+        req.setEmailCode("123456");
 
         mockMvc.perform(post("/api/v1/auth/register", csrf, req))
                 .andExpect(status().isConflict())
@@ -312,6 +314,8 @@ class AuthHttpStatusMappingTest {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("bobby");
         req.setPassword("password123");
+        req.setEmail("bobby@example.invalid");
+        req.setEmailCode("123456");
 
         mockMvc.perform(post("/api/v1/auth/register", csrf, req))
                 .andExpect(status().isConflict());
@@ -341,6 +345,8 @@ class AuthHttpStatusMappingTest {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("bobby");
         req.setPassword("password123");
+        req.setEmail("bobby@example.invalid");
+        req.setEmailCode("123456");
 
         mockMvc.perform(post("/api/v1/auth/register", csrf, req))
                 .andExpect(status().isServiceUnavailable())
