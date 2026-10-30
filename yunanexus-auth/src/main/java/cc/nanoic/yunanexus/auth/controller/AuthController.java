@@ -79,6 +79,20 @@ public class AuthController {
         return Result.success(emailCodeService.send(body.getEmail(), body.getPurpose(), clientIp(request)));
     }
 
+    /**
+     * 邮箱验证码登录（免密码）。
+     */
+    @cc.nanoic.yunanexus.common.audit.annotation.AuditAction(
+            module = "auth", action = "LOGIN_EMAIL_CODE", risk = "HIGH")
+    @PostMapping("/login/email-code")
+    public Result<LoginResult> loginByEmailCode(
+            @Valid @RequestBody cc.nanoic.yunanexus.auth.domain.EmailCodeLoginRequest request,
+            HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        LoginResult result = authService.loginByEmailCode(request, clientIp(httpRequest));
+        ssoService.establish(result, httpRequest, httpResponse);
+        return Result.success(result);
+    }
+
     @PostMapping("/refresh")
     public Result<LoginResult> refresh(@Valid @RequestBody RefreshRequest request) {
         return Result.success(authService.refresh(request.getRefreshToken()));

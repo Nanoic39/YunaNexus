@@ -1,5 +1,6 @@
 package cc.nanoic.yunanexus.auth.service;
 
+import cc.nanoic.yunanexus.auth.domain.EmailCodeLoginRequest;
 import cc.nanoic.yunanexus.auth.domain.LoginRequest;
 import cc.nanoic.yunanexus.auth.domain.LoginResult;
 import cc.nanoic.yunanexus.auth.domain.MeResponse;
@@ -25,6 +26,15 @@ public interface AuthService {
      * @return 令牌响应（access + refresh + 外部 ID）
      */
     LoginResult login(LoginRequest request, String ip);
+
+    /**
+     * 邮箱验证码登录（免密码）。
+     *
+     * @param request 登录请求
+     * @param ip      来源 IP
+     * @return 登录结果
+     */
+    LoginResult loginByEmailCode(EmailCodeLoginRequest request, String ip);
 
     /**
      * 刷新令牌（轮转：旧 refresh 作废，签发新 access + refresh）。

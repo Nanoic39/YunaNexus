@@ -68,6 +68,10 @@ public class AuthServiceImpl implements AuthService {
     /** 字段注入：避免改动构造签名牵连既有测试；测试环境为 null 时跳过通知 */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private LoginLockNotifier loginLockNotifier;
+
+    /** 字段注入：避免改动构造签名牵连既有测试 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private EmailCodeService emailCodeService;
     private final cc.nanoic.yunanexus.auth.service.impl.LoginGuardService loginGuardService;
     private final CaptchaService captchaService;
     private final TokenService tokenService;
@@ -199,6 +203,46 @@ public class AuthServiceImpl implements AuthService {
 
         recordAttempt(user.getUsername(), user.getUserId(), request.getClientCode(), true, null, ip);
         log.info("登录成功 userId={} client={}", user.getUserId(), client.getClientCode());
+        return result;
+    }
+
+    @Override
+    public LoginResult loginByEmailCode(cc.nanoic.yunanexus.auth.domain.EmailCodeLoginRequest request, String ip) {
+        AuthClient client = requireEnabledClient(request.getClientCode());
+        if (!cc.nanoic.yunanexus.auth.entity.ApplicationCategory.allowsPassword(client.getApplicationCategory())) {
+            throw new BizException(ErrorCode.FORBIDDEN, "此应用仅允许授权码登录");
+        }
+        // 验证码一次性消费；用途绑定 LOGIN，防止拿注册码来登录
+        if (!emailCodeService.verify(request.getEmail(), cc.nanoic.yunanexus.auth.domain.EmailCodePurpose.LOGIN,
+                request.getEmailCode())) {
+            recordAttempt(request.getEmail(), null, client.getClientCode(), false, "EMAIL_CODE_INVALID", ip);
+            throw new BizException(ErrorCode.BAD_CREDENTIALS);
+        }
+        AuthUser user = authUserMapper.selectByEmail(request.getEmail());
+        if (user == null) {
+            recordAttempt(request.getEmail(), null, client.getClientCode(), false, "USER_NOT_FOUND", ip);
+            throw new BizException(ErrorCode.BAD_CREDENTIALS);
+        }
+        checkStatus(user);
+        // 验证码登录同样受分级处置约束：否则攻击者可绕过密码失败计数反复刷验证码
+        if (loginAttemptService.isLocked(user.getUsername())) {
+            recordAttempt(user.getUsername(), user.getUserId(), client.getClientCode(), false, "USER_LOCKED", ip);
+            throw new BizException(ErrorCode.USER_LOCKED);
+        }
+        AuthPlatform platform = authPlatformMapper.selectByUserIdAndClient(user.getUserId(), client.getClientCode());
+        if (platform == null || platform.getStatus() == null || platform.getStatus() != 1) {
+            recordAttempt(user.getUsername(), user.getUserId(), client.getClientCode(),
+                    false, "PLATFORM_AUTH_REVOKED", ip);
+            throw new BizException(ErrorCode.PLATFORM_AUTH_REVOKED);
+        }
+        if (Integer.valueOf(1).equals(user.getPasswordResetRequired())) {
+            throw new BizException(ErrorCode.BAD_REQUEST, "请先通过邮箱重置流程设置新密码");
+        }
+        String epoch = accountEpochService.currentOrCreate(user.getUserId());
+        loginAttemptService.reset(user.getUsername());
+        authUserMapper.resetFailCountOnLoginSuccess(user.getUsername(), now(), ip);
+        LoginResult result = issueTokensAndSession(user, client.getClientCode(), ip, epoch);
+        recordAttempt(user.getUsername(), user.getUserId(), client.getClientCode(), true, "EMAIL_CODE_LOGIN", ip);
         return result;
     }
 
