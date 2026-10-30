@@ -298,3 +298,13 @@ public record MeResponse(
 - 禁止在凭证失败时返回 403（应为 401），授权失败 403，基础设施故障 503。
 - 禁止实现 Logback 转换器（未宣称已实现）。
 - 禁止生产环境使用非 TLS 明文凭据。
+
+## 10. 匿名端点契约与公开邮箱发码（2026-10-30）
+
+`common-core` 的 `AuthPublicEndpoints` 是 auth 匿名端点唯一声明，按精确 HTTP 方法与路径匹配。auth 的 `SecurityConfig` 与 gateway 的 `JwtAuthFilter` 共同使用，包含 `POST /api/v1/auth/email-code`。新增匿名端点时修改这份契约，同时构建并发布 auth 和 gateway；网关外部 `permit-paths` 中遗留的 auth 路径或通配符不能扩展该契约。管理入口仍委托 auth 的管理员鉴权过滤器，内部校验接口与健康检查仍由各服务自身规则控制。
+
+匿名不代表免 CSRF。浏览器先通过 `GET /api/v1/auth/csrf` 取得 Cookie 与令牌，再调用发码等写接口。错误方法、未知认证路径和个人账号接口仍要求认证。
+
+公开邮箱发码使用当前 Redis standalone 的 Lua 原子操作：同邮箱 60 秒冷却、24 小时最多 10 次，同来源 IP 10 分钟最多 20 次；发送失败仍消耗窗口配额但释放本次冷却。验证码有效期 10 分钟，最多 5 次错误，校验成功立即消费。Redis 键使用邮箱/IP 摘要，值保存验证码摘要，日志不包含收件人或验证码。多键限流脚本尚不支持 Redis Cluster 跨槽部署。
+
+本次仅打通发码与安全边界，`EmailCodeService` 尚未接入注册或邮箱验证码登录。接入这些消费方前需按用途隔离验证码。找回密码已有独立 `PasswordRecoveryService` 流程，不应误用通用发码接口替代。

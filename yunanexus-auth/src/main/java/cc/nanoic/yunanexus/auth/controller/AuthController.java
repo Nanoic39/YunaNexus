@@ -73,8 +73,9 @@ public class AuthController {
      * @return 是否已发送
      */
     @PostMapping("/email-code")
-    public Result<Boolean> sendEmailCode(@RequestBody java.util.Map<String, String> body) {
-        return Result.success(emailCodeService.send(body.get("email")));
+    public Result<Boolean> sendEmailCode(
+            @RequestBody java.util.Map<String, String> body, HttpServletRequest request) {
+        return Result.success(emailCodeService.send(body.get("email"), clientIp(request)));
     }
 
     @PostMapping("/refresh")

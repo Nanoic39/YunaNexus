@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.gateway.filter;
 
 import cc.nanoic.yunanexus.common.core.util.SecureExternalIdGenerator;
+import cc.nanoic.yunanexus.common.core.security.AuthPublicEndpoints;
 import cc.nanoic.yunanexus.gateway.config.GatewayProperties;
 import cc.nanoic.yunanexus.gateway.security.GatewayAuthException;
 import cc.nanoic.yunanexus.gateway.security.GatewayErrorCodes;
@@ -85,7 +86,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
                 });
         }
 
-        if (isPermitted(sanitized.getPath().value())) {
+        if (isPermitted(sanitized.getMethod().name(), sanitized.getPath().value())) {
             return chain.filter(sanitizedExchange);
         }
 
@@ -137,7 +138,12 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
         return Ordered.HIGHEST_PRECEDENCE + 10;
     }
 
-    private boolean isPermitted(String path) {
+    private boolean isPermitted(String method, String path) {
+        if (AuthPublicEndpoints.isAuthPath(path)) {
+            // Admin credentials are checked by auth's AdminAuthenticationFilter, not JWT here.
+            return AuthPublicEndpoints.matches(method, path)
+                    || path.equals("/api/v1/auth/admin") || path.startsWith("/api/v1/auth/admin/");
+        }
         for (String pattern : properties.getPermitPaths()) {
             if (pathMatcher.match(pattern, path)) {
                 return true;

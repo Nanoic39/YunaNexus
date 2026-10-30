@@ -633,3 +633,9 @@ python3 /YunaNexus/platform/ops/reload-edge-config.py
 脚本通过本项目的 compose.sh 使用已有镜像创建无端口的一次性容器检查新挂载配置，再重建本项目 edge，校验宿主机与容器内配置 SHA256 一致并再次 nginx -t。不会操作全局 Docker 或其他业务。重建会短暂中断 edge 连接，应在变更窗口执行。其他单文件挂载的应用配置采用相同原则，配置变更后重建对应项目容器。
 
 登录限流保持原有5次/分钟与突发配置；超限返回429 JSON及Retry-After，前端能够展示可读文案，不能用降低限流强度来让测试通过。
+
+### Auth 匿名访问回归
+
+`python3 ops/smoke-auth-public.py` 验证 3000/3001 两个入口的公开发码、CSRF、登录态和管理端隔离，默认仅提交非法邮箱，不发送邮件或修改业务账号。用 `--base-url`、`--admin-base-url` 可以完全替换默认目标。经测试邮箱所有者授权后，添加 `--email <测试邮箱>` 会通过第一个入口发送一封验证码邮件，并立即验证重发冷却；日志不输出邮箱、Cookie 或令牌。HTTP 成功表示 SMTP 接受投递，收件箱送达仍需收件人确认。
+
+Auth 匿名端点由 `common-core/AuthPublicEndpoints` 声明，需同时发布 auth 和 gateway。外部配置中旧的 auth 白名单不再覆盖该契约；非 auth 路径和已登录用户的 permission 白名单保持各自用途。

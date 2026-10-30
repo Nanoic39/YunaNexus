@@ -4,6 +4,7 @@ import cc.nanoic.yunanexus.auth.security.AdminAuthenticationFilter;
 import cc.nanoic.yunanexus.auth.security.JwtAuthenticationFilter;
 import cc.nanoic.yunanexus.auth.security.SecurityErrorWriter;
 import cc.nanoic.yunanexus.auth.service.AuthenticationService;
+import cc.nanoic.yunanexus.common.core.security.AuthPublicEndpoints;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -111,24 +112,22 @@ public class SecurityConfig {
                 .accessDeniedHandler((request, response, accessDeniedException) ->
                     securityErrorWriter.write(response, 403, "无权限"))
             )
-            .authorizeHttpRequests(auth -> auth
+            .authorizeHttpRequests(auth -> {
+                for (var endpoint : AuthPublicEndpoints.endpoints()) {
+                    auth.requestMatchers(HttpMethod.valueOf(endpoint.method()), endpoint.path()).permitAll();
+                }
+                auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/internal/auth/admin/check", "/internal/auth/admin/super-check", "/internal/auth/admin/identity", "/internal/auth/oauth/allow").authenticated()
-                .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/auth/captcha").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/register",
-                    "/api/v1/auth/refresh", "/api/v1/auth/unlock-appeal",
-                    "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/verify", "/api/v1/auth/password-reset/complete",
-                    "/api/v1/auth/sso/token", "/api/v1/auth/sso/authorize").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout", "/api/v1/auth/logout-all").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
                 .requestMatchers("/api/v1/auth/account/**").authenticated()
                 .requestMatchers(HttpMethod.POST,"/api/v1/auth/application/permissions/check").authenticated()
                 .requestMatchers(HttpMethod.POST,"/internal/auth/api-key/verify").permitAll()
                 .requestMatchers(AdminAuthenticationFilter.ADMIN_PATH_PREFIX + "/**").hasRole("ADMIN")
-                .anyRequest().denyAll()
-            )
+                .anyRequest().denyAll();
+            })
             .addFilterBefore(jwtFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(adminFilter, JwtAuthenticationFilter.class);
 

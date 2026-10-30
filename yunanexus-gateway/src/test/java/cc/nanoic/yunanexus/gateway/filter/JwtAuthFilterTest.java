@@ -1,6 +1,7 @@
 package cc.nanoic.yunanexus.gateway.filter;
 
 import cc.nanoic.yunanexus.common.core.util.SecureExternalIdGenerator;
+import cc.nanoic.yunanexus.common.core.security.AuthPublicEndpoints;
 import cc.nanoic.yunanexus.gateway.config.GatewayProperties;
 import cc.nanoic.yunanexus.gateway.security.JwtVerifier;
 import cc.nanoic.yunanexus.gateway.security.TokenBlacklistChecker;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.server.ServerWebExchange;
@@ -67,7 +69,8 @@ class JwtAuthFilterTest {
     void setUp() {
         GatewayProperties props = new GatewayProperties();
         props.setIssuer("yunanexus");
-        props.setPermitPaths(List.of("/api/v1/auth/login", "/actuator/**"));
+        // Simulate an old external config: auth wildcards must not broaden the shared contract.
+        props.setPermitPaths(List.of("/api/v1/auth/**", "/actuator/**"));
         GatewayProperties.Key key = new GatewayProperties.Key();
         key.setKid("v1");
         key.setPublicKeyBase64(Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded()));
@@ -92,7 +95,7 @@ class JwtAuthFilterTest {
     @Test
     void permittedPathPassesWithoutToken() {
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/v1/auth/login").build());
+                MockServerHttpRequest.post("/api/v1/auth/login").build());
 
         filter.filter(exchange, capturingChain()).block();
 
@@ -109,6 +112,38 @@ class JwtAuthFilterTest {
 
         assertEquals(401, exchange.getResponse().getStatusCode().value());
         assertNull(captured.get());
+    }
+
+    @Test
+    void sharedPublicContractPassesWithoutJwtEvenWhenExternalConfigOmitsIt() {
+        for (var endpoint : AuthPublicEndpoints.endpoints()) {
+            captured.set(null);
+            var exchange = MockServerWebExchange.from(MockServerHttpRequest
+                    .method(HttpMethod.valueOf(endpoint.method()), endpoint.path()).build());
+            filter.filter(exchange, capturingChain()).block();
+            assertNotNull(captured.get(), endpoint.toString());
+            assertNull(exchange.getResponse().getStatusCode(), endpoint.toString());
+        }
+    }
+
+    @Test
+    void legacyAuthWildcardCannotExposeProtectedUnknownOrWrongMethodEndpoints() {
+        for (String path : List.of("/api/v1/auth/me", "/api/v1/auth/account/security",
+                "/api/v1/auth/email-code", "/api/v1/auth/login", "/api/v1/auth/sso/unknown",
+                "/api/v1/auth/password-reset/unknown")) {
+            captured.set(null);
+            var exchange = MockServerWebExchange.from(MockServerHttpRequest.get(path).build());
+            filter.filter(exchange, capturingChain()).block();
+            assertEquals(401, exchange.getResponse().getStatusCode().value(), path);
+            assertNull(captured.get(), path);
+        }
+    }
+
+    @Test
+    void adminCredentialsAreDelegatedToAuth() {
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/api/v1/auth/admin/clients").build());
+        filter.filter(exchange, capturingChain()).block();
+        assertNotNull(captured.get());
     }
 
     @Test
@@ -159,7 +194,7 @@ class JwtAuthFilterTest {
     @Test
     void permittedPathStripsIdentityHeaders() {
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/v1/auth/login")
+                MockServerHttpRequest.post("/api/v1/auth/login")
                         .header("X-User-Id", "999")
                         .build());
 
