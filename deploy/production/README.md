@@ -639,3 +639,5 @@ python3 /YunaNexus/platform/ops/reload-edge-config.py
 `python3 ops/smoke-auth-public.py` 验证 3000/3001 两个入口的公开发码、CSRF、登录态和管理端隔离，默认仅提交非法邮箱，不发送邮件或修改业务账号。用 `--base-url`、`--admin-base-url` 可以完全替换默认目标。经测试邮箱所有者授权后，添加 `--email <测试邮箱>` 会通过第一个入口发送一封验证码邮件，并立即验证重发冷却；日志不输出邮箱、Cookie 或令牌。HTTP 成功表示 SMTP 接受投递，收件箱送达仍需收件人确认。
 
 Auth 匿名端点由 `common-core/AuthPublicEndpoints` 声明，需同时发布 auth 和 gateway。外部配置中旧的 auth 白名单不再覆盖该契约；非 auth 路径和已登录用户的 permission 白名单保持各自用途。
+
+`python3 ops/configure-forwarded-headers.py` 默认检查 nginx 转发头；增加 `--apply` 会保存 root 专用备份并在原 inode 写回配置。随后先执行 `ops/compose.sh exec -T edge nginx -t`，成功后再 `nginx -s reload`。该脚本覆盖 XFF、清除外来 Forwarded/prefix/ssl/port，并从实际请求重建 host/proto；若容器与宿主文件哈希原本不一致，应采用前述 `reload-edge-config.py` 重建挂载。当前 Docker userland proxy 仍会丢失真实客户端地址，发码的 IP 限额暂由公网用户共享；头清理只防伪造，不能恢复源地址。
